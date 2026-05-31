@@ -1,0 +1,445 @@
+
+================================
+  PFLOTRAN Development Version
+================================
+
+"grid_structured_type" set to default value.
+pflotran card:: GRID
+pflotran card:: MATERIAL_PROPERTY
+  Name :: soil
+pflotran card:: CHARACTERISTIC_CURVES
+  Name :: cc_vg
+ WARNING: Mualem-van Genuchten relative permeability function is being used without SMOOTH option.
+pflotran card:: OUTPUT
+pflotran card:: TIME
+pflotran card:: REGION
+all
+pflotran card:: REGION
+top
+pflotran card:: REGION
+bottom
+pflotran card:: FLOW_CONDITION
+initial
+pflotran card:: INITIAL_CONDITION
+"Initial Condition name" set to default value.
+pflotran card:: STRATA
+pflotran card:: END_SUBSURFACE
+
+Number of processes: 1
+
+Extent of Gridded Domain
+ X: 0.000000E+00 - 1.000000E+00
+ Y: 0.000000E+00 - 1.000000E+00
+ Z: 0.000000E+00 - 2.000000E+00
+
+Size of Gridded Domain
+ Number of grid cells: 80
+
+Min/Max Cell Volumes [m^3]
+ Maximum: 2.500000E-02
+ Minimum: 2.500000E-02
+
+Number of active grid cells: 80
+Number of inactive grid cells: 0
+
+Default HDF5 method is used in Initialization
+  Beginning setup of FLOW SNES
+ number of dofs =   1, number of phases =   1
+ mode = Richards: p
+  Finished setting up FLOW SNES
+
+ Requested processors and decomposition =     1, npx,y,z=   -1  -1  -1
+ Actual decomposition: npx,y,z=    1   1   1
+
+
+FLOW Time Stepper SNES
+      maximum number of steps: 999999
+constant time steps threshold: 5
+       maximum number of cuts: 16
+             reduction factor: 5.000000E-01
+        maximum growth factor: 2.000000E+00
+                 acceleration: on
+       acceleration threshold: 5
+       number of ramp entries: 5
+                ramp entry #1: 2.0000
+                ramp entry #2: 2.0000
+                ramp entry #3: 2.0000
+                ramp entry #4: 2.0000
+                ramp entry #5: 2.0000
+                ramp entry #6: 1.8000
+                ramp entry #7: 1.6000
+                ramp entry #8: 1.4000
+                ramp entry #9: 1.2000
+               ramp entry #10: 1.0000
+               ramp entry #11: 1.0000
+               ramp entry #12: 1.0000
+               ramp entry #13: 1.0000
+
+FLOW Newton Solver
+                         atol: 1.000000E-50
+                         rtol: 1.000000E-08
+                         stol: 1.000000E-08
+                         dtol: 1.000000E+04
+                      maxnorm: 1.000000E+20
+                    inftolres: -9.990000E+02
+                    inftolupd: -9.990000E+02
+                 inftolrelupd: -9.990000E+02
+                 inftolsclres: -9.990000E+02
+                     max iter: 50
+                     min iter: 1
+                         maxf: 10000
+                  matrix type: baij
+         precond. matrix type: baij
+               inexact newton: off
+            print convergence: on
+   print detailed convergence: off
+          check infinity norm: on
+
+FLOW Linear Solver
+                       solver: bcgs
+               preconditioner: ilu
+                         atol: 1.000000E-50
+                         rtol: 1.000000E-05
+                         dtol: 1.000000E+04
+            maximum iteration: 10000
+
+ --> write tecplot output file: pflotran-000.tec
+ --> write tecplot velocity output file: pflotran-vel-000.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+ Finished Initialization
+
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 1.62E-11 2x: 0.00E+00 2u: 0.00E+00 ir: 1.39E-11 iu: 0.00E+00 rsn:   0
+  1 2r: 1.05E-15 2x: 8.20E+05 2u: 7.55E-07 ir: 3.33E-16 iu: 7.14E-07 rsn: stol
+
+ Step      1 Time=  1.15741E-05 Dt=  1.15741E-05 [day] conv_reason: 4
+  newton =   1 [       1] linear =     1 [         1] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.104812E-14 0.131015E-16 0.333067E-15
+  --> max change: dpmx=   7.1390E-07
+
+ --> write tecplot output file: pflotran-001.tec
+ --> write tecplot velocity output file: pflotran-vel-001.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 1.60E-11 2x: 0.00E+00 2u: 0.00E+00 ir: 1.37E-11 iu: 0.00E+00 rsn:   0
+  1 2r: 4.70E-16 2x: 8.20E+05 2u: 1.47E-06 ir: 1.67E-16 iu: 1.38E-06 rsn: stol
+
+ Step      2 Time=  3.47222E-05 Dt=  2.31481E-05 [day] conv_reason: 4
+  newton =   1 [       2] linear =     1 [         2] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.470004E-15 0.587506E-17 0.166533E-15
+  --> max change: dpmx=   1.3754E-06
+
+ --> write tecplot output file: pflotran-002.tec
+ --> write tecplot velocity output file: pflotran-vel-002.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 1.58E-11 2x: 0.00E+00 2u: 0.00E+00 ir: 1.32E-11 iu: 0.00E+00 rsn:   0
+  1 2r: 2.29E-16 2x: 8.20E+05 2u: 2.79E-06 ir: 8.33E-17 iu: 2.57E-06 rsn: stol
+
+ Step      3 Time=  8.10185E-05 Dt=  4.62963E-05 [day] conv_reason: 4
+  newton =   1 [       3] linear =     1 [         3] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.229299E-15 0.286623E-17 0.832667E-16
+  --> max change: dpmx=   2.5688E-06
+
+ --> write tecplot output file: pflotran-003.tec
+ --> write tecplot velocity output file: pflotran-vel-003.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 1.54E-11 2x: 0.00E+00 2u: 0.00E+00 ir: 1.23E-11 iu: 0.00E+00 rsn:   0
+  1 2r: 1.12E-16 2x: 8.20E+05 2u: 5.14E-06 ir: 3.47E-17 iu: 4.57E-06 rsn: stol
+
+ Step      4 Time=  1.73611E-04 Dt=  9.25926E-05 [day] conv_reason: 4
+  newton =   1 [       4] linear =     1 [         4] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.111994E-15 0.139992E-17 0.346945E-16
+  --> max change: dpmx=   4.5744E-06
+
+ --> write tecplot output file: pflotran-004.tec
+ --> write tecplot velocity output file: pflotran-vel-004.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 1.49E-11 2x: 0.00E+00 2u: 0.00E+00 ir: 1.09E-11 iu: 0.00E+00 rsn:   0
+  1 2r: 7.34E-17 2x: 8.20E+05 2u: 9.19E-06 ir: 4.16E-17 iu: 7.68E-06 rsn: stol
+
+ Step      5 Time=  3.58796E-04 Dt=  1.85185E-04 [day] conv_reason: 4
+  newton =   1 [       5] linear =     1 [         5] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.733523E-16 0.916904E-18 0.416334E-16
+  --> max change: dpmx=   7.6769E-06
+
+ --> write tecplot output file: pflotran-005.tec
+ --> write tecplot velocity output file: pflotran-vel-005.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 1.42E-11 2x: 0.00E+00 2u: 0.00E+00 ir: 9.18E-12 iu: 0.00E+00 rsn:   0
+  1 2r: 4.22E-17 2x: 8.20E+05 2u: 1.61E-05 ir: 1.39E-17 iu: 1.22E-05 rsn: stol
+
+ Step      6 Time=  7.29167E-04 Dt=  3.70370E-04 [day] conv_reason: 4
+  newton =   1 [       6] linear =     1 [         6] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.421809E-16 0.527261E-18 0.138778E-16
+  --> max change: dpmx=   1.2218E-05
+
+ --> write tecplot output file: pflotran-006.tec
+ --> write tecplot velocity output file: pflotran-vel-006.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 1.35E-11 2x: 0.00E+00 2u: 0.00E+00 ir: 9.07E-12 iu: 0.00E+00 rsn:   0
+  1 2r: 1.77E-17 2x: 8.20E+05 2u: 2.76E-05 ir: 6.94E-18 iu: 1.88E-05 rsn: stol
+
+ Step      7 Time=  1.46991E-03 Dt=  7.40741E-04 [day] conv_reason: 4
+  newton =   1 [       7] linear =     1 [         7] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.176855E-16 0.221068E-18 0.693889E-17
+  --> max change: dpmx=   1.8821E-05
+
+ --> write tecplot output file: pflotran-007.tec
+ --> write tecplot velocity output file: pflotran-vel-007.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 1.26E-11 2x: 0.00E+00 2u: 0.00E+00 ir: 8.22E-12 iu: 0.00E+00 rsn:   0
+  1 2r: 1.19E-17 2x: 8.20E+05 2u: 4.69E-05 ir: 6.07E-18 iu: 2.84E-05 rsn: stol
+
+ Step      8 Time=  2.95139E-03 Dt=  1.48148E-03 [day] conv_reason: 4
+  newton =   1 [       8] linear =     1 [         8] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.119262E-16 0.149078E-18 0.607153E-17
+  --> max change: dpmx=   2.8441E-05
+
+ --> write tecplot output file: pflotran-008.tec
+ --> write tecplot velocity output file: pflotran-vel-008.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 1.15E-11 2x: 0.00E+00 2u: 0.00E+00 ir: 6.80E-12 iu: 0.00E+00 rsn:   0
+  1 2r: 7.76E-18 2x: 8.20E+05 2u: 7.88E-05 ir: 3.90E-18 iu: 4.22E-05 rsn: stol
+
+ Step      9 Time=  5.91435E-03 Dt=  2.96296E-03 [day] conv_reason: 4
+  newton =   1 [       9] linear =     1 [         9] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.775868E-17 0.969835E-19 0.390313E-17
+  --> max change: dpmx=   4.2220E-05
+
+ --> write tecplot output file: pflotran-009.tec
+ --> write tecplot velocity output file: pflotran-vel-009.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 1.02E-11 2x: 0.00E+00 2u: 0.00E+00 ir: 5.44E-12 iu: 0.00E+00 rsn:   0
+  1 2r: 1.52E-17 2x: 8.20E+05 2u: 1.31E-04 ir: 1.08E-17 iu: 6.15E-05 rsn: stol
+
+ Step     10 Time=  1.18403E-02 Dt=  5.92593E-03 [day] conv_reason: 4
+  newton =   1 [      10] linear =     1 [        10] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.151936E-16 0.189920E-18 0.108420E-16
+  --> max change: dpmx=   6.1511E-05
+
+ --> write tecplot output file: pflotran-010.tec
+ --> write tecplot velocity output file: pflotran-vel-010.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 8.80E-12 2x: 0.00E+00 2u: 0.00E+00 ir: 4.43E-12 iu: 0.00E+00 rsn:   0
+  1 2r: 7.06E-18 2x: 8.20E+05 2u: 2.17E-04 ir: 4.88E-18 iu: 8.80E-05 rsn: stol
+
+ Step     11 Time=  2.36921E-02 Dt=  1.18519E-02 [day] conv_reason: 4
+  newton =   1 [      11] linear =     1 [        11] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.705981E-17 0.882477E-19 0.487891E-17
+  --> max change: dpmx=   8.7961E-05
+
+ --> write tecplot output file: pflotran-011.tec
+ --> write tecplot velocity output file: pflotran-vel-011.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 7.40E-12 2x: 0.00E+00 2u: 0.00E+00 ir: 3.36E-12 iu: 0.00E+00 rsn:   0
+  1 2r: 6.11E-18 2x: 8.20E+05 2u: 3.57E-04 ir: 3.36E-18 iu: 1.35E-04 rsn: stol
+
+ Step     12 Time=  4.73958E-02 Dt=  2.37037E-02 [day] conv_reason: 4
+  newton =   1 [      12] linear =     1 [        12] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.610771E-17 0.763464E-19 0.336103E-17
+  --> max change: dpmx=   1.3547E-04
+
+ --> write tecplot output file: pflotran-012.tec
+ --> write tecplot velocity output file: pflotran-vel-012.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 6.04E-12 2x: 0.00E+00 2u: 0.00E+00 ir: 2.53E-12 iu: 0.00E+00 rsn:   0
+  1 2r: 4.86E-18 2x: 8.20E+05 2u: 5.87E-04 ir: 2.90E-18 iu: 2.44E-04 rsn: stol
+
+ Step     13 Time=  9.48032E-02 Dt=  4.74074E-02 [day] conv_reason: 4
+  newton =   1 [      13] linear =     1 [        13] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.485662E-17 0.607077E-19 0.290024E-17
+  --> max change: dpmx=   2.4445E-04
+
+ --> write tecplot output file: pflotran-013.tec
+ --> write tecplot velocity output file: pflotran-vel-013.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 4.78E-12 2x: 0.00E+00 2u: 0.00E+00 ir: 1.84E-12 iu: 0.00E+00 rsn:   0
+  1 2r: 7.65E-18 2x: 8.20E+05 2u: 9.60E-04 ir: 4.47E-18 iu: 4.16E-04 rsn: stol
+
+ Step     14 Time=  1.89618E-01 Dt=  9.48148E-02 [day] conv_reason: 4
+  newton =   1 [      14] linear =     1 [        14] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.765296E-17 0.956621E-19 0.447233E-17
+  --> max change: dpmx=   4.1576E-04
+
+ --> write tecplot output file: pflotran-014.tec
+ --> write tecplot velocity output file: pflotran-vel-014.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 3.68E-12 2x: 0.00E+00 2u: 0.00E+00 ir: 1.30E-12 iu: 0.00E+00 rsn:   0
+  1 2r: 2.68E-18 2x: 8.20E+05 2u: 8.88E-04 ir: 1.40E-18 iu: 3.81E-04 rsn: stol
+
+ Step     15 Time=  2.89618E-01 Dt=  1.00000E-01 [day] conv_reason: 4
+  newton =   1 [      15] linear =     1 [        15] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.267591E-17 0.334489E-19 0.139591E-17
+  --> max change: dpmx=   3.8111E-04
+
+ --> write tecplot output file: pflotran-015.tec
+ --> write tecplot velocity output file: pflotran-vel-015.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 3.05E-12 2x: 0.00E+00 2u: 0.00E+00 ir: 1.02E-12 iu: 0.00E+00 rsn:   0
+  1 2r: 1.20E-17 2x: 8.20E+05 2u: 8.10E-04 ir: 8.27E-18 iu: 3.39E-04 rsn: stol
+
+ Step     16 Time=  3.89618E-01 Dt=  1.00000E-01 [day] conv_reason: 4
+  newton =   1 [      16] linear =     1 [        16] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.120440E-16 0.150550E-18 0.826704E-17
+  --> max change: dpmx=   3.3912E-04
+
+ --> write tecplot output file: pflotran-016.tec
+ --> write tecplot velocity output file: pflotran-vel-016.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 2.66E-12 2x: 0.00E+00 2u: 0.00E+00 ir: 8.52E-13 iu: 0.00E+00 rsn:   0
+  1 2r: 4.18E-18 2x: 8.20E+05 2u: 7.55E-04 ir: 2.51E-18 iu: 3.07E-04 rsn: stol
+
+ Step     17 Time=  4.89618E-01 Dt=  1.00000E-01 [day] conv_reason: 4
+  newton =   1 [      17] linear =     1 [        17] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.418490E-17 0.523112E-19 0.250722E-17
+  --> max change: dpmx=   3.0735E-04
+
+ --> write tecplot output file: pflotran-017.tec
+ --> write tecplot velocity output file: pflotran-vel-017.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 2.38E-12 2x: 0.00E+00 2u: 0.00E+00 ir: 7.37E-13 iu: 0.00E+00 rsn:   0
+  1 2r: 4.30E-18 2x: 8.20E+05 2u: 7.13E-04 ir: 2.71E-18 iu: 2.83E-04 rsn: stol
+
+ Step     18 Time=  5.89618E-01 Dt=  1.00000E-01 [day] conv_reason: 4
+  newton =   1 [      18] linear =     1 [        18] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.429750E-17 0.537188E-19 0.271051E-17
+  --> max change: dpmx=   2.8257E-04
+
+ --> write tecplot output file: pflotran-018.tec
+ --> write tecplot velocity output file: pflotran-vel-018.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 2.17E-12 2x: 0.00E+00 2u: 0.00E+00 ir: 6.54E-13 iu: 0.00E+00 rsn:   0
+  1 2r: 4.61E-18 2x: 8.20E+05 2u: 6.80E-04 ir: 2.89E-18 iu: 2.63E-04 rsn: stol
+
+ Step     19 Time=  6.89618E-01 Dt=  1.00000E-01 [day] conv_reason: 4
+  newton =   1 [      19] linear =     1 [        19] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.461018E-17 0.576273E-19 0.288669E-17
+  --> max change: dpmx=   2.6273E-04
+
+ --> write tecplot output file: pflotran-019.tec
+ --> write tecplot velocity output file: pflotran-vel-019.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 2.00E-12 2x: 0.00E+00 2u: 0.00E+00 ir: 5.93E-13 iu: 0.00E+00 rsn:   0
+  1 2r: 5.54E-18 2x: 8.20E+05 2u: 6.53E-04 ir: 2.83E-18 iu: 2.46E-04 rsn: stol
+
+ Step     20 Time=  7.89618E-01 Dt=  1.00000E-01 [day] conv_reason: 4
+  newton =   1 [      20] linear =     1 [        20] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.554162E-17 0.692703E-19 0.283248E-17
+  --> max change: dpmx=   2.4648E-04
+
+ --> write tecplot output file: pflotran-020.tec
+ --> write tecplot velocity output file: pflotran-vel-020.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 1.87E-12 2x: 0.00E+00 2u: 0.00E+00 ir: 5.45E-13 iu: 0.00E+00 rsn:   0
+  1 2r: 4.14E-18 2x: 8.20E+05 2u: 6.30E-04 ir: 2.09E-18 iu: 2.33E-04 rsn: stol
+
+ Step     21 Time=  8.89618E-01 Dt=  1.00000E-01 [day] conv_reason: 4
+  newton =   1 [      21] linear =     1 [        21] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.414419E-17 0.518023E-19 0.208709E-17
+  --> max change: dpmx=   2.3289E-04
+
+ --> write tecplot output file: pflotran-021.tec
+ --> write tecplot velocity output file: pflotran-vel-021.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 1.76E-12 2x: 0.00E+00 2u: 0.00E+00 ir: 5.06E-13 iu: 0.00E+00 rsn:   0
+  1 2r: 5.74E-18 2x: 8.20E+05 2u: 6.11E-04 ir: 3.56E-18 iu: 2.21E-04 rsn: stol
+
+ Step     22 Time=  9.89618E-01 Dt=  1.00000E-01 [day] conv_reason: 4
+  newton =   1 [      22] linear =     1 [        22] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.573535E-17 0.716919E-19 0.356431E-17
+  --> max change: dpmx=   2.2135E-04
+
+ --> write tecplot output file: pflotran-022.tec
+ --> write tecplot velocity output file: pflotran-vel-022.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+== RICHARDS FLOW ===============================================================
+  0 2r: 1.66E-12 2x: 0.00E+00 2u: 0.00E+00 ir: 4.73E-13 iu: 0.00E+00 rsn:   0
+  1 2r: 8.47E-18 2x: 8.20E+05 2u: 6.32E-05 ir: 5.10E-18 iu: 2.29E-05 rsn: stol
+
+ Step     23 Time=  1.00000E+00 Dt=  1.03819E-02 [day] conv_reason: 4
+  newton =   1 [      23] linear =     1 [        23] cuts =  0 [   0]
+  --> SNES Linear/Non-Linear Iterations = 1 / 1
+  --> SNES Residual: 0.847396E-17 0.105925E-18 0.509575E-17
+  --> max change: dpmx=   2.2858E-05
+
+ --> write tecplot output file: pflotran-023.tec
+ --> write tecplot velocity output file: pflotran-vel-023.tec
+      0.00 Seconds to write to Tecplot file(s)
+
+PMCSubsurfaceFlow
+ Total Time: 6.2426E-03 seconds
+
+ FLOW TS SNES steps = 23  newton = 23  linear = 23  cuts = 0
+ FLOW TS SNES Wasted Linear Iterations = 0
+ FLOW TS SNES Wasted Newton Iterations = 0
+ FLOW TS SNES time = 0.0 seconds
+
+ Wall Clock Time:  3.5360E-02 [sec]   5.8933E-04 [min]   9.8222E-06 [hr]
+COMMAND: /opt/petsc/linux-gnu-c-opt/bin/mpirun -n 1 /opt/pflotran/src/pflotran/pflotran -pflotranin pflotran.in
+

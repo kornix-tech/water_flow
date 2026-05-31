@@ -1,0 +1,13 @@
+TEST_SUITE_STATUS=DRY_RUN
+tests_total=1
+tests_passed=0
+tests_passed_with_warnings=0
+tests_failed=1
+
+_test_linear_darcy=GENERATED
+
+warnings_total=0
+unexpected_warnings_total=0
+solver_errors_total=0
+solver_divergences_total=0
+solver_cuts_total=0

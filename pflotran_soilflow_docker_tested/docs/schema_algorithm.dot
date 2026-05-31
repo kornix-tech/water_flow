@@ -1,0 +1,68 @@
+digraph soilflow_algorithm {
+	graph [fontname="DejaVu Sans" fontsize=13 label="Алгоритм сборки образа и запуска demo-задачи PFLOTRAN/Richards" labelloc=t nodesep=0.5 rankdir=TB ranksep=0.65 splines=ortho]
+	node [fontname="DejaVu Sans" fontsize=10 margin="0.08,0.05" shape=box style="rounded,filled"]
+	edge [fontname="DejaVu Sans" fontsize=9]
+	start [label="Старт
+WSL Ubuntu + Docker" fillcolor="#fff2cc" shape=oval]
+	build_cmd [label="./scripts/build_image.sh
+или make build" fillcolor="#d9ead3"]
+	docker_build [label="docker build
+Dockerfile" fillcolor="#cfe2f3"]
+	builder [label="Builder stage:
+apt packages → git clone PETSc → configure/make
+→ git clone PFLOTRAN → make pflotran" fillcolor="#cfe2f3"]
+	runtime [label="Runtime stage:
+копирование PETSc/PFLOTRAN
+копирование Python-адаптера, XLSX, docs
+dry-run проверка генерации input" fillcolor="#eadcf8"]
+	image [label="Docker image
+soilflow-pflotran:local" fillcolor="#eadcf8" shape=cylinder]
+	run_cmd [label="./scripts/run_demo_docker.sh
+или make run" fillcolor="#d9ead3"]
+	docker_run [label="docker run --network none
+volume: output → /work или /workspace/output" fillcolor="#d9ead3"]
+	entry [label="entrypoint: demo / run-demo" fillcolor="#eadcf8"]
+	py [label="python3 soilflow_pflotran.py
+--xlsx ... --workdir ... --run" fillcolor="#d9ead3"]
+	xlsx_load [label="load_workbook(data_only=True)
+чтение листов 01–09 и 10_Weather_Daily" fillcolor="#d9ead3"]
+	validate [label="Проверка и преобразование параметров
+as_float/as_int/as_bool
+контроль θr < θs, n > 1, Ks > 0" fillcolor="#d9ead3"]
+	derive [label="Расчёт производных параметров
+Sr = θr/θs
+m = 1 - 1/n
+permeability = Ks μ/(ρg)
+mean top flux" fillcolor="#d9ead3"]
+	write_files [label="Запись файлов задачи
+pflotran.in
+forcing_daily.csv
+soilflow_run_summary.txt" fillcolor="#f4cccc"]
+	find_exe [label="Поиск PFLOTRAN_EXE
+в контейнере: /opt/pflotran/src/pflotran/pflotran" fillcolor="#fce5cd"]
+	mpirun [label="mpirun -n N pflotran
+-pflotranin pflotran.in" fillcolor="#fce5cd"]
+	results [label="Результаты
+run_pflotran.log
+PFLOTRAN TECPLOT output
+сводка и форсинг" fillcolor="#f4cccc" shape=folder]
+	end [label="Конец
+файлы доступны в output/" fillcolor="#fff2cc" shape=oval]
+	start -> build_cmd
+	build_cmd -> docker_build
+	docker_build -> builder
+	builder -> runtime
+	runtime -> image
+	image -> run_cmd
+	run_cmd -> docker_run
+	docker_run -> entry
+	entry -> py
+	py -> xlsx_load
+	xlsx_load -> validate
+	validate -> derive
+	derive -> write_files
+	write_files -> find_exe
+	find_exe -> mpirun
+	mpirun -> results
+	results -> end
+}

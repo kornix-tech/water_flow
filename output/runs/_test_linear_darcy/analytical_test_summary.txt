@@ -1,0 +1,37 @@
+SoilFlow/PFLOTRAN _test summary
+=================================
+
+Status: GENERATED
+Test case: linear_darcy_saturated_column
+
+Physical model:
+  1D saturated homogeneous isotropic column.
+  Linearized Richards equation: K(h)=Ks=const; no sources/sinks; no evaporation.
+  PFLOTRAN equation uses qz = -Ks*d(P/(rho*g) + z)/dz for the z-up saturated form.
+  Test BC: top constant flux + bottom reference pressure; steady bottom flux must equal imposed top flux.
+
+Geometry:
+  column_height_m = 2
+  nx,ny,nz        = 1,1,80
+
+Parameters:
+  porosity         = 0.43
+  ksat_m_s         = 5.00000000e-06
+  intrinsic_perm   = 4.55139132e-13 m2
+  rho_water        = 997 kg/m3
+  mu_water         = 0.00089 Pa*s
+  gravity          = 9.80665 m/s2
+
+Boundary/reference values:
+  bottom_pressure_pa = 125000  (Dirichlet/reference)
+  top_pressure_pa    = 109356.43  (analytical expected value, not imposed)
+  imposed_flux_z_m_s = -1.00000000e-06  (analytical qz; negative means downward)
+  top_boundary_liquid_flux = 1.00000000e-06  (PFLOTRAN Neumann, inward-positive at top)
+
+Analytical solution:
+  P(z) = P_bottom - rho*g*(1 + qz/Ks)*z
+  z=0 is bottom; z=L is top; qz is PFLOTRAN +z-direction flux.
+
+Acceptance tolerances:
+  abs pressure tolerance = 10 Pa
+  rel pressure tolerance = 0.001

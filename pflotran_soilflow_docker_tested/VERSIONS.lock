@@ -1,0 +1,7 @@
+# Build-time defaults. They can be overridden with docker build --build-arg or docker/build_image.sh env vars.
+UBUNTU_VERSION=24.04
+PETSC_VERSION=v3.24.5
+PETSC_ARCH=linux-opt
+PFLOTRAN_GIT_URL=https://bitbucket.org/pflotran/pflotran
+PFLOTRAN_REF=master
+PYTHON_REQUIREMENTS=requirements.txt

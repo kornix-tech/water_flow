@@ -1,0 +1,23 @@
+SoilFlow/PFLOTRAN run summary
+=============================
+
+Project: demo_richards_soil_column
+Model mode: RICHARDS
+Dimension: 1
+
+Derived parameters:
+  residual_saturation = 0.10465116
+  vg_m                = 0.35897436
+  alpha_pa_inv        = 3.68202444e-04 1/Pa
+  perm_x              = 1.02483014e-13 m2
+  perm_y              = 1.02483014e-13 m2
+  perm_z              = 1.02483014e-13 m2
+  mean_top_flux       = 2.74470899e-08 m/s
+
+Weather summary:
+  days                = 7
+  mean net input      = 2.371 mm/day
+
+Note:
+  The current demo maps Weather to a constant mean top flux.
+  Root uptake, drainage and dynamic groundwater are configured in XLSX as extension contracts.

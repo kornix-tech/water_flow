@@ -1,0 +1,109 @@
+export type JobStatus = "queued" | "running" | "success" | "failed" | "cancelled";
+
+export interface HealthResponse {
+  status: string;
+  service: string;
+}
+
+export interface SystemInfo {
+  soilflow_home: string;
+  workspace: string;
+  pflotran_exe: string;
+  pflotran_exists: boolean;
+  job_workers: number;
+  auth_mode: string;
+  frontend_available: boolean;
+  api_docs_enabled: boolean;
+  hsts_enabled: boolean;
+  api_rate_limit_per_minute: number;
+}
+
+export interface JobRead {
+  id: string;
+  kind: string;
+  status: JobStatus;
+  command: string[];
+  run_name: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  exit_code: number | null;
+  log_path: string;
+  output_dir: string;
+  error_message: string | null;
+  calculation_id: number | null;
+}
+
+export interface JobCreated {
+  job_id: string;
+  status: JobStatus;
+  run_name: string | null;
+}
+
+export interface RunInfo {
+  run_name: string;
+  path: string;
+  has_test_status: boolean;
+  has_suite_status: boolean;
+  has_visualization: boolean;
+  files: string[];
+}
+
+export interface InputField {
+  sheet: string;
+  row: number;
+  section: string | null;
+  key: string;
+  value: string | number | boolean | null;
+  value_type: "text" | "number" | "boolean" | "date" | string;
+  unit: string | null;
+  description: string | null;
+  pflotran: string | null;
+  note: string | null;
+}
+
+export interface WeatherRow {
+  row: number | null;
+  date: string;
+  precipitation_mm_day: number;
+  irrigation_mm_day: number;
+  epot_mm_day: number;
+  tpot_mm_day: number;
+  groundwater_depth_m: number | null;
+  comment: string | null;
+}
+
+export interface InputTab {
+  id: string;
+  title: string;
+  kind: "fields" | "weather" | string;
+  description: string | null;
+  fields: InputField[];
+  weather: WeatherRow[];
+}
+
+export interface InputWorkbook {
+  filename: string;
+  updated_at: string | null;
+  tabs: InputTab[];
+  calculation_id: number | null;
+  calculation_title: string | null;
+  calculation_created_at: string | null;
+  calculation_status: string | null;
+}
+
+export interface CalculationSummary {
+  id: number;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  run_name: string | null;
+  job_id: string | null;
+  status: string;
+  result_dir: string | null;
+  has_results: boolean;
+}
+
+export interface CalculationRead extends CalculationSummary {
+  input: InputWorkbook;
+}

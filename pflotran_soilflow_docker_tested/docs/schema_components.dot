@@ -1,0 +1,138 @@
+digraph soilflow_components {
+	graph [concentrate=false fontname="DejaVu Sans" fontsize=13 label="Компонентная схема Docker-пакета SoilFlow/PFLOTRAN" labelloc=t nodesep=0.55 rankdir=LR ranksep=0.85 splines=ortho]
+	node [fontname="DejaVu Sans" fontsize=10 margin="0.08,0.05" shape=box style="rounded,filled"]
+	edge [fontname="DejaVu Sans" fontsize=9]
+	subgraph cluster_host {
+		color="#7f8c8d" fontname="DejaVu Sans" fontsize=12 label="Хост: WSL Ubuntu 24.04 + Docker" style=rounded
+		user [label="Пользователь
+команды shell" fillcolor="#fff2cc"]
+		build_sh [label="scripts/build_image.sh
+или docker/build_image.sh" fillcolor="#d9ead3"]
+		run_sh [label="scripts/run_demo_docker.sh
+или docker/run_demo.sh" fillcolor="#d9ead3"]
+		save_load [label="save_image.sh / load_image.sh
+перенос образа" fillcolor="#d9ead3"]
+		out_host [label="output/
+каталог результатов
+на хосте" fillcolor="#fce5cd"]
+	}
+	subgraph cluster_build {
+		color="#6fa8dc" fontname="DejaVu Sans" fontsize=12 label="Dockerfile: стадия builder" style=rounded
+		ubuntu_build [label="ubuntu:24.04
+компиляторы, git, make" fillcolor="#cfe2f3"]
+		petsc_build [label="PETSc
+MPICH, HDF5, BLAS/LAPACK,
+METIS/ParMETIS" fillcolor="#cfe2f3"]
+		pflotran_build [label="PFLOTRAN
+сборка pflotran binary" fillcolor="#cfe2f3"]
+	}
+	subgraph cluster_runtime {
+		color="#8e7cc3" fontname="DejaVu Sans" fontsize=12 label="Docker image: runtime" style=rounded
+		runtime_libs [label="runtime libraries
+PETSc + PFLOTRAN + Python3" fillcolor="#eadcf8"]
+		entrypoint [label="docker/entrypoint.sh
+команды: demo, run-demo,
+generate, check, pflotran, shell" fillcolor="#eadcf8"]
+		check [label="soilflow-check
+самопроверка контейнера" fillcolor="#eadcf8"]
+		app [label="/opt/soilflow/
+код + XLSX + docs" fillcolor="#eadcf8"]
+	}
+	subgraph cluster_adapter {
+		color="#93c47d" fontname="DejaVu Sans" fontsize=12 label="Python-адаптер: scripts/soilflow_pflotran.py" style=rounded
+		xlsx [label="input/soilflow_pflotran_demo.xlsx
+табличные исходные данные" fillcolor="#d9ead3"]
+		read [label="read_params()
+read_weather()" fillcolor="#d9ead3"]
+		derived [label="compute_derived()
+θr/θs → Sr
+Ks → permeability
+α 1/m → α 1/Pa
+средний top flux" fillcolor="#d9ead3"]
+		generate [label="generate_pflotran_input()
+PFLOTRAN input deck
+RICHARDS mode" fillcolor="#d9ead3"]
+		write [label="write_weather_csv()
+write_summary()" fillcolor="#d9ead3"]
+		runner [label="run_native()
+mpirun/pflotran
+лог выполнения" fillcolor="#d9ead3"]
+	}
+	subgraph cluster_pflotran {
+		color="#e69138" fontname="DejaVu Sans" fontsize=12 label="PFLOTRAN расчётное ядро" style=rounded
+		pflotran [label="pflotran -pflotranin pflotran.in
+SIMULATION_TYPE SUBSURFACE
+MODE RICHARDS" fillcolor="#fce5cd"]
+		fvm [label="FVM / integrated finite volume
+структурированная сетка
+1D/2D/3D через NXYZ" fillcolor="#fce5cd"]
+		vg [label="van Genuchten saturation
+Mualem VG relative permeability" fillcolor="#fce5cd"]
+		bc [label="Boundary conditions
+верх: LIQUID_FLUX NEUMANN
+низ: hydrostatic / no-flow / constant pressure" fillcolor="#fce5cd"]
+	}
+	subgraph cluster_outputs {
+		color="#cc0000" fontname="DejaVu Sans" fontsize=12 label="Файлы расчётной задачи" style=rounded
+		infile [label="pflotran.in
+основной input deck" fillcolor="#f4cccc"]
+		forcing [label="forcing_daily.csv
+суточный форсинг" fillcolor="#f4cccc"]
+		summary [label="soilflow_run_summary.txt
+производные параметры" fillcolor="#f4cccc"]
+		log [label="run_pflotran.log
+stdout/stderr PFLOTRAN" fillcolor="#f4cccc"]
+		tecplot [label="PFLOTRAN output
+TECPLOT POINT files" fillcolor="#f4cccc"]
+	}
+	subgraph cluster_future {
+		color="#999999" fontname="DejaVu Sans" fontsize=12 label="Заложенные контракты расширения в XLSX/архитектуре" style="rounded,dashed"
+		et [label="внешняя ET/T-модель
+Epot, Tpot, Zroot" fillcolor="#eeeeee" style="rounded,filled,dashed"]
+		roots [label="root uptake
+Sroot[cell,t]" fillcolor="#eeeeee" style="rounded,filled,dashed"]
+		irr [label="полив
+события, интенсивность, норма" fillcolor="#eeeeee" style="rounded,filled,dashed"]
+		drain [label="дренаж
+linear sink / drain BC" fillcolor="#eeeeee" style="rounded,filled,dashed"]
+		gw [label="динамические грунтовые воды
+Hgw(t) / reservoir" fillcolor="#eeeeee" style="rounded,filled,dashed"]
+	}
+	user -> build_sh [label=build]
+	build_sh -> ubuntu_build
+	ubuntu_build -> petsc_build
+	petsc_build -> pflotran_build
+	pflotran_build -> runtime_libs [label="COPY --from=builder"]
+	runtime_libs -> entrypoint
+	entrypoint -> check [label=check]
+	user -> run_sh [label=run]
+	run_sh -> entrypoint [label="docker run"]
+	entrypoint -> app
+	app -> xlsx
+	xlsx -> read
+	read -> derived
+	derived -> generate
+	read -> write
+	generate -> infile
+	write -> forcing
+	write -> summary
+	infile -> pflotran
+	runner -> pflotran [label="запуск"]
+	entrypoint -> runner
+	pflotran -> fvm
+	fvm -> vg
+	fvm -> bc
+	pflotran -> log
+	pflotran -> tecplot
+	forcing -> summary [style=dotted]
+	log -> out_host [label=volume]
+	tecplot -> out_host [label=volume]
+	summary -> out_host [label=volume]
+	save_load -> runtime_libs [label="portable image" style=dashed]
+	et -> xlsx [label="параметры" style=dashed]
+	roots -> xlsx [label="параметры" style=dashed]
+	irr -> xlsx [label="параметры" style=dashed]
+	drain -> xlsx [label="параметры" style=dashed]
+	gw -> xlsx [label="параметры" style=dashed]
+	et -> derived [label="пока: Epot в top flux" style=dashed]
+}

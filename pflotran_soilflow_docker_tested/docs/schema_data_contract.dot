@@ -1,0 +1,92 @@
+digraph soilflow_data_contract {
+	graph [fontname="DejaVu Sans" fontsize=13 label="Контракт данных XLSX → Python-адаптер → PFLOTRAN input/output" labelloc=t nodesep=0.5 rankdir=LR ranksep=0.8 splines=ortho]
+	node [fontname="DejaVu Sans" fontsize=10 margin="0.08,0.05" shape=box style="rounded,filled"]
+	edge [fontname="DejaVu Sans" fontsize=9]
+	subgraph cluster_xlsx {
+		color="#93c47d" fontname="DejaVu Sans" fontsize=12 label="XLSX исходные данные" style=rounded
+		s01 [label="01_Project
+имя проекта, режим" fillcolor="#d9ead3"]
+		s02 [label="02_Domain
+размерность, Lx,Ly,Dz, Nx,Ny,Nz" fillcolor="#d9ead3"]
+		s03 [label="03_Soil
+θs, θr, α, n, Ks, anisotropy" fillcolor="#d9ead3"]
+		s04 [label="04_Initial_BC
+начальное давление
+нижняя граница" fillcolor="#d9ead3"]
+		s05 [label="05_Time_Forcing
+период, timestep" fillcolor="#d9ead3"]
+		s06 [label="06_ET_Roots
+Epot/Tpot/root contract" fillcolor="#eeeeee" style="rounded,filled,dashed"]
+		s07 [label="07_Irrigation_Drainage
+полив, дренаж contract" fillcolor="#eeeeee" style="rounded,filled,dashed"]
+		s08 [label="08_Groundwater
+динамические ГВ contract" fillcolor="#eeeeee" style="rounded,filled,dashed"]
+		s09 [label="09_Solver
+mpi_processes, PFLOTRAN options" fillcolor="#d9ead3"]
+		s10 [label="10_Weather_Daily
+P, irrigation, Epot, Tpot, Hgw" fillcolor="#d9ead3"]
+	}
+	subgraph cluster_py {
+		color="#6fa8dc" fontname="DejaVu Sans" fontsize=12 label="Python mapping layer" style=rounded
+		params [label="params dict
+CONFIG_SHEETS" fillcolor="#cfe2f3"]
+		weather [label="weather rows
+forcing table" fillcolor="#cfe2f3"]
+		derived2 [label="Derived dataclass
+Sr, m, αPa⁻¹, perm X/Y/Z, flux" fillcolor="#cfe2f3"]
+		inputdeck [label="PFLOTRAN input text
+SIMULATION/SUBSURFACE/GRID/..." fillcolor="#cfe2f3"]
+	}
+	subgraph cluster_pf {
+		color="#e69138" fontname="DejaVu Sans" fontsize=12 label="PFLOTRAN input deck" style=rounded
+		grid [label="GRID
+TYPE structured
+NXYZ / DXYZ" fillcolor="#fce5cd"]
+		mat [label="MATERIAL_PROPERTY
+POROSITY, PERMEABILITY" fillcolor="#fce5cd"]
+		cc [label="CHARACTERISTIC_CURVES
+VAN_GENUCHTEN
+MUALEM_VG_LIQ" fillcolor="#fce5cd"]
+		time [label="TIME
+FINAL_TIME
+MAXIMUM_TIMESTEP_SIZE" fillcolor="#fce5cd"]
+		regions [label="REGION
+all/top/bottom" fillcolor="#fce5cd"]
+		flow [label="FLOW_CONDITION
+top flux, initial hydrostatic, bottom" fillcolor="#fce5cd"]
+		bc2 [label="BOUNDARY_CONDITION
+INITIAL_CONDITION
+STRATA" fillcolor="#fce5cd"]
+	}
+	subgraph cluster_out {
+		color="#cc0000" fontname="DejaVu Sans" fontsize=12 label="Output / diagnostics" style=rounded
+		csv [label="forcing_daily.csv" fillcolor="#f4cccc"]
+		sum2 [label="soilflow_run_summary.txt" fillcolor="#f4cccc"]
+		runlog [label="run_pflotran.log" fillcolor="#f4cccc"]
+		pfout [label="TECPLOT POINT output" fillcolor="#f4cccc"]
+	}
+	s01 -> params
+	s02 -> params
+	s03 -> params
+	s04 -> params
+	s05 -> params
+	s09 -> params
+	s10 -> weather
+	s06 -> weather [label="Epot/Tpot пока как данные" style=dashed]
+	s07 -> weather [label="irrigation пока как данные" style=dashed]
+	s08 -> weather [label="Hgw пока как данные" style=dashed]
+	params -> derived2
+	weather -> derived2
+	derived2 -> inputdeck
+	inputdeck -> grid
+	inputdeck -> mat
+	inputdeck -> cc
+	inputdeck -> time
+	inputdeck -> regions
+	inputdeck -> flow
+	inputdeck -> bc2
+	weather -> csv
+	derived2 -> sum2
+	bc2 -> runlog
+	bc2 -> pfout
+}

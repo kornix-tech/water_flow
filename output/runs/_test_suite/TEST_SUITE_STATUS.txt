@@ -1,0 +1,16 @@
+TEST_SUITE_STATUS=PASS_WITH_WARNINGS
+tests_total=4
+tests_passed=1
+tests_passed_with_warnings=3
+tests_failed=0
+
+_test_linear_darcy=PASS
+_test_hydrostatic_vg_no_flow=PASS_WITH_WARNINGS
+_test_unit_gradient_unsat=PASS_WITH_WARNINGS
+_test_transient_uniform_storage_vg=PASS_WITH_WARNINGS
+
+warnings_total=4
+unexpected_warnings_total=0
+solver_errors_total=0
+solver_divergences_total=0
+solver_cuts_total=0

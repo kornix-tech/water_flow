@@ -1,0 +1,31 @@
+SoilFlow/PFLOTRAN _test_unit_gradient_unsat summary
+========================================================
+
+Status: GENERATED
+Unit-gradient unsaturated drainage verification
+
+Физический смысл:
+  P(z)=const; S=const; qz=-Ks*kr(S)
+  z направлена вверх; отрицательный qz означает нисходящий поток.
+
+Параметры:
+  column_height_m = 2
+  nx,ny,nz        = 1,1,80
+  porosity         = 0.43
+  residual_sat     = 0.10465116
+  alpha_1_m        = 3.6 1/m
+  n,m              = 1.56, 0.35897436
+  ksat_m_s         = 5.00000000e-06
+  intrinsic_perm   = 4.55139132e-13 m2
+  rho_water        = 997 kg/m3
+  mu_water         = 0.00089 Pa*s
+  gravity          = 9.80665 m/s2
+  P_atm            = 101325 Pa
+  bottom_pressure  = 101325 Pa
+  constant_pressure= 90000 Pa
+
+Критерии PASS:
+  pressure_abs_tolerance_pa = 10
+  saturation_abs_tolerance  = 0.0001
+  flux_abs_tolerance_m_s    = 1.00000000e-10
+  flux_relative_tolerance   = 0.005
