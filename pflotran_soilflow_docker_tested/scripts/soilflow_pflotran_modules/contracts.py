@@ -32,7 +32,9 @@ MODULE_BOUNDARIES = {
     "profile_carrier": "Генерация PFLOTRAN profile-carrier deck'ов для аналитических тестов.",
     "surface_balance": "Нормализация погодного форсинга, верхний поток и производные параметры почвы.",
     "result_diagnostics": "Парсинг результатов, solver diagnostics и единая запись статуса.",
+    "result_contract": "Solver-neutral профиль, diagnostics и статус для будущих parser-adapter реализаций.",
     "solver_runner": "Поиск и запуск внешнего solver-а без знания физической постановки.",
+    "test_evaluation": "Единая сборка PASS/WARN/FAIL, UNKNOWN/PFLOTRAN_ERROR и suite status.",
     "analytical_tests": "Аналитические профили и метрики сравнения численных тестов.",
 }
 
@@ -54,6 +56,6 @@ REPLACEABLE_ADAPTERS: tuple[ReplaceableAdapterContract, ...] = (
         name="result_parser",
         current_module="soilflow_pflotran_modules.result_diagnostics",
         responsibility="Прочитать численные профили, временные ряды, предупреждения solver-а и итоговый статус.",
-        replacement_rule="Для другого solver-а нужен parser-adapter, который сохраняет общие ключи профилей и diagnostics.",
+        replacement_rule="Для другого solver-а нужен parser-adapter, который возвращает soilflow_pflotran_modules.result_contract.",
     ),
 )

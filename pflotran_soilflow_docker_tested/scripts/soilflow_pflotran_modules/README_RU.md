@@ -20,11 +20,16 @@ CLI и web-backend. Этот пакет задает безопасные гра
   `retention_model=tabular` и `conductivity_model=tabular`.
 - `demo_deck_writer.py`: стандартный PFLOTRAN `RICHARDS` deck writer для
   demo/пользовательских 1D/2D/3D расчетов, включая сетку, `OUTPUT`,
-  `CHARACTERISTIC_CURVES` и граничные условия. Специализированная floodplain-
-  постановка пока остается в CLI-фасаде как отдельный будущий блок.
+  `CHARACTERISTIC_CURVES` и граничные условия.
+- `floodplain_deck_writer.py`: специализированный PFLOTRAN deck writer и summary
+  для пойменного участка с двухслойной почвой, рекой и регулируемой дреной.
 - `result_diagnostics.py`: низкоуровневый разбор PFLOTRAN Tecplot output,
   агрегация профилей по глубине, solver/warning diagnostics, direct flux probe,
   transient snapshot loader и единая запись `TEST_STATUS.txt`.
+- `result_contract.py`: solver-neutral контракт профилей, diagnostics и статуса
+  для будущих parser-adapter реализаций.
+- `test_evaluation.py`: единая сборка `PASS/WARN/FAIL`, `UNKNOWN`,
+  `PFLOTRAN_ERROR` и suite status.
 - `solver_runner.py`: поиск исполняемого PFLOTRAN, native/WSL запуск и запись
   логов без знания физической постановки. Это текущий solver adapter.
 - `surface_balance.py`: нормализация погодных строк, расчет `net_surface_input`,
@@ -42,9 +47,8 @@ CLI и web-backend. Этот пакет задает безопасные гра
   в тестовых deck'ах.
 - `analytical_tests`: строгие метрики сравнения профилей и физические PFLOTRAN
   deck'и для transport/heat/two-phase/groundwater задач.
-- `test_evaluation`: сборка метрик PASS/WARN/FAIL и CSV/JSON сравнений.
-- `floodplain_deck_writer`: специализированная постановка регулируемого
-  дренажа, которую нужно вынести из CLI-фасада отдельным крупным шагом.
+- `test_registry`: описание тестов, генераторы, runners и evaluators как
+  отдельный registry вместо роста CLI-фасада.
 
 Правило дальнейшего рефакторинга: переносить по одному блоку, оставляя
 `soilflow_pflotran.py` тонким совместимым CLI-фасадом и добавляя тест на каждый

@@ -59,7 +59,7 @@ pflotran_soilflow_docker_tested/
     check_project.sh                 единая проверка: Python compile, backend unittest, frontend build, restart, API smoke
     api_smoke.sh                     read-only проверка базового API-контракта живого web-сервиса
     sync_to_running_container.sh     документированный hot-copy workflow для запущенного контейнера
-    soilflow_pflotran_modules/       вынесенные контракты parser/model/deck/result diagnostics/solver runner/surface balance и границы дальнейшей декомпозиции
+    soilflow_pflotran_modules/       вынесенные контракты parser/model/deck/floodplain/result diagnostics/result contract/solver runner/surface balance/test evaluation
     *.sh                             вспомогательные Docker-команды
 
   web/backend/app/
@@ -635,9 +635,9 @@ scripts/__pycache__/
 ## 16. Рекомендуемый следующий план разработки
 
 1. Для релизного состояния выполнить полную пересборку Docker image и сверить ее с hot-copy workflow.
-2. Продолжить перенос блоков `soilflow_pflotran.py` в `soilflow_pflotran_modules`: следующий безопасный кандидат - test evaluation/status composition или специализированный floodplain deck writer.
+2. Продолжить перенос тестового слоя `soilflow_pflotran.py` в `test_registry`: описание теста, generator, runner, evaluator и expected artifacts.
 3. Довести расширенные profile carrier тесты до строгих физических deck'ов PFLOTRAN для transport/heat/two-phase/groundwater задач.
-4. При замене solver-а подключать новый adapter рядом с `solver_runner.py` и parser-adapter рядом с `result_diagnostics.py`; при замене испарения подключать новую реализацию через `surface_balance.py`/forcing contract.
+4. При замене solver-а подключать новый adapter рядом с `solver_runner.py` и parser-adapter рядом с `result_diagnostics.py`, возвращая `result_contract.py`; при замене испарения подключать новую реализацию через `surface_balance.py`/forcing contract.
 5. Для дренажной задачи вынести исследовательские сценарии в отдельный воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`, `УГВ`, `C`, `G`, `Z`.
 6. Отдельно решить, остается ли регулируемый колодец эквивалентным sink или нужен явный модуль hydraulic network.
 

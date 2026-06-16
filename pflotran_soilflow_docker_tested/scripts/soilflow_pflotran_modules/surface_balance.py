@@ -24,6 +24,16 @@ class Derived:
     mean_top_flux_m_s: float
 
 
+class SimpleSurfaceFluxModel:
+    """Текущая минимальная модель: P + irrigation - Epot без root uptake."""
+
+    def normalize_row(self, row: dict[str, Any]) -> dict[str, Any] | None:
+        return normalize_weather_row(row)
+
+    def mean_top_flux_m_s(self, params: dict[str, Any], weather: list[dict[str, Any]]) -> float:
+        return compute_mean_top_flux_m_s(params, weather)
+
+
 def normalize_weather_row(row: dict[str, Any]) -> dict[str, Any] | None:
     date_text = str(row.get("date") or "")
     if not date_text:

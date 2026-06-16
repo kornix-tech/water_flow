@@ -247,14 +247,6 @@ def warning_status(warnings: dict[str, bool | int], policy: str) -> str:
     return "PASS"
 
 
-def combined_test_status(physical_ok: bool, solver_ok: bool, warning_check: str) -> str:
-    if not physical_ok or not solver_ok or warning_check == "FAIL":
-        return "FAIL"
-    if warning_check == "WARN":
-        return "PASS_WITH_WARNINGS"
-    return "PASS"
-
-
 def write_unified_status(path: Path, fields: dict[str, Any]) -> None:
     ordered = []
     for key, value in fields.items():

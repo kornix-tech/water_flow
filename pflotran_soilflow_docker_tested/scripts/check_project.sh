@@ -7,30 +7,33 @@ FRONTEND_NODE_IMAGE="${FRONTEND_NODE_IMAGE:-node:20}"
 
 cd "$ROOT_DIR"
 
-echo "[1/6] Python compile"
-python3 -m compileall -q web/backend/app scripts/soilflow_pflotran.py scripts/soilflow_visualize.py
+echo "[1/7] Python compile"
+python3 -m compileall -q web/backend/app scripts tests
 
-echo "[2/6] Backend unit tests"
+echo "[2/7] Backend unit tests"
 python3 -m unittest discover -s web/backend/tests
 python3 -m unittest discover -s tests
 
-echo "[3/6] Frontend production build"
+echo "[3/7] Modular scenario smoke"
+./scripts/smoke_modular_scenarios.sh
+
+echo "[4/7] Frontend production build"
 docker run --rm \
   -v "$ROOT_DIR:/app" \
   -w /app/web/frontend \
   "$FRONTEND_NODE_IMAGE" \
   npm run build
 
-echo "[4/6] Cleanup generated frontend build"
+echo "[5/7] Cleanup generated frontend build"
 docker run --rm \
   -v "$ROOT_DIR:/app" \
   alpine:latest \
   sh -lc "rm -rf /app/web/frontend/dist /app/web/frontend/node_modules/.vite-temp"
 
-echo "[5/6] Restart web service"
+echo "[6/7] Restart web service"
 WEB_PORT="$WEB_PORT" docker compose restart soilflow-web
 
-echo "[6/6] API contract and workflow checks"
+echo "[7/7] API contract and workflow checks"
 for attempt in $(seq 1 30); do
   if curl -fsS "http://localhost:${WEB_PORT}/api/health" >/dev/null 2>&1; then
     break

@@ -26,9 +26,9 @@ from soilflow_pflotran_modules.physical_models import (
     validate_soil_model_pair,
 )
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
+from soilflow_pflotran_modules.result_contract import profile_rows_to_contract
 from soilflow_pflotran_modules.result_diagnostics import (
     classify_pflotran_warnings,
-    combined_test_status,
     direct_flux_output_probe,
     fit_line_slope,
     load_tecpotran_records,
@@ -38,8 +38,14 @@ from soilflow_pflotran_modules.result_diagnostics import (
     write_unified_status,
 )
 from soilflow_pflotran_modules.solver_runner import find_pflotran_native, run_native
-from soilflow_pflotran_modules.surface_balance import compute_mean_top_flux_m_s, normalize_weather_row, write_weather_csv
+from soilflow_pflotran_modules.surface_balance import (
+    SimpleSurfaceFluxModel,
+    compute_mean_top_flux_m_s,
+    normalize_weather_row,
+    write_weather_csv,
+)
 from soilflow_pflotran_modules.tabular_curves import build_tabular_characteristic_curve_assets, build_tabular_permeability_assets
+from soilflow_pflotran_modules.test_evaluation import combined_test_status, suite_status_lines
 from soilflow_pflotran import compute_derived, generate_pflotran_input, read_params, read_weather, run_demo_mode
 
 
@@ -67,6 +73,8 @@ class ArchitectureContractTests(unittest.TestCase):
         self.assertIn("solver_runner", MODULE_BOUNDARIES)
         self.assertIn("surface_balance", MODULE_BOUNDARIES)
         self.assertIn("result_diagnostics", MODULE_BOUNDARIES)
+        self.assertIn("result_contract", MODULE_BOUNDARIES)
+        self.assertIn("test_evaluation", MODULE_BOUNDARIES)
 
 
 class PhysicalModelTests(unittest.TestCase):
@@ -270,6 +278,36 @@ class SurfaceBalanceTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertIn("net_surface_input_mm_day", text)
             self.assertIn("2026-06-16", text)
+
+    def test_simple_surface_flux_model_exposes_replaceable_interface(self) -> None:
+        model = SimpleSurfaceFluxModel()
+        weather_row = model.normalize_row({"date": "2026-06-16", "precipitation_mm_day": 8.64})
+        assert weather_row is not None
+
+        self.assertAlmostEqual(model.mean_top_flux_m_s({}, [weather_row]), 1.0e-7)
+
+
+class ResultContractTests(unittest.TestCase):
+    def test_profile_rows_are_converted_to_solver_neutral_contract(self) -> None:
+        contract = profile_rows_to_contract(
+            [{"z_m": 0.5, "pressure_pa": 101325.0, "saturation": 0.9}],
+            source_solver="unit-test",
+        )
+
+        self.assertEqual(contract.status, "PARSED")
+        self.assertEqual(contract.source_solver, "unit-test")
+        self.assertEqual(contract.profiles[0].coordinate_m, 0.5)
+        self.assertEqual(contract.profiles[0].pressure_pa, 101325.0)
+
+
+class TestEvaluationTests(unittest.TestCase):
+    def test_suite_status_accepts_generated_outputs_in_dry_run(self) -> None:
+        result = SimpleNamespace(test_id="_test_linear_darcy", status="GENERATED", metrics={})
+
+        lines = suite_status_lines([result], dry_run=True)
+
+        self.assertIn("TEST_SUITE_STATUS=DRY_RUN", lines)
+        self.assertIn("tests_failed=0", lines)
 
 
 class ResultDiagnosticsTests(unittest.TestCase):
