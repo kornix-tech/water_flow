@@ -40,7 +40,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from soilflow_pflotran_modules.extended_analytical import (
     generate_extended_analytical_rows,
@@ -61,6 +61,19 @@ from soilflow_pflotran_modules.physical_models import (
     validate_soil_model_pair,
 )
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
+from soilflow_pflotran_modules.result_diagnostics import (
+    classify_pflotran_warnings,
+    combined_test_status,
+    compute_saturation_bounds,
+    direct_flux_output_probe,
+    find_final_tec_file,
+    fit_line_slope,
+    load_tecpotran_records,
+    load_transient_snapshots,
+    parse_pflotran_solver_diagnostics,
+    records_to_z_pressure_saturation,
+    write_unified_status,
+)
 from soilflow_pflotran_modules.tabular_curves import build_tabular_characteristic_curve_assets, build_tabular_permeability_assets
 
 CONFIG_SHEETS = {
@@ -119,7 +132,6 @@ PFLOTRAN_PROFILE_TESTS = {
     "boussinesq_groundwater_mound",
 }
 PRESSURE_REPORT_ZERO_THRESHOLD_PA = 10.0
-UNEXPECTED_WARNING_FAIL_PATTERNS = ("failed", "invalid", "not recognized", "ignored card", "missing")
 ATM_PRESSURE_PA = 101325.0
 
 
@@ -1871,321 +1883,6 @@ def run_wsl(workdir: Path, pflotran_wsl: str, mpi_processes: int) -> int:
     return proc.returncode
 
 
-# -----------------------------------------------------------------------------
-# PFLOTRAN output parsing and test comparison
-# -----------------------------------------------------------------------------
-def _parse_tec_variables(line: str) -> list[str]:
-    quoted = re.findall(r'"([^"]+)"', line)
-    if quoted:
-        return [q.strip() for q in quoted]
-    _, _, rhs = line.partition("=")
-    return [part.strip().strip('"') for part in rhs.split(",") if part.strip()]
-
-
-def _float_line(line: str) -> list[float] | None:
-    stripped = line.strip()
-    if not stripped or stripped.startswith("#"):
-        return None
-    upper = stripped.upper()
-    if upper.startswith(("TITLE", "VARIABLES", "ZONE", "TEXT", "GEOMETRY")):
-        return None
-    parts = stripped.replace("D", "E").replace("d", "e").split()
-    try:
-        return [float(x) for x in parts]
-    except ValueError:
-        return None
-
-
-def parse_tecpotran_tec(path: Path) -> tuple[list[str], list[list[float]]]:
-    variables: list[str] = []
-    rows: list[list[float]] = []
-    with path.open("r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            if line.strip().upper().startswith("VARIABLES"):
-                variables = _parse_tec_variables(line)
-                continue
-            nums = _float_line(line)
-            if nums is not None:
-                rows.append(nums)
-    if not variables and rows:
-        variables = [f"col_{i}" for i in range(len(rows[0]))]
-    return variables, rows
-
-
-def find_final_tec_file(workdir: Path) -> Path | None:
-    candidates = [p for p in workdir.glob("pflotran-[0-9]*.tec") if p.is_file()]
-    if not candidates:
-        return None
-    # Prefer files with more numeric data and later modification time.
-    return sorted(candidates, key=lambda p: (p.stat().st_size, p.stat().st_mtime))[-1]
-
-
-def _find_column(variables: list[str], aliases: Iterable[str]) -> int | None:
-    lower_vars = [v.lower().replace("_", " ") for v in variables]
-    for alias in aliases:
-        a = alias.lower()
-        for i, v in enumerate(lower_vars):
-            if a in v:
-                return i
-    return None
-
-
-def load_numerical_pressure_profile(workdir: Path) -> tuple[Path, list[tuple[float, float]]]:
-    tec = find_final_tec_file(workdir)
-    if tec is None:
-        raise FileNotFoundError("Не найден TECPLOT/DAT output PFLOTRAN (*.tec, *.dat, *.plt)")
-    variables, rows = parse_tecpotran_tec(tec)
-    if not rows:
-        raise ValueError(f"Файл {tec.name} не содержит числовых строк")
-
-    z_col = _find_column(variables, ["z [", "z", "z coordinate", "coordinate z"])
-    p_col = _find_column(variables, ["liquid pressure", "pressure [pa]", "pressure"])
-    if z_col is None:
-        # For a 1D structured POINT output PFLOTRAN usually writes X,Y,Z first.
-        z_col = 2 if len(rows[0]) > 2 else 0
-    if p_col is None:
-        # Try a conservative fallback: first column after coordinates with pressure-scale values.
-        for j in range(len(rows[0])):
-            vals = [r[j] for r in rows if len(r) > j]
-            if vals and max(abs(v) for v in vals) > 1000.0:
-                p_col = j
-                break
-    if p_col is None:
-        raise ValueError(f"Не удалось найти колонку давления в {tec.name}. Variables: {variables}")
-
-    profile = []
-    for r in rows:
-        if len(r) <= max(z_col, p_col):
-            continue
-        profile.append((float(r[z_col]), float(r[p_col])))
-    if not profile:
-        raise ValueError(f"Не удалось извлечь профиль z/pressure из {tec.name}")
-
-    # PFLOTRAN may output all cells for 3D; aggregate pressure by z center for 1D comparison.
-    by_z: dict[float, list[float]] = {}
-    for z, p in profile:
-        key = round(z, 12)
-        by_z.setdefault(key, []).append(p)
-    averaged = sorted((z, sum(vals) / len(vals)) for z, vals in by_z.items())
-    return tec, averaged
-
-
-def load_tecpotran_records(workdir: Path) -> tuple[Path, list[dict[str, float]]]:
-    tec = find_final_tec_file(workdir)
-    if tec is None:
-        raise FileNotFoundError("Не найден TECPLOT/DAT output PFLOTRAN (*.tec, *.dat, *.plt)")
-    variables, rows = parse_tecpotran_tec(tec)
-    if not rows:
-        raise ValueError(f"Файл {tec.name} не содержит числовых строк")
-    records: list[dict[str, float]] = []
-    for row in rows:
-        record: dict[str, float] = {}
-        for i, value in enumerate(row):
-            key = variables[i] if i < len(variables) else f"col_{i}"
-            record[key] = float(value)
-        records.append(record)
-    return tec, records
-
-
-def record_value(record: dict[str, float], aliases: Iterable[str]) -> float:
-    normalized = {k.lower().replace("_", " "): v for k, v in record.items()}
-    for alias in aliases:
-        a = alias.lower()
-        for key, value in normalized.items():
-            if a in key:
-                return value
-    raise KeyError(f"Не найдена колонка PFLOTRAN output: {list(aliases)}")
-
-
-def records_to_z_pressure_saturation(records: list[dict[str, float]]) -> list[dict[str, float]]:
-    converted: list[dict[str, float]] = []
-    for record in records:
-        converted.append(
-            {
-                "z_m": record_value(record, ["z [", "z", "coordinate z"]),
-                "pressure_pa": record_value(record, ["liquid pressure", "pressure [pa]", "pressure"]),
-                "saturation": record_value(record, ["liquid saturation", "saturation"]),
-            }
-        )
-    by_z: dict[float, dict[str, list[float]]] = {}
-    for row in converted:
-        key = round(row["z_m"], 12)
-        bucket = by_z.setdefault(key, {"pressure_pa": [], "saturation": []})
-        bucket["pressure_pa"].append(row["pressure_pa"])
-        bucket["saturation"].append(row["saturation"])
-    return [
-        {
-            "z_m": z,
-            "pressure_pa": sum(vals["pressure_pa"]) / len(vals["pressure_pa"]),
-            "saturation": sum(vals["saturation"]) / len(vals["saturation"]),
-        }
-        for z, vals in sorted(by_z.items())
-    ]
-
-
-def compute_saturation_bounds(records: list[dict[str, float]]) -> tuple[float, float]:
-    values = [row["saturation"] for row in records if "saturation" in row]
-    if not values:
-        raise ValueError("В PFLOTRAN output не найдена колонка Liquid Saturation.")
-    return min(values), max(values)
-
-
-def fit_line_slope(xs: list[float], ys: list[float]) -> float:
-    if len(xs) != len(ys):
-        raise ValueError("xs and ys must have the same length.")
-    if len(xs) < 2:
-        raise ValueError("At least two points are required to fit a slope.")
-    x_mean = sum(xs) / len(xs)
-    y_mean = sum(ys) / len(ys)
-    numerator = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys))
-    denominator = sum((x - x_mean) ** 2 for x in xs)
-    if denominator == 0.0:
-        raise ValueError("Cannot fit slope: all x values are identical.")
-    return numerator / denominator
-
-
-def _warning_lines(text: str) -> list[str]:
-    return [line.strip() for line in text.splitlines() if "WARNING" in line]
-
-
-def classify_pflotran_warnings(log_path: Path, test_kind: str) -> dict[str, bool | int | str]:
-    text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
-    mualem_smooth_phrase = (
-        "Mualem-van Genuchten relative permeability function is being used without SMOOTH option"
-    )
-    brooks_corey_smooth_phrase = "Brooks-Corey saturation function is being used without SMOOTH option"
-    lines = _warning_lines(text)
-    mualem_count = sum(1 for line in lines if mualem_smooth_phrase in line)
-    brooks_corey_count = sum(1 for line in lines if brooks_corey_smooth_phrase in line)
-    expected_count = mualem_count + brooks_corey_count
-    fail_like = any(any(pattern in line.lower() for pattern in UNEXPECTED_WARNING_FAIL_PATTERNS) for line in lines)
-    policy = "ignore_for_saturated_test" if test_kind == "linear_darcy" else "warn_for_unsaturated_test"
-    unexpected = max(0, len(lines) - expected_count)
-    if fail_like:
-        check = "FAIL"
-    elif policy == "ignore_for_saturated_test" and unexpected == 0:
-        check = "PASS"
-    elif len(lines) > 0 and policy == "warn_for_unsaturated_test":
-        check = "WARN"
-    elif unexpected > 0:
-        check = "WARN"
-    else:
-        check = "PASS"
-    return {
-        "mualem_vg_without_smooth": mualem_count > 0,
-        "mualem_vg_without_smooth_warning": mualem_count > 0,
-        "brooks_corey_without_smooth_warning": brooks_corey_count > 0,
-        "warning_count": len(lines),
-        "solver_warning_count": len(lines),
-        "expected_warning_count": expected_count,
-        "unexpected_warning_count": unexpected,
-        "warning_check": check,
-        "warning_policy": policy,
-        "mualem_smooth_warning_policy": policy,
-    }
-
-
-def parse_pflotran_solver_diagnostics(log_path: Path) -> dict[str, bool | int | float | None]:
-    text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
-    cuts = [int(m.group(1)) for m in re.finditer(r"cuts\s*=\s*(\d+)", text, flags=re.IGNORECASE)]
-    error_count = len(re.findall(r"\bERROR\b", text, flags=re.IGNORECASE))
-    diverged = bool(re.search(r"\b(?:DIVERGED|SNES_DIVERGED)\b", text, flags=re.IGNORECASE))
-    newton = [int(m.group(1)) for m in re.finditer(r"newton\s*=\s*(\d+)", text, flags=re.IGNORECASE)]
-    linear = [int(m.group(1)) for m in re.finditer(r"linear\s*=\s*(\d+)", text, flags=re.IGNORECASE)]
-    return {
-        "solver_error_count": error_count,
-        "solver_warning_count": len(_warning_lines(text)),
-        "solver_diverged": diverged,
-        "solver_cuts": max(cuts) if cuts else 0,
-        "snes_diverged_count": len(re.findall(r"SNES_DIVERGED|DIVERGED", text, flags=re.IGNORECASE)),
-        "flow_ts_snes_steps": len(re.findall(r"^\s*Step\s+\d+\s+Time=", text, flags=re.MULTILINE)),
-        "flow_ts_newton_iterations": sum(newton),
-        "flow_ts_linear_iterations": sum(linear),
-        "wall_clock_time_s": None,
-    }
-
-
-def warning_status(warnings: dict[str, bool | int], policy: str) -> str:
-    if policy == "warn_for_unsaturated_test" and warnings.get("mualem_vg_without_smooth"):
-        return "WARN"
-    if policy == "fail_if_unexpected" and warnings.get("warning_count", 0):
-        return "FAIL"
-    return "PASS"
-
-
-def combined_test_status(physical_ok: bool, solver_ok: bool, warning_check: str) -> str:
-    if not physical_ok or not solver_ok or warning_check == "FAIL":
-        return "FAIL"
-    if warning_check == "WARN":
-        return "PASS_WITH_WARNINGS"
-    return "PASS"
-
-
-def write_unified_status(path: Path, fields: dict[str, Any]) -> None:
-    ordered = []
-    for key, value in fields.items():
-        if isinstance(value, bool):
-            value = str(value).lower()
-        ordered.append(f"{key}={value}")
-    path.write_text("\n".join(ordered) + "\n", encoding="utf-8")
-
-
-def find_pflotran_conservation_files(output_dir: Path) -> list[Path]:
-    return sorted(p for p in output_dir.glob("*conservation*") if p.is_file())
-
-
-def find_pflotran_mass_balance_files(output_dir: Path) -> list[Path]:
-    return sorted(p for p in output_dir.glob("*mass*balance*") if p.is_file())
-
-
-def parse_pflotran_conservation_or_mass_balance(path: Path) -> dict[str, Any]:
-    text = path.read_text(encoding="utf-8", errors="replace")
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    header = next((line for line in lines if not line.startswith("#")), "")
-    tokens = re.split(r"[\s,]+", header)
-    interesting = [
-        token
-        for token in tokens
-        if any(marker in token.lower() for marker in ("flux", "source", "sink", "liquid", "water", "boundary"))
-    ]
-    return {
-        "path": str(path),
-        "line_count": len(lines),
-        "header": header[:500],
-        "candidate_columns": interesting,
-        "parseable": bool(interesting),
-    }
-
-
-def direct_flux_output_probe(workdir: Path) -> dict[str, Any]:
-    conservation_files = find_pflotran_conservation_files(workdir)
-    mass_balance_files = find_pflotran_mass_balance_files(workdir)
-    velocity_files = sorted(p for p in workdir.glob("*vel*.tec") if p.is_file())
-    parsed = [parse_pflotran_conservation_or_mass_balance(p) for p in conservation_files + mass_balance_files]
-    q_direct_m_s = None
-    if velocity_files:
-        variables, rows = parse_tecpotran_tec(velocity_files[-1])
-        qz_col = _find_column(variables, ["qlz", "z velocity", "liquid z"])
-        if qz_col is not None and rows:
-            vals = [row[qz_col] for row in rows if len(row) > qz_col]
-            if vals:
-                # PFLOTRAN velocity Tecplot пишет q в m/day при TIME_UNITS day.
-                q_direct_m_s = sum(vals) / len(vals) / 86400.0
-    parseable = any(item.get("parseable") for item in parsed) or q_direct_m_s is not None
-    return {
-        "requested": True,
-        "conservation_files": [p.name for p in conservation_files],
-        "mass_balance_files": [p.name for p in mass_balance_files],
-        "velocity_files": [p.name for p in velocity_files],
-        "parseable": parseable,
-        "q_direct_m_s": q_direct_m_s,
-        "parsed_files": parsed,
-        "reason": (
-            "parseable velocity/conservation output found" if parseable else "no recognized liquid flux columns"
-        ),
-    }
-
-
 def write_test_comparison(test: LinearDarcyTest, numerical: list[tuple[float, float]], path: Path) -> tuple[float, float, int]:
     max_abs = 0.0
     max_rel = 0.0
@@ -2615,49 +2312,6 @@ def evaluate_vg_test_after_run(test: VGRichardsTest, workdir: Path) -> TestResul
         status_path.write_text(f"TEST_STATUS=UNKNOWN\nreason={type(exc).__name__}: {exc}\n", encoding="utf-8")
         print(f"[TEST] UNKNOWN {test.test_id}: {exc}", file=sys.stderr)
         return TestResult(test.test_id, "UNKNOWN", workdir, {"reason": f"{type(exc).__name__}: {exc}"})
-
-
-def transient_output_times_from_log(log_path: Path) -> list[float]:
-    text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
-    times: list[float] = [0.0]
-    current_time = 0.0
-    for line in text.splitlines():
-        match = re.search(r"Time=\s*([0-9.Ee+-]+)", line)
-        if match:
-            current_time = float(match.group(1).replace("D", "E").replace("d", "e"))
-        if "write tecplot output file" in line.lower():
-            if not times or not math.isclose(times[-1], current_time):
-                times.append(current_time)
-    return times
-
-
-def load_transient_snapshots(workdir: Path) -> list[dict[str, float]]:
-    files = sorted((p for p in workdir.glob("*.tec") if "-vel-" not in p.name), key=lambda p: (p.name, p.stat().st_mtime))
-    output_times = transient_output_times_from_log(workdir / "run_pflotran.log")
-    snapshots: list[dict[str, float]] = []
-    for index, path in enumerate(files):
-        variables, rows = parse_tecpotran_tec(path)
-        if not rows:
-            continue
-        records = []
-        for row in rows:
-            records.append({variables[i] if i < len(variables) else f"col_{i}": float(v) for i, v in enumerate(row)})
-        converted = records_to_z_pressure_saturation(records)
-        pressures = [r["pressure_pa"] for r in converted]
-        sats = [r["saturation"] for r in converted]
-        snapshots.append(
-            {
-                "index": float(index),
-                "time_days": output_times[index] if index < len(output_times) else float(index),
-                "pressure_mean_pa": sum(pressures) / len(pressures),
-                "pressure_min_pa": min(pressures),
-                "pressure_max_pa": max(pressures),
-                "saturation_mean": sum(sats) / len(sats),
-                "saturation_min": min(sats),
-                "saturation_max": max(sats),
-            }
-        )
-    return snapshots
 
 
 def write_xy_svg(path: Path, title: str, x_label: str, y_label: str, rows: list[dict[str, float]], y_num: str, y_ana: str) -> None:

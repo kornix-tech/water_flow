@@ -22,6 +22,9 @@ CLI и web-backend. Этот пакет задает безопасные гра
   demo/пользовательских 1D/2D/3D расчетов, включая сетку, `OUTPUT`,
   `CHARACTERISTIC_CURVES` и граничные условия. Специализированная floodplain-
   постановка пока остается в CLI-фасаде как отдельный будущий блок.
+- `result_diagnostics.py`: низкоуровневый разбор PFLOTRAN Tecplot output,
+  агрегация профилей по глубине, solver/warning diagnostics, direct flux probe,
+  transient snapshot loader и единая запись `TEST_STATUS.txt`.
 
 Планируемые границы:
 

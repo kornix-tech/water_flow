@@ -25,6 +25,17 @@ from soilflow_pflotran_modules.physical_models import (
     validate_soil_model_pair,
 )
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
+from soilflow_pflotran_modules.result_diagnostics import (
+    classify_pflotran_warnings,
+    combined_test_status,
+    direct_flux_output_probe,
+    fit_line_slope,
+    load_tecpotran_records,
+    parse_pflotran_solver_diagnostics,
+    parse_tecpotran_tec,
+    records_to_z_pressure_saturation,
+    write_unified_status,
+)
 from soilflow_pflotran_modules.tabular_curves import build_tabular_characteristic_curve_assets, build_tabular_permeability_assets
 from soilflow_pflotran import compute_derived, generate_pflotran_input, read_params, read_weather, run_demo_mode
 
@@ -206,6 +217,83 @@ class DemoDeckWriterTests(unittest.TestCase):
         derived = compute_derived(params, weather)
 
         self.assertEqual(generate_standard_pflotran_input(params, derived), generate_pflotran_input(params, derived))
+
+
+class ResultDiagnosticsTests(unittest.TestCase):
+    def test_parse_tecpotran_records_and_aggregate_by_z(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tec_path = Path(tmpdir) / "pflotran-001.tec"
+            tec_path.write_text(
+                "\n".join(
+                    [
+                        'VARIABLES = "X [m]", "Y [m]", "Z [m]", "Liquid Pressure [Pa]", "Liquid Saturation"',
+                        "ZONE T=\"0\"",
+                        "0 0 0.25 101000 0.90",
+                        "1 0 0.25 103000 0.94",
+                        "0 0 0.75 99000 0.80",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            variables, rows = parse_tecpotran_tec(tec_path)
+            _, records = load_tecpotran_records(Path(tmpdir))
+            converted = records_to_z_pressure_saturation(records)
+
+            self.assertIn("Liquid Pressure [Pa]", variables)
+            self.assertEqual(len(rows), 3)
+            self.assertEqual(len(converted), 2)
+            self.assertAlmostEqual(converted[0]["pressure_pa"], 102000.0)
+            self.assertAlmostEqual(converted[0]["saturation"], 0.92)
+
+    def test_solver_warning_and_status_helpers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "run_pflotran.log"
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "WARNING: Mualem-van Genuchten relative permeability function is being used without SMOOTH option",
+                        "Step 1 Time= 1.0D-03 newton = 3 linear = 11 cuts = 0",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status_path = Path(tmpdir) / "TEST_STATUS.txt"
+
+            warnings = classify_pflotran_warnings(log_path, "hydrostatic_vg_no_flow")
+            solver = parse_pflotran_solver_diagnostics(log_path)
+            write_unified_status(status_path, {"ok": True, "status": combined_test_status(True, True, str(warnings["warning_check"]))})
+
+            self.assertEqual(warnings["warning_check"], "WARN")
+            self.assertEqual(solver["solver_cuts"], 0)
+            self.assertEqual(solver["flow_ts_newton_iterations"], 3)
+            self.assertIn("ok=true", status_path.read_text(encoding="utf-8"))
+            self.assertIn("status=PASS_WITH_WARNINGS", status_path.read_text(encoding="utf-8"))
+
+    def test_direct_flux_probe_reads_velocity_tec(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vel_path = Path(tmpdir) / "pflotran-vel-001.tec"
+            vel_path.write_text(
+                "\n".join(
+                    [
+                        'VARIABLES = "X [m]", "Y [m]", "Z [m]", "QLZ"',
+                        "0 0 0 -0.0864",
+                        "0 0 1 -0.0864",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            probe = direct_flux_output_probe(Path(tmpdir))
+
+            self.assertTrue(probe["parseable"])
+            self.assertAlmostEqual(float(probe["q_direct_m_s"]), -1.0e-6)
+
+    def test_fit_line_slope(self) -> None:
+        self.assertAlmostEqual(fit_line_slope([0.0, 1.0, 2.0], [1.0, 3.0, 5.0]), 2.0)
 
 
 class CliContractTests(unittest.TestCase):
