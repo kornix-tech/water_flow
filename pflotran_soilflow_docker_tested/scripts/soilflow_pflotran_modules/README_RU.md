@@ -18,12 +18,18 @@ CLI и web-backend. Этот пакет задает безопасные гра
 - `tabular_curves.py`: нормализация сохраненных табличных кривых, проверка
   монотонности и запись PFLOTRAN `LOOKUP_TABLE`/`PCHIP_LIQ` таблиц для
   `retention_model=tabular` и `conductivity_model=tabular`.
+- `demo_deck_writer.py`: стандартный PFLOTRAN `RICHARDS` deck writer для
+  demo/пользовательских 1D/2D/3D расчетов, включая сетку, `OUTPUT`,
+  `CHARACTERISTIC_CURVES` и граничные условия. Специализированная floodplain-
+  постановка пока остается в CLI-фасаде как отдельный будущий блок.
 
 Планируемые границы:
 
 - `input_contract`: JSON-снимок исходных данных, единицы измерения, валидация.
 - `physical_models`: пары моделей водоудерживания и влагопроводности.
-- `deck_writer`: генерация PFLOTRAN input deck.
+- `deck_writer`: расширение вынесенного writer'а на специализированные
+  постановки и устранение оставшихся дублей `OUTPUT`/`CHARACTERISTIC_CURVES`
+  в тестовых deck'ах.
 - `analytical_tests`: строгие метрики сравнения профилей и физические PFLOTRAN
   deck'и для transport/heat/two-phase/groundwater задач.
 - `runner`: запуск PFLOTRAN и диагностические файлы.

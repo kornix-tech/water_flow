@@ -10,13 +10,14 @@ SCRIPTS_ROOT = Path(__file__).resolve().parents[1] / "scripts"
 if str(SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_ROOT))
 
-from soilflow_pflotran_modules.input_contract import as_bool, as_float, as_int, optional_float, pf_float
+from soilflow_pflotran_modules.demo_deck_writer import build_demo_grid, generate_standard_pflotran_input
 from soilflow_pflotran_modules.extended_analytical import (
     buckley_fractional_flow,
     generate_extended_analytical_rows,
     generate_normalized_profile_rows,
     green_ampt_cumulative_infiltration,
 )
+from soilflow_pflotran_modules.input_contract import as_bool, as_float, as_int, optional_float, pf_float
 from soilflow_pflotran_modules.physical_models import (
     model_pair_label,
     normalize_grid_dimension,
@@ -25,7 +26,7 @@ from soilflow_pflotran_modules.physical_models import (
 )
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
 from soilflow_pflotran_modules.tabular_curves import build_tabular_characteristic_curve_assets, build_tabular_permeability_assets
-from soilflow_pflotran import run_demo_mode
+from soilflow_pflotran import compute_derived, generate_pflotran_input, read_params, read_weather, run_demo_mode
 
 
 class InputContractTests(unittest.TestCase):
@@ -176,6 +177,35 @@ class ExtendedAnalyticalTests(unittest.TestCase):
             self.assertIn("SATURATION_FUNCTION LOOKUP_TABLE", deck)
             self.assertIn("PERMEABILITY_FUNCTION PCHIP_LIQ", deck)
             self.assertIn("TIME_UNITS yr", retention_file.read_text(encoding="utf-8"))
+
+
+class DemoDeckWriterTests(unittest.TestCase):
+    def test_grid_builder_normalizes_xy_grid(self) -> None:
+        grid = build_demo_grid(
+            {
+                "dimension": "2",
+                "grid_plane": "XY",
+                "length_x_m": 10,
+                "length_y_m": 4,
+                "depth_z_m": 2,
+                "nx": 5,
+                "ny": 4,
+                "nz": 99,
+            }
+        )
+
+        self.assertEqual(grid.dimension, "2d_xy")
+        self.assertEqual((grid.nx, grid.ny, grid.nz), (5, 4, 1))
+        self.assertAlmostEqual(grid.dx_m, 2.0)
+        self.assertAlmostEqual(grid.dy_m, 1.0)
+
+    def test_standard_deck_writer_matches_legacy_wrapper(self) -> None:
+        input_json = Path("input/soilflow_pflotran_demo.json")
+        params = read_params(input_json)
+        weather = read_weather(input_json)
+        derived = compute_derived(params, weather)
+
+        self.assertEqual(generate_standard_pflotran_input(params, derived), generate_pflotran_input(params, derived))
 
 
 class CliContractTests(unittest.TestCase):

@@ -59,7 +59,7 @@ pflotran_soilflow_docker_tested/
     check_project.sh                 единая проверка: Python compile, backend unittest, frontend build, restart, API smoke
     api_smoke.sh                     read-only проверка базового API-контракта живого web-сервиса
     sync_to_running_container.sh     документированный hot-copy workflow для запущенного контейнера
-    soilflow_pflotran_modules/       вынесенные контракты парсинга/моделей/extended analytical/profile-carrier и границы дальнейшей декомпозиции
+    soilflow_pflotran_modules/       вынесенные контракты парсинга/моделей/deck writer/extended analytical/profile-carrier и границы дальнейшей декомпозиции
     *.sh                             вспомогательные Docker-команды
 
   web/backend/app/
@@ -635,9 +635,9 @@ scripts/__pycache__/
 ## 16. Рекомендуемый следующий план разработки
 
 1. Для релизного состояния выполнить полную пересборку Docker image и сверить ее с hot-copy workflow.
-2. Продолжить перенос блоков `soilflow_pflotran.py` в `soilflow_pflotran_modules`: следующий безопасный кандидат - writer основного PFLOTRAN deck'а и parser результатов.
+2. Продолжить перенос блоков `soilflow_pflotran.py` в `soilflow_pflotran_modules`: следующий безопасный кандидат - parser результатов/solver diagnostics и общие test status writers.
 3. Довести расширенные profile carrier тесты до строгих физических deck'ов PFLOTRAN для transport/heat/two-phase/groundwater задач.
-4. Продолжить перенос блоков `soilflow_pflotran.py` в `soilflow_pflotran_modules`: следующий безопасный кандидат - writer основного PFLOTRAN deck'а.
+4. Продолжить перенос блоков `soilflow_pflotran.py` в `soilflow_pflotran_modules`: следующий безопасный кандидат - parser результатов/solver diagnostics.
 5. Для дренажной задачи вынести исследовательские сценарии в отдельный воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`, `УГВ`, `C`, `G`, `Z`.
 6. Отдельно решить, остается ли регулируемый колодец эквивалентным sink или нужен явный модуль hydraulic network.
 

@@ -6,6 +6,7 @@
 - Добавлен web workflow `Табличная почва`: страница `Тесты` создает расчет в SQLite, сохраняет табличные кривые Pc(S)/kr(S), запускает PFLOTRAN и автоматически строит графики.
 - Добавлен живой regression-smoke `scripts/api_tabular_workflow_smoke.sh` для полного API-контура `расчет -> soil_curve_tables -> PFLOTRAN -> визуализация`.
 - Добавлены валидация и SVG-предпросмотр табличных кривых на странице `Исходные данные`.
+- Добавлен модуль `soilflow_pflotran_modules.demo_deck_writer` для стандартного PFLOTRAN RICHARDS deck writer и unit-тесты его совместимости с прежним wrapper'ом.
 - Добавлен модуль `soilflow_pflotran_modules.tabular_curves` с нормализацией табличных кривых, записью PFLOTRAN `.dat` файлов и unit-тестами монотонности.
 - Добавлен интерфейс редактирования табличных кривых почвы на странице `Исходные данные`: паспорт кривой, точки `h/P/theta/S/kr/K`, сохранение, обновление и удаление через SQLite API.
 - Добавлен модуль `soilflow_pflotran_modules.profile_carrier` для генерации PFLOTRAN profile-carrier deck'ов расширенных аналитических тестов.
@@ -49,6 +50,7 @@
 - Статус расширенных profile-тестов теперь включает `analytical_overlay_check`, источник и число точек аналитического профиля.
 - `scripts/api_smoke.sh` проверяет read-only контракт `/api/soil-curves/calculations/{id}`, если в базе уже есть расчеты.
 - `scripts/check_project.sh` теперь включает полный расчетный smoke для табличной почвы через публичный API.
+- Стандартный PFLOTRAN deck writer вынесен из `soilflow_pflotran.py`; основной скрипт оставлен совместимым CLI-фасадом и отдельно маршрутизирует `floodplain_controlled_drainage`.
 - Первый блок `soilflow_pflotran.py` вынесен из монолита в модули: парсинг входных значений, PFLOTRAN float-format и валидация пар моделей почвы.
 - Все расширенные аналитические benchmarks теперь генерируют PFLOTRAN `RICHARDS` profile carrier, `pflotran.in` и `analytical_profiles.csv`, чтобы после запуска были расчетные TECPLOT-профили для графиков.
 - Dry-run suite больше не считает статусы `GENERATED`/`GENERATED_ONLY` failed при `TEST_SUITE_STATUS=DRY_RUN`.
