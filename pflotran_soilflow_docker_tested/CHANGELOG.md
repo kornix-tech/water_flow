@@ -1,6 +1,8 @@
 ## [Unreleased]
 
 ### Added
+- Добавлена расчетная поддержка табличной влагопроводности `conductivity_model=tabular` при `van_genuchten` или `brooks_corey`: CLI строит PFLOTRAN `PCHIP_LIQ` из сохраненных `soil_curve_tables`.
+- Добавлен модуль `soilflow_pflotran_modules.tabular_curves` с нормализацией табличной влагопроводности, записью PFLOTRAN `.dat` файлов и unit-тестами монотонности.
 - Добавлен интерфейс редактирования табличных кривых почвы на странице `Исходные данные`: паспорт кривой, точки `h/P/theta/S/kr/K`, сохранение, обновление и удаление через SQLite API.
 - Добавлен модуль `soilflow_pflotran_modules.profile_carrier` для генерации PFLOTRAN profile-carrier deck'ов расширенных аналитических тестов.
 - Добавлен API `/api/soil-curves` для создания, чтения, списка и удаления табличных кривых почвы, привязанных к расчету.
@@ -35,6 +37,7 @@
 - Добавлена панель прогресса задач в левом меню: общий индикатор по последним задачам и отдельный индикатор текущего запуска.
 
 ### Changed
+- В интерфейсе `Исходные данные` табличная кривая стала разрешенной моделью влагопроводности для аналитических моделей водоудерживания `van_genuchten` и `brooks_corey`.
 - JSON-снимок расчета, передаваемый в CLI при запуске расчета или визуализации, теперь включает `soil_curve_tables` сохраненного расчета.
 - Генератор profile-carrier deck'ов вынесен из `soilflow_pflotran.py`, чтобы продолжить декомпозицию монолита без изменения CLI-контракта.
 - Из `soilflow_pflotran.py` вынесен блок extended analytical helpers; основной скрипт стал ближе к CLI-фасаду.
@@ -89,7 +92,7 @@
 - Удалены старые frontend alias-маршруты `/inputs`, `/vvod`, `/jobs`, `/zadachi`, `/tests`, `/results`, `/rezultaty`, `/visualization`, `/system`.
 
 ### Technical
-- При выборе табличной модели в расчетном CLI выводится явная русскоязычная ошибка: хранение таблиц уже поддержано, а генерация PFLOTRAN tabular `CHARACTERISTIC_CURVES` остается отдельным следующим шагом.
+- Табличная влагопроводность передается в PFLOTRAN через внешний `.dat` файл с колонками `saturation kr`; табличное водоудерживание пока хранится в SQLite, но не включается в PFLOTRAN deck из-за проваленного smoke-run `SATURATION_FUNCTION PCHIP` в текущей сборке PFLOTRAN.
 - SQLite-хранилище переведено на явный журнал `schema_migrations`; текущая миграция сохраняет обратную совместимость с базами без `jobs.calculation_id`.
 - Строковые статусы заданий и расчетов вынесены в общий backend-модуль `job_lifecycle.py`.
 - `.gitignore` расширен для SQLite WAL/SHM, frontend dist, Vite temp, локальных архивов, uploads/tmp и generated visualization artifacts.

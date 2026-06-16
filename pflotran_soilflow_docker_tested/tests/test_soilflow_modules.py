@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from soilflow_pflotran_modules.physical_models import (
     validate_soil_model_pair,
 )
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
+from soilflow_pflotran_modules.tabular_curves import build_tabular_permeability_assets
 
 
 class InputContractTests(unittest.TestCase):
@@ -54,6 +56,10 @@ class PhysicalModelTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_soil_model_pair("gardner", "mualem")
 
+    def test_tabular_pair_is_accepted(self) -> None:
+        validate_soil_model_pair("van_genuchten", "tabular")
+        self.assertEqual(model_pair_label("van_genuchten", "tabular"), "van Genuchten + Табличная кривая")
+
 
 class ExtendedAnalyticalTests(unittest.TestCase):
     def test_green_ampt_solution_is_monotonic(self) -> None:
@@ -84,6 +90,52 @@ class ExtendedAnalyticalTests(unittest.TestCase):
         self.assertIn("MODE RICHARDS", deck)
         self.assertIn("FORMAT TECPLOT POINT", deck)
         self.assertIn("CHARACTERISTIC_CURVES cc_vg", deck)
+
+    def test_tabular_curves_generate_pchip_permeability_file(self) -> None:
+        tables = [
+            {
+                "curve_name": "lab_conductivity",
+                "curve_kind": "conductivity",
+                "points": [
+                    {"saturation": 0.2, "relative_permeability": 0.0},
+                    {"saturation": 0.6, "relative_permeability": 0.25},
+                    {"saturation": 1.0, "relative_permeability": 1.0},
+                ],
+            },
+        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            assets = build_tabular_permeability_assets(
+                tables=tables,
+                workdir=Path(tmpdir),
+                theta_s=0.45,
+                ksat_m_s=1.0e-5,
+            )
+            deck = "\n".join(assets.permeability_function_lines)
+            self.assertIn("PERMEABILITY_FUNCTION PCHIP_LIQ", deck)
+            self.assertEqual(len(assets.written_files), 1)
+            for written_file in assets.written_files:
+                self.assertTrue(written_file.exists())
+
+    def test_tabular_curves_reject_nonmonotonic_kr(self) -> None:
+        tables = [
+            {
+                "curve_name": "bad_conductivity",
+                "curve_kind": "conductivity",
+                "points": [
+                    {"saturation": 0.2, "relative_permeability": 0.0},
+                    {"saturation": 0.6, "relative_permeability": 0.4},
+                    {"saturation": 1.0, "relative_permeability": 0.3},
+                ],
+            }
+        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with self.assertRaises(ValueError):
+                build_tabular_permeability_assets(
+                    tables=tables,
+                    workdir=Path(tmpdir),
+                    theta_s=0.45,
+                    ksat_m_s=1.0e-5,
+                )
 
 
 if __name__ == "__main__":

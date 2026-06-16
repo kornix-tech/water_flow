@@ -6,8 +6,10 @@ from typing import Any
 SUPPORTED_MODEL_PAIRS = {
     ("van_genuchten", "mualem"),
     ("van_genuchten", "burdine"),
+    ("van_genuchten", "tabular"),
     ("brooks_corey", "mualem"),
     ("brooks_corey", "burdine"),
+    ("brooks_corey", "tabular"),
 }
 
 RETENTION_MODEL_LABELS = {
@@ -21,6 +23,7 @@ CONDUCTIVITY_MODEL_LABELS = {
     "burdine": "Burdine",
     "corey": "Corey",
     "gardner": "Gardner",
+    "tabular": "Табличная кривая",
 }
 
 
@@ -73,4 +76,3 @@ def validate_soil_model_pair(retention_model: str, conductivity_model: str) -> N
 
 def model_pair_label(retention_model: str, conductivity_model: str) -> str:
     return f"{RETENTION_MODEL_LABELS[retention_model]} + {CONDUCTIVITY_MODEL_LABELS[conductivity_model]}"
-

@@ -240,7 +240,7 @@
           "unit": "-",
           "description": "Модель водоудерживания: van_genuchten, brooks_corey или gardner. Сейчас для расчета разрешены только проверенные пары; переменная безразмерная.",
           "pflotran": "SATURATION_FUNCTION",
-          "note": "Gardner зарезервирован как вариант интерфейса, но отклоняется валидатором до проверки PFLOTRAN-блока."
+          "note": "Gardner зарезервирован как вариант интерфейса, но отклоняется валидатором до проверки PFLOTRAN-блока. Табличное водоудерживание хранится в SQLite, но не включено в расчет до отдельной проверки PFLOTRAN saturation PCHIP/LOOKUP_TABLE."
         },
         {
           "sheet": "03_Soil",
@@ -250,9 +250,9 @@
           "value": "mualem",
           "value_type": "text",
           "unit": "-",
-          "description": "Модель влагопроводности: mualem, burdine, corey или gardner. Сейчас разрешены только проверенные пары с van_genuchten или brooks_corey; переменная безразмерная.",
+          "description": "Модель влагопроводности: mualem, burdine, tabular, corey или gardner. Сейчас разрешены проверенные пары с van_genuchten или brooks_corey; переменная безразмерная.",
           "pflotran": "PERMEABILITY_FUNCTION",
-          "note": "Corey и Gardner зарезервированы как варианты интерфейса, но отклоняются валидатором до проверки liquid-реализации."
+          "note": "tabular использует сохраненные soil_curve_tables и PFLOTRAN PCHIP_LIQ. Corey и Gardner зарезервированы как варианты интерфейса, но отклоняются валидатором до проверки liquid-реализации."
         },
         {
           "sheet": "03_Soil",

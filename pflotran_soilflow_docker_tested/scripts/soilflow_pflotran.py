@@ -55,6 +55,7 @@ from soilflow_pflotran_modules.physical_models import (
     validate_soil_model_pair,
 )
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
+from soilflow_pflotran_modules.tabular_curves import build_tabular_permeability_assets
 
 CONFIG_SHEETS = {
     "01_Project",
@@ -314,11 +315,6 @@ def compute_derived(params: dict[str, Any], weather: list[dict[str, Any]]) -> De
     theta_r = as_float(params.get("theta_r"))
     retention_model = normalize_model_token(params.get("retention_model"), "van_genuchten")
     conductivity_model = normalize_model_token(params.get("conductivity_model"), "mualem")
-    if retention_model == "tabular" or conductivity_model == "tabular":
-        raise ValueError(
-            "Табличные кривые soil_curve_tables уже сохраняются в JSON-снимке расчета, "
-            "но генерация PFLOTRAN tabular CHARACTERISTIC_CURVES будет подключена отдельным шагом."
-        )
     vg_alpha_1_m = as_float(params.get("vg_alpha_1_m"))
     vg_n = as_float(params.get("vg_n"))
     bc_lambda = as_float(params.get("bc_lambda"), 2.0)
@@ -393,6 +389,7 @@ def characteristic_curves_lines(
     alpha_pa_inv: float,
     vg_m: float,
     bc_lambda: float,
+    permeability_function_lines: list[str] | None = None,
 ) -> list[str]:
     validate_soil_model_pair(retention_model, conductivity_model)
     lines = [f"CHARACTERISTIC_CURVES {name}"]
@@ -413,6 +410,10 @@ def characteristic_curves_lines(
             "  /",
         ]
 
+    if permeability_function_lines is not None:
+        lines += [*permeability_function_lines, "/"]
+        return lines
+
     if retention_model == "brooks_corey":
         permeability_function = "BURDINE_BC_LIQ" if conductivity_model == "burdine" else "MUALEM_BC_LIQ"
         parameter_lines = [f"    LAMBDA {pf_float(bc_lambda)}"]
@@ -429,7 +430,11 @@ def characteristic_curves_lines(
     return lines
 
 
-def generate_pflotran_input(params: dict[str, Any], derived: Derived) -> str:
+def generate_pflotran_input(
+    params: dict[str, Any],
+    derived: Derived,
+    permeability_function_lines: list[str] | None = None,
+) -> str:
     if normalize_model_token(params.get("scenario_type"), "standard") == "floodplain_controlled_drainage":
         return generate_floodplain_drainage_input(params)
 
@@ -496,6 +501,7 @@ def generate_pflotran_input(params: dict[str, Any], derived: Derived) -> str:
             alpha_pa_inv=derived.alpha_pa_inv,
             vg_m=derived.vg_m,
             bc_lambda=derived.bc_lambda,
+            permeability_function_lines=permeability_function_lines,
         ),
         "",
         *test_output_block("    PERIODIC TIMESTEP 1"),
@@ -3488,7 +3494,17 @@ def run_demo_mode(args: argparse.Namespace) -> int:
     workdir.mkdir(parents=True, exist_ok=True)
 
     write_weather_csv(weather, workdir / "forcing_daily.csv")
-    input_text = generate_pflotran_input(params, derived)
+    permeability_function_lines = None
+    if derived.conductivity_model == "tabular":
+        tabular_assets = build_tabular_permeability_assets(
+            tables=soil_curve_tables,
+            workdir=workdir,
+            theta_s=as_float(params.get("theta_s")),
+            ksat_m_s=as_float(params.get("ksat_m_s")),
+        )
+        permeability_function_lines = tabular_assets.permeability_function_lines
+
+    input_text = generate_pflotran_input(params, derived, permeability_function_lines=permeability_function_lines)
     (workdir / "pflotran.in").write_text(input_text, encoding="utf-8")
     write_summary(params, derived, weather, workdir / "soilflow_run_summary.txt", soil_curve_table_count=len(soil_curve_tables))
 
