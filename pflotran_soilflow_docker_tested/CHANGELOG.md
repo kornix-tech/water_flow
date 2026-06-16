@@ -11,6 +11,7 @@
 - Добавлены модули `soilflow_pflotran_modules.solver_runner` и `soilflow_pflotran_modules.surface_balance` как replaceable adapter boundaries для solver-а и блока верхнего водного баланса/испарения.
 - Добавлены модули `soilflow_pflotran_modules.floodplain_deck_writer`, `result_contract` и `test_evaluation`, а также smoke `scripts/smoke_modular_scenarios.sh`.
 - Добавлены модули `soilflow_pflotran_modules.test_registry` и `test_artifacts` для маршрутизации тестов, путей suite и общих CSV/SVG/overlay artifacts.
+- Добавлен модуль `soilflow_pflotran_modules.profile_benchmarks` для генерации аналитических profile overlay и оценки TECPLOT-ready статусов профильных benchmarks.
 - Добавлена архитектурная схема `docs/ARCHITECTURE_RU.md` с текущими потоками данных и заменяемыми adapter-границами.
 - Добавлен модуль `soilflow_pflotran_modules.tabular_curves` с нормализацией табличных кривых, записью PFLOTRAN `.dat` файлов и unit-тестами монотонности.
 - Добавлен интерфейс редактирования табличных кривых почвы на странице `Исходные данные`: паспорт кривой, точки `h/P/theta/S/kr/K`, сохранение, обновление и удаление через SQLite API.
@@ -60,6 +61,7 @@
 - Поиск/запуск PFLOTRAN и расчет производных параметров верхнего потока вынесены из `soilflow_pflotran.py`; фасад больше не содержит прямого `subprocess` runner-а и текущая ET-логика изолирована для будущей замены.
 - Специализированная floodplain-постановка, базовая сборка статусов тестов и suite status вынесены из `soilflow_pflotran.py`; `check_project.sh` теперь компилирует весь каталог `scripts` и запускает modular scenario smoke.
 - Список verification/profile тестов, выбор `all`, пути рабочих папок и общие CSV/SVG helpers вынесены из `soilflow_pflotran.py`; CLI сохраняет прежний контракт `--test`, `--workdir`, `--output-dir`.
+- Генерация `analytical_profiles.csv` и оценка profile-smoke TECPLOT-статуса вынесены из `soilflow_pflotran.py`; helper'ы van Genuchten saturation/kr перенесены в `physical_models.py`.
 - Verification-suite теперь явно разделяет уровни `strict_analytical`, `partial_balance` и `profile_smoke` в `TEST_STATUS.txt`, suite summary и web-описаниях тестов.
 - Первый блок `soilflow_pflotran.py` вынесен из монолита в модули: парсинг входных значений, PFLOTRAN float-format и валидация пар моделей почвы.
 - Все расширенные аналитические benchmarks теперь генерируют PFLOTRAN `RICHARDS` profile carrier, `pflotran.in` и `analytical_profiles.csv`, чтобы после запуска были расчетные TECPLOT-профили для графиков.

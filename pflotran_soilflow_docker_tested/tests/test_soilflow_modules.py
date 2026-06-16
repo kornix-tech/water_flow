@@ -23,7 +23,15 @@ from soilflow_pflotran_modules.physical_models import (
     model_pair_label,
     normalize_grid_dimension,
     normalize_model_token,
+    pressure_head_from_vg_saturation,
+    saturation_from_effective_saturation,
     validate_soil_model_pair,
+    vg_effective_saturation_from_pressure_head,
+    vg_mualem_relative_permeability,
+)
+from soilflow_pflotran_modules.profile_benchmarks import (
+    profile_status_fields_after_run,
+    write_richards_profile_analytical_profiles,
 )
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
 from soilflow_pflotran_modules.result_contract import profile_rows_to_contract
@@ -88,6 +96,7 @@ class ArchitectureContractTests(unittest.TestCase):
         self.assertIn("result_diagnostics", MODULE_BOUNDARIES)
         self.assertIn("result_contract", MODULE_BOUNDARIES)
         self.assertIn("test_evaluation", MODULE_BOUNDARIES)
+        self.assertIn("profile_benchmarks", MODULE_BOUNDARIES)
 
 
 class PhysicalModelTests(unittest.TestCase):
@@ -108,6 +117,23 @@ class PhysicalModelTests(unittest.TestCase):
         validate_soil_model_pair("van_genuchten", "tabular")
         self.assertEqual(model_pair_label("van_genuchten", "tabular"), "van Genuchten + Табличная кривая")
         validate_soil_model_pair("tabular", "tabular")
+
+    def test_van_genuchten_helpers_are_bounded_and_invertible(self) -> None:
+        residual_saturation = 0.1
+        alpha_1_m = 3.6
+        n = 1.56
+        m = 1.0 - 1.0 / n
+
+        effective_saturation = vg_effective_saturation_from_pressure_head(-0.8, alpha_1_m, n, m)
+        saturation = saturation_from_effective_saturation(effective_saturation, residual_saturation)
+        pressure_head = pressure_head_from_vg_saturation(saturation, residual_saturation, alpha_1_m, n, m)
+        relative_permeability = vg_mualem_relative_permeability(effective_saturation, m)
+
+        self.assertGreater(effective_saturation, 0.0)
+        self.assertLessEqual(effective_saturation, 1.0)
+        self.assertAlmostEqual(pressure_head, -0.8, places=9)
+        self.assertGreaterEqual(relative_permeability, 0.0)
+        self.assertLessEqual(relative_permeability, 1.0)
 
 
 class ExtendedAnalyticalTests(unittest.TestCase):
@@ -377,6 +403,45 @@ class TestArtifactsTests(unittest.TestCase):
             self.assertIn("time_days", (workdir / "rows.csv").read_text(encoding="utf-8"))
             self.assertIn("<svg", (workdir / "curve.svg").read_text(encoding="utf-8"))
             self.assertEqual(diagnostics["analytical_overlay_check"], "PASS")
+
+
+class ProfileBenchmarkTests(unittest.TestCase):
+    def test_richards_profile_overlay_rows_are_written_for_mms(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = Path(tmpdir)
+
+            write_richards_profile_analytical_profiles("richards_mms", workdir)
+            text = (workdir / "analytical_profiles.csv").read_text(encoding="utf-8")
+
+            self.assertIn("pressure_head_m", text)
+            self.assertIn("theta_m3_m3", text)
+
+    def test_profile_status_fields_use_tecpot_profile_and_overlay(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = Path(tmpdir)
+            (workdir / "pflotran-001.tec").write_text(
+                "\n".join(
+                    [
+                        'VARIABLES = "X [m]", "Y [m]", "Z [m]", "Liquid Pressure [Pa]", "Liquid Saturation"',
+                        "ZONE T=\"0\"",
+                        "0 0 0.25 101000 0.90",
+                        "0 0 0.75 99000 0.80",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            write_rows_csv(
+                workdir / "analytical_profiles.csv",
+                [{"depth_m": 0.1, "theta_m3_m3": 0.3, "pressure_head_m": -1.0}],
+            )
+
+            fields = profile_status_fields_after_run("richards_mms", workdir)
+
+            self.assertEqual(fields["verification_level"], "profile_smoke")
+            self.assertEqual(fields["profile_status"], "TECPLOT_READY")
+            self.assertEqual(fields["analytical_overlay_check"], "PASS")
+            self.assertEqual(fields["profile_points"], 2)
 
 
 class ResultDiagnosticsTests(unittest.TestCase):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 
@@ -78,3 +79,30 @@ def validate_soil_model_pair(retention_model: str, conductivity_model: str) -> N
 
 def model_pair_label(retention_model: str, conductivity_model: str) -> str:
     return f"{RETENTION_MODEL_LABELS[retention_model]} + {CONDUCTIVITY_MODEL_LABELS[conductivity_model]}"
+
+
+def vg_effective_saturation_from_pressure_head(h_m: float, alpha_1_m: float, n: float, m: float) -> float:
+    if h_m >= 0:
+        return 1.0
+    return (1.0 + (alpha_1_m * abs(h_m)) ** n) ** (-m)
+
+
+def saturation_from_effective_saturation(se: float, residual_saturation: float) -> float:
+    bounded_effective_saturation = max(0.0, min(1.0, se))
+    return residual_saturation + (1.0 - residual_saturation) * bounded_effective_saturation
+
+
+def pressure_head_from_vg_saturation(saturation: float, residual_saturation: float, alpha_1_m: float, n: float, m: float) -> float:
+    if saturation >= 1.0:
+        return 0.0
+    effective_saturation = (saturation - residual_saturation) / max(1.0e-12, 1.0 - residual_saturation)
+    effective_saturation = max(1.0e-12, min(1.0, effective_saturation))
+    return -((effective_saturation ** (-1.0 / m) - 1.0) ** (1.0 / n)) / alpha_1_m
+
+
+def vg_mualem_relative_permeability(se: float, m: float) -> float:
+    bounded_effective_saturation = max(0.0, min(1.0, se))
+    if bounded_effective_saturation <= 0.0:
+        return 0.0
+    term = 1.0 - (1.0 - bounded_effective_saturation ** (1.0 / m)) ** m
+    return math.sqrt(bounded_effective_saturation) * term * term

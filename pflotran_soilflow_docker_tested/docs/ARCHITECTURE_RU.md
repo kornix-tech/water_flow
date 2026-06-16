@@ -46,6 +46,8 @@ flowchart LR
   `partial_balance`, `profile_smoke`.
 - `test_artifacts.py` - общие CSV/SVG artifacts и диагностика аналитического
   overlay.
+- `profile_benchmarks.py` - профильные benchmark artifacts: `analytical_profiles.csv`,
+  TECPLOT-ready status и profile-smoke diagnostics после запуска PFLOTRAN.
 
 ## Заменяемые границы
 
@@ -63,6 +65,9 @@ flowchart LR
 - Часть аналитических test deck/evaluator функций ещё остается в
   `soilflow_pflotran.py`; следующий крупный рефакторинг должен выделить
   `test_builders` и `test_evaluators`.
+- Профильные benchmark overlay и TECPLOT-status уже вынесены в
+  `profile_benchmarks.py`, но физические strict-evaluator'ы для них еще не
+  подключены.
 - Profile smoke тесты не считаются строгой верификацией: они проверяют
   генерацию PFLOTRAN-профиля и аналитического reference artifact, но не
   физическое совпадение с Theis/Ogata/Terzaghi/heat/Buckley и другими моделями.

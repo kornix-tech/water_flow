@@ -620,6 +620,7 @@ scripts/__pycache__/
 6. Для многофакторного исследования дождя/импеданса нужны более легкие расчетные сетки или план эксперимента, иначе серия 3 x 3 работает долго.
 7. Табличные экспериментальные кривые уже хранятся в SQLite, редактируются через frontend, проходят UI-валидацию/предпросмотр и попадают в временный JSON-снимок расчета как `soil_curve_tables`; табличное водоудерживание передается в PFLOTRAN через `LOOKUP_TABLE`, табличная влагопроводность - через `PCHIP_LIQ`.
 8. Пара `Голованов-Аверьянов` обозначена как предметная цель, но не доведена до проверенной PFLOTRAN-реализации.
+9. Профильные benchmark artifacts и TECPLOT-ready status вынесены в `soilflow_pflotran_modules.profile_benchmarks`; strict-evaluator'ы для Theis/Ogata/Terzaghi/heat/Buckley/Boussinesq/Richards MMS еще не подключены.
 
 ## 15. Что важно сохранить в следующих итерациях
 
@@ -636,8 +637,8 @@ scripts/__pycache__/
 ## 16. Рекомендуемый следующий план разработки
 
 1. Для релизного состояния выполнить полную пересборку Docker image и сверить ее с hot-copy workflow.
-2. Продолжить перенос тестового слоя `soilflow_pflotran.py` в `test_builders` и `test_evaluators`: dataclass-параметры, generator, evaluator и expected artifacts.
-3. Довести расширенные profile carrier тесты до строгих физических deck'ов PFLOTRAN для transport/heat/two-phase/groundwater задач.
+2. Продолжить перенос тестового слоя `soilflow_pflotran.py` в `test_builders` и `test_evaluators`: dataclass-параметры, generator и строгие evaluator'ы для Richards/VG/Brooks-Corey тестов.
+3. Довести расширенные profile carrier тесты до строгих физических deck'ов PFLOTRAN для transport/heat/two-phase/groundwater задач, подключая их через `profile_benchmarks.py`.
 4. При замене solver-а подключать новый adapter рядом с `solver_runner.py` и parser-adapter рядом с `result_diagnostics.py`, возвращая `result_contract.py`; при замене испарения подключать новую реализацию через `surface_balance.py`/forcing contract.
 5. Для дренажной задачи вынести исследовательские сценарии в отдельный воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`, `УГВ`, `C`, `G`, `Z`.
 6. Отдельно решить, остается ли регулируемый колодец эквивалентным sink или нужен явный модуль hydraulic network.

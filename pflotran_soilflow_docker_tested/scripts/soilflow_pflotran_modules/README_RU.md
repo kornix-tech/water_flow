@@ -9,7 +9,8 @@ CLI и web-backend. Этот пакет задает безопасные гра
 - `input_contract.py`: приведение чисел/булевых значений, optional float,
   ключи и PFLOTRAN d-формат чисел.
 - `physical_models.py`: нормализация токенов, размерность сетки, разрешенные
-  пары моделей водоудерживания/влагопроводности.
+  пары моделей водоудерживания/влагопроводности и общие helper'ы van
+  Genuchten saturation/relative permeability.
 - `extended_analytical.py`: расширенные аналитические эталоны, Green-Ampt,
   Buckley-Leverett и нормированный профиль для overlay с PFLOTRAN.
 - `profile_carrier.py`: генерация PFLOTRAN `RICHARDS` profile-carrier deck'ов
@@ -35,6 +36,8 @@ CLI и web-backend. Этот пакет задает безопасные гра
   проверки `strict_analytical`/`partial_balance`/`profile_smoke`.
 - `test_artifacts.py`: общие CSV/SVG artifacts и проверка аналитического overlay
   для profile-тестов.
+- `profile_benchmarks.py`: генерация `analytical_profiles.csv` для расширенных
+  profile benchmark'ов и сборка TECPLOT-ready статуса после PFLOTRAN запуска.
 - `solver_runner.py`: поиск исполняемого PFLOTRAN, native/WSL запуск и запись
   логов без знания физической постановки. Это текущий solver adapter.
 - `surface_balance.py`: нормализация погодных строк, расчет `net_surface_input`,

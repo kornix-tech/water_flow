@@ -37,6 +37,7 @@ MODULE_BOUNDARIES = {
     "test_evaluation": "Единая сборка PASS/WARN/FAIL, UNKNOWN/PFLOTRAN_ERROR и suite status.",
     "test_registry": "Реестр verification/profile тестов, выбор сценариев и рабочие пути suite.",
     "test_artifacts": "Общие CSV/SVG artifacts и diagnostics аналитического overlay.",
+    "profile_benchmarks": "Генерация аналитических profile overlay и оценка TECPLOT-ready статуса профильных benchmarks.",
     "analytical_tests": "Аналитические профили и метрики сравнения численных тестов.",
 }
 

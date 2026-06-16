@@ -40,8 +40,6 @@ from typing import Any
 
 from soilflow_pflotran_modules.extended_analytical import (
     generate_extended_analytical_rows,
-    generate_normalized_profile_rows,
-    green_ampt_cumulative_infiltration,
 )
 from soilflow_pflotran_modules.floodplain_deck_writer import (
     generate_floodplain_drainage_input,
@@ -58,14 +56,20 @@ from soilflow_pflotran_modules.input_contract import as_bool, as_float, as_int, 
 from soilflow_pflotran_modules.physical_models import (
     model_pair_label,
     normalize_model_token,
+    saturation_from_effective_saturation,
     validate_soil_model_pair,
+    vg_effective_saturation_from_pressure_head,
+    vg_mualem_relative_permeability,
+)
+from soilflow_pflotran_modules.profile_benchmarks import (
+    evaluate_profile_test_after_run as evaluate_profile_benchmark_after_run,
+    write_richards_profile_analytical_profiles,
 )
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
 from soilflow_pflotran_modules.result_diagnostics import (
     classify_pflotran_warnings,
     compute_saturation_bounds,
     direct_flux_output_probe,
-    find_final_tec_file,
     fit_line_slope,
     load_tecpotran_records,
     load_transient_snapshots,
@@ -87,7 +91,6 @@ from soilflow_pflotran_modules.surface_balance import (
 )
 from soilflow_pflotran_modules.tabular_curves import build_tabular_characteristic_curve_assets, build_tabular_permeability_assets
 from soilflow_pflotran_modules.test_artifacts import (
-    analytical_profile_overlay_diagnostics,
     write_curve_svg,
     write_rows_csv,
     write_xy_svg,
@@ -444,12 +447,6 @@ def analytical_potential(test: LinearDarcyTest, z_m: float) -> float:
     return analytical_pressure(test, z_m) + test.rho_water_kg_m3 * test.gravity_m_s2 * z_m
 
 
-def vg_effective_saturation_from_pressure_head(h_m: float, alpha_1_m: float, n: float, m: float) -> float:
-    if h_m >= 0.0:
-        return 1.0
-    return (1.0 + (alpha_1_m * abs(h_m)) ** n) ** (-m)
-
-
 def brooks_corey_effective_saturation_from_pressure_head(h_m: float, alpha_1_m: float, bc_lambda: float) -> float:
     if h_m >= 0.0:
         return 1.0
@@ -457,11 +454,6 @@ def brooks_corey_effective_saturation_from_pressure_head(h_m: float, alpha_1_m: 
     if capillary_factor <= 1.0:
         return 1.0
     return capillary_factor ** (-bc_lambda)
-
-
-def saturation_from_effective_saturation(se: float, residual_saturation: float) -> float:
-    se = max(0.0, min(1.0, se))
-    return residual_saturation + (1.0 - residual_saturation) * se
 
 
 def effective_saturation_from_saturation(saturation: float, residual_saturation: float) -> float:
@@ -483,15 +475,6 @@ def brooks_corey_pressure_head_from_saturation(saturation: float, residual_satur
     if se >= 1.0:
         return 0.0
     return -(se ** (-1.0 / bc_lambda)) / alpha_1_m
-
-
-def mualem_vg_relative_permeability(se: float, m: float) -> float:
-    se = max(0.0, min(1.0, se))
-    if se <= 0.0:
-        return 0.0
-    if se >= 1.0:
-        return 1.0
-    return math.sqrt(se) * (1.0 - (1.0 - se ** (1.0 / m)) ** m) ** 2
 
 
 def burdine_vg_relative_permeability(se: float, m: float) -> float:
@@ -531,7 +514,7 @@ def richards_relative_permeability(test: VGRichardsTest, se: float) -> float:
         return brooks_corey_relative_permeability(se, test.bc_lambda, test.conductivity_model)
     if test.conductivity_model == "burdine":
         return burdine_vg_relative_permeability(se, test.m)
-    return mualem_vg_relative_permeability(se, test.m)
+    return vg_mualem_relative_permeability(se, test.m)
 
 
 def build_vg_test(params: dict[str, Any], test_kind: str) -> VGRichardsTest:
@@ -1788,123 +1771,6 @@ def evaluate_vg_test_after_run(test: VGRichardsTest, workdir: Path) -> TestResul
         return TestResult(test.test_id, "UNKNOWN", workdir, {"reason": f"{type(exc).__name__}: {exc}"})
 
 
-def evaluate_profile_test_after_run(test_name: str, workdir: Path) -> TestResult:
-    status_path = workdir / "TEST_STATUS.txt"
-    try:
-        tec_files = sorted(p for p in workdir.glob("pflotran-[0-9]*.tec") if p.is_file() and "-vel-" not in p.name)
-        if not tec_files:
-            raise FileNotFoundError("PFLOTRAN не записал TECPLOT snapshot-файлы")
-        _, records = load_tecpotran_records(workdir)
-        converted = records_to_z_pressure_saturation(records)
-        pressure_values = [row["pressure_pa"] for row in converted]
-        saturation_values = [row["saturation"] for row in converted]
-        status_fields = {
-            "TEST_STATUS": "PASS_WITH_WARNINGS",
-            "test_id": f"_test_{test_name}",
-            "verification_level": verification_level_for_test(test_name),
-            "verification_note": "Profile smoke: PFLOTRAN строит расчетный Richards-профиль, но строгая физическая постановка и аналитическая метрика для этого benchmark еще не подключены.",
-            "numerical_comparison": "PFLOTRAN_PROFILE_ONLY",
-            "profile_status": "TECPLOT_READY",
-            "tecplot_snapshot_count": len(tec_files),
-            "final_tecplot_file": find_final_tec_file(workdir).name if find_final_tec_file(workdir) else "NA",
-            "profile_points": len(converted),
-            "pressure_min_pa": f"{min(pressure_values):.12g}",
-            "pressure_max_pa": f"{max(pressure_values):.12g}",
-            "saturation_min": f"{min(saturation_values):.12g}",
-            "saturation_max": f"{max(saturation_values):.12g}",
-            "note": "PFLOTRAN расчетные профили построены; строгая аналитическая метрика для этого benchmark будет подключена отдельной задачей.",
-        }
-        status_fields.update(analytical_profile_overlay_diagnostics(workdir))
-        write_unified_status(status_path, status_fields)
-        print(f"[TEST] PASS_WITH_WARNINGS: _test_{test_name} PFLOTRAN TECPLOT profiles={len(tec_files)}")
-        return TestResult(f"_test_{test_name}", "PASS_WITH_WARNINGS", workdir, status_fields)
-    except Exception as exc:
-        reason = write_unknown_status(status_path, exc)
-        print(f"[TEST] UNKNOWN _test_{test_name}: {exc}", file=sys.stderr)
-        return TestResult(f"_test_{test_name}", "UNKNOWN", workdir, {"reason": reason})
-
-
-def write_richards_profile_analytical_profiles(test_name: str, workdir: Path) -> None:
-    length_m = 1.2
-    nz = 96
-    dz = length_m / nz
-    porosity = 0.43
-    residual_saturation = 0.10465116279069768
-    alpha_1_m = 3.6
-    n = 1.56
-    m = 1.0 - 1.0 / n
-    output_interval_days = 0.025
-    if test_name not in {"green_ampt_infiltration", "philip_infiltration", "richards_mms"}:
-        write_rows_csv(workdir / "analytical_profiles.csv", generate_normalized_profile_rows(test_name, length_m))
-        return
-
-    if test_name == "green_ampt_infiltration":
-        final_time_days = 0.5
-        initial_head_m = -1.4
-        ksat_m_s = 1.0e-6
-        suction_m = 0.25
-        delta_theta = 0.25
-    elif test_name == "philip_infiltration":
-        final_time_days = 0.25
-        initial_head_m = -1.0
-        sorptivity = 0.012
-        a_coeff = 2.0e-6
-    else:
-        final_time_days = 0.5
-        initial_head_m = -1.0
-        amplitude = 0.2
-        tau_days = 1.0
-
-    initial_se = vg_effective_saturation_from_pressure_head(initial_head_m, alpha_1_m, n, m)
-    initial_saturation = saturation_from_effective_saturation(initial_se, residual_saturation)
-    initial_theta = porosity * initial_saturation
-    frame_count = int(round(final_time_days / output_interval_days)) + 2
-    rows: list[dict[str, float]] = []
-    for frame_index in range(frame_count):
-        time_days = min(final_time_days, frame_index * output_interval_days)
-        time_s = time_days * 86400.0
-        if test_name == "green_ampt_infiltration":
-            cumulative_m = green_ampt_cumulative_infiltration(time_s, ksat_m_s, suction_m, delta_theta)
-            wetting_depth_m = min(length_m, cumulative_m / max(1.0e-12, porosity - initial_theta))
-        elif test_name == "philip_infiltration":
-            cumulative_m = sorptivity * math.sqrt(max(0.0, time_s)) + a_coeff * time_s
-            wetting_depth_m = min(length_m, cumulative_m / max(1.0e-12, porosity - initial_theta))
-        else:
-            wetting_depth_m = 0.0
-
-        for cell_id in range(1, nz + 1):
-            z_center_m = (cell_id - 0.5) * dz
-            depth_m = length_m - z_center_m
-            if test_name == "richards_mms":
-                pressure_head_m = initial_head_m + amplitude * math.sin(math.pi * z_center_m / length_m) * math.exp(
-                    -time_days / tau_days
-                )
-                se = vg_effective_saturation_from_pressure_head(pressure_head_m, alpha_1_m, n, m)
-                theta = porosity * saturation_from_effective_saturation(se, residual_saturation)
-            else:
-                # Для инфильтрационных эталонов аналитика задаёт интегральное
-                # продвижение фронта. На график выводим эквивалентный профиль
-                # wetting-front, чтобы PFLOTRAN-профиль сравнивался с эталоном
-                # прямо в координатах глубины.
-                if depth_m <= wetting_depth_m:
-                    theta = porosity
-                    pressure_head_m = -0.02
-                else:
-                    theta = initial_theta
-                    pressure_head_m = initial_head_m
-            rows.append(
-                {
-                    "frame_index": frame_index,
-                    "time_days": time_days,
-                    "cell_id": cell_id,
-                    "depth_m": depth_m,
-                    "theta_m3_m3": theta,
-                    "pressure_head_m": pressure_head_m,
-                }
-            )
-    write_rows_csv(workdir / "analytical_profiles.csv", rows)
-
-
 def run_extended_pflotran_profile_test(args: argparse.Namespace, test_name: str) -> TestResult:
     workdir = test_workdir(args, test_name)
     workdir.mkdir(parents=True, exist_ok=True)
@@ -1937,7 +1803,7 @@ def run_extended_pflotran_profile_test(args: argparse.Namespace, test_name: str)
         if rc != 0:
             write_pflotran_error_status(workdir / "TEST_STATUS.txt", rc)
             return TestResult(f"_test_{test_name}", "PFLOTRAN_ERROR", workdir, {"exit_code": rc})
-        return evaluate_profile_test_after_run(test_name, workdir)
+        return evaluate_profile_benchmark_result(test_name, workdir)
 
     if args.prefer_wsl:
         wsl_exe = find_pflotran_wsl()
@@ -1946,13 +1812,24 @@ def run_extended_pflotran_profile_test(args: argparse.Namespace, test_name: str)
             if rc != 0:
                 write_pflotran_error_status(workdir / "TEST_STATUS.txt", rc)
                 return TestResult(f"_test_{test_name}", "PFLOTRAN_ERROR", workdir, {"exit_code": rc})
-            return evaluate_profile_test_after_run(test_name, workdir)
+            return evaluate_profile_benchmark_result(test_name, workdir)
 
     (workdir / "TEST_STATUS.txt").write_text(
         "TEST_STATUS=GENERATED_ONLY\nPFLOTRAN executable was not found; analytical files and pflotran.in were generated only.\n",
         encoding="utf-8",
     )
     return TestResult(f"_test_{test_name}", "GENERATED_ONLY", workdir, {})
+
+
+def evaluate_profile_benchmark_result(test_name: str, workdir: Path) -> TestResult:
+    try:
+        result = evaluate_profile_benchmark_after_run(test_name, workdir, TestResult)
+        print(f"[TEST] {result.status}: _test_{test_name} PFLOTRAN profile benchmark")
+        return result
+    except Exception as exc:
+        reason = write_unknown_status(workdir / "TEST_STATUS.txt", exc)
+        print(f"[TEST] UNKNOWN _test_{test_name}: {exc}", file=sys.stderr)
+        return TestResult(f"_test_{test_name}", "UNKNOWN", workdir, {"reason": reason})
 
 
 def evaluate_transient_storage_after_run(test: TransientStorageTest, workdir: Path) -> TestResult:
