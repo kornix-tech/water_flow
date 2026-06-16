@@ -75,7 +75,7 @@ def submit_calculation_run(request: Request, calculation_id: int, run_name: str 
     calculation_input_snapshot_path = settings.tmp_dir / "calculations" / f"calculation_{calculation.id:06d}.json"
     write_workbook_json(workbook, calculation_input_snapshot_path)
     normalized_run_name = run_name or f"calculation_{calculation.id:06d}"
-    command, command_run_name, output_dir = soilflow_cli.demo_command(
+    command, command_run_name, output_dir = soilflow_cli.calculation_command(
         settings,
         normalized_run_name,
         input_json=calculation_input_snapshot_path,

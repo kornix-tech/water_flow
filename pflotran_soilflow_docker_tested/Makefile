@@ -1,6 +1,6 @@
 IMAGE_NAME ?= soilflow-pflotran:local
 
-.PHONY: build run test test-strict test-linear test-hydrostatic test-unit-gradient test-transient dry-run dry-test dry-test-transient visualize visualize-demo visualize-test-linear visualize-test-hydrostatic visualize-test-unit-gradient visualize-test-transient visualize-selftest web-build web-up web-down web-logs web-open web-shell web-test-api check shell save clean
+.PHONY: build run test test-strict test-linear test-hydrostatic test-unit-gradient test-transient dry-run dry-test dry-test-transient visualize visualize-demo visualize-test-linear visualize-test-hydrostatic visualize-test-unit-gradient visualize-test-transient visualize-selftest web-build web-up web-down web-logs web-open web-shell web-test-api web-sync project-check check shell save clean
 
 build:
 	IMAGE_NAME=$(IMAGE_NAME) ./scripts/build_image.sh
@@ -77,6 +77,12 @@ web-shell:
 
 web-test-api:
 	curl -f http://localhost:8080/api/health
+
+web-sync:
+	./scripts/sync_to_running_container.sh
+
+project-check:
+	./scripts/check_project.sh
 
 check:
 	docker run --rm $(IMAGE_NAME) check

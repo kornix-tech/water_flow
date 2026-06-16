@@ -1,8 +1,10 @@
 # SoilFlow/PFLOTRAN Docker kit
 
-Автономный Docker-комплект для демонстрационного расчёта влагопереноса в почве на основе уравнения Ричардса с использованием PFLOTRAN как внешнего FVM-решателя.
+Автономный Docker-комплект и web-интерфейс для подготовки, запуска и анализа расчетов влагопереноса в почве. PFLOTRAN используется как внешнее конечно-объемное расчетное ядро, а прикладной слой проекта отвечает за исходные данные, очередь заданий, сохранение расчетов, тесты и визуализацию.
 
-Комплект рассчитан на ваш сценарий: Windows → WSL Ubuntu 24.04 → Docker. После сборки образ содержит PFLOTRAN, PETSc, Python-адаптер, XLSX-шаблон исходных данных и демонстрационный сценарий. Интернет нужен только на стадии `docker build`; запуск расчёта можно выполнять с `--network none`.
+Текущий рабочий режим - web-first: пользователь редактирует исходные данные в интерфейсе, backend сохраняет JSON-снимок расчета в SQLite как `расчет №...`, затем генерирует PFLOTRAN input deck и запускает расчет. XLSX больше не является внутренним этапом подготовки данных и допускается только как формат экспорта/legacy-артефакт.
+
+Комплект рассчитан на сценарий Windows -> WSL Ubuntu 24.04 -> Docker. После сборки образ содержит PFLOTRAN, PETSc, Python-адаптер, FastAPI backend и собранный React/Vite frontend. Интернет нужен на стадии `docker build`; штатный запуск уже собранного расчета не должен зависеть от сети.
 
 ## 1. Состав пакета
 
@@ -23,17 +25,24 @@ scripts/
   save_image.sh                                 экспорт готового образа в .tar
   load_image.sh                                 импорт образа из .tar
   clean_output.sh                               очистка output/runs
-  soilflow_pflotran.py                          XLSX → PFLOTRAN input → запуск PFLOTRAN
+  soilflow_pflotran.py                          JSON-снимок → PFLOTRAN input → запуск PFLOTRAN
+  soilflow_visualize.py                         TECPLOT/CSV → HTML/SVG/CSV графики
+
+web/
+  backend/app/                                  FastAPI API, SQLite jobs/calculations, очередь заданий
+  frontend/src/                                 React/Vite SPA
 
 input/
-  soilflow_pflotran_demo.xlsx                   синтетические входные данные
+  soilflow_pflotran_demo.json                   JSON-шаблон исходных данных
+  soilflow_pflotran_demo.xlsx                   legacy/экспортный формат
 
 output/
-  .gitkeep                                      папка для результатов; монтируется в контейнер как /work
+  .gitkeep                                      папка для generated результатов; не должна попадать в git
 
 docs/
-  ARCHITECTURE_RU.md                            пояснение программной архитектуры
-  LICENSE_NOTES_RU.md                           лицензионные замечания
+  EXTERNAL_CONTEXT_RU.md                        внешний контекст проекта для продолжения разработки
+  WEB_INTERFACE_RU.md                           web-интерфейс
+  ANALYTICAL_TESTS_RU.md                        аналитические и verification-тесты
 ```
 
 ## 2. Что делает контейнер
@@ -43,20 +52,22 @@ docs/
 ```text
 /opt/petsc                                      PETSc, собранный при docker build
 /opt/pflotran                                   PFLOTRAN, собранный при docker build
-/opt/soilflow/scripts/soilflow_pflotran.py      Python-адаптер
-/opt/soilflow/input/soilflow_pflotran_demo.xlsx XLSX demo input
-/work                                           рабочая папка расчёта
+/opt/soilflow/scripts/soilflow_pflotran.py      Python-адаптер расчета
+/opt/soilflow/scripts/soilflow_visualize.py     Python-визуализация
+/opt/soilflow/web/backend/app                   FastAPI backend
+/opt/soilflow/web/frontend/dist                 собранный frontend
+/opt/soilflow/input/soilflow_pflotran_demo.json JSON-шаблон исходных данных
+/workspace                                      рабочая папка web-сервиса
 ```
 
 По умолчанию контейнер выполняет:
 
 ```text
-1. читает XLSX;
-2. генерирует /work/runs/demo_richards/pflotran.in;
-3. генерирует /work/runs/demo_richards/forcing_daily.csv;
-4. генерирует /work/runs/demo_richards/soilflow_run_summary.txt;
+1. читает JSON-снимок исходных данных;
+2. генерирует /workspace/output/runs/<run>/pflotran.in;
+3. генерирует forcing_daily.csv и soilflow_run_summary.txt;
 5. запускает PFLOTRAN;
-6. сохраняет лог и output-файлы PFLOTRAN в /work/runs/demo_richards.
+6. сохраняет лог, output-файлы PFLOTRAN и графики в /workspace/output/runs/<run>.
 ```
 
 ## 3. Быстрый старт в WSL Ubuntu 24.04
@@ -124,6 +135,18 @@ docker run --rm soilflow-pflotran:local check
 
 Команда проверит наличие Python, PFLOTRAN executable, `mpirun` и выполнит сухую генерацию входного файла.
 
+Для проверки актуальной web-разработки используйте:
+
+```bash
+make project-check
+```
+
+Для синхронизации уже запущенного контейнера без полной пересборки образа:
+
+```bash
+make web-sync
+```
+
 ## 5. Запуск без доступа к интернету
 
 Скрипт `run_demo_docker.sh` уже запускает контейнер с:
@@ -139,28 +162,24 @@ docker run --rm soilflow-pflotran:local check
 ```bash
 docker run --rm -it \
   --network none \
-  -v "$PWD/output:/work" \
+  -v "$PWD/output:/workspace/output" \
   soilflow-pflotran:local
 ```
 
-## 6. Запуск с собственным XLSX
+## 6. Запуск с собственными исходными данными
 
-Положите новый XLSX рядом с demo-файлом, например:
-
-```text
-input/my_case.xlsx
-```
-
-Запустите:
-
-```bash
-./scripts/run_demo_docker.sh input/my_case.xlsx /work/runs/my_case
-```
-
-Результаты будут в:
+Актуальный путь - через страницу `/ishodnye`: параметры сохраняются в SQLite как новый `расчет №...`, после чего backend формирует JSON-снимок и PFLOTRAN input deck. Для автоматизированных сценариев используйте JSON-структуру по образцу:
 
 ```text
-output/runs/my_case/
+input/soilflow_pflotran_demo.json
+```
+
+XLSX-файлы старого формата оставлены только как legacy/экспортный формат и не должны использоваться как промежуточное хранилище проекта.
+
+Результаты расчетов пишутся в:
+
+```text
+/workspace/output/runs/<run_name>/
 ```
 
 ## 7. Только генерация PFLOTRAN input без расчёта
@@ -193,7 +212,7 @@ ls -lh /opt/pflotran/src/pflotran/pflotran
 Ручной запуск расчёта внутри контейнера:
 
 ```bash
-cd /work/runs/demo_richards
+cd /workspace/output/runs/demo_richards
 mpirun -n 1 pflotran -pflotranin pflotran.in
 ```
 
@@ -243,20 +262,19 @@ IMAGE_NAME=soilflow-pflotran:dev \
 
 PFLOTRAN в официальной Linux-инструкции указывает PETSc `v3.24.5` и конфигурацию PETSc с `--download-mpich`, `--download-hdf5`, `--download-fblaslapack`, `--download-metis`, `--download-parmetis`; Dockerfile следует этой логике.
 
-## 11. XLSX-файл исходных данных
+## 11. JSON-шаблон исходных данных
 
 Файл:
 
 ```text
-input/soilflow_pflotran_demo.xlsx
+input/soilflow_pflotran_demo.json
 ```
 
-содержит русскоязычные листы с параметрами, единицами измерения и пояснениями физического смысла. В демо заполнены правдоподобные синтетические данные для условной 1D почвенной колонки.
+содержит многовкладочную структуру формы, параметры, единицы измерения и русскоязычные пояснения физического смысла. При сохранении через web-интерфейс эта структура записывается в SQLite как JSON-снимок конкретного расчета.
 
-Основные листы:
+Основные вкладки:
 
 ```text
-00_README
 01_Project
 02_Domain
 03_Soil
@@ -270,13 +288,13 @@ input/soilflow_pflotran_demo.xlsx
 11_Derived_Checks
 ```
 
-Сейчас Python-адаптер читает машинно-значимые пары:
+Python-адаптер читает машинно-значимые поля:
 
 ```text
-Parameter → Value
+key -> value
 ```
 
-а также суточный форсинг с листа `10_Weather_Daily`.
+а также суточный форсинг из вкладки `10_Weather_Daily`.
 
 ## 12. Текущее физическое содержание demo
 
@@ -289,7 +307,7 @@ structured grid
 van Genuchten saturation function
 Mualem relative permeability
 верхняя граница LIQUID_FLUX NEUMANN
-нижняя граница HYDROSTATIC / CONSTANT_PRESSURE / NO_FLOW по XLSX
+нижняя граница HYDROSTATIC / CONSTANT_PRESSURE / NO_FLOW по JSON-параметрам
 TECPLOT POINT output
 ```
 
@@ -299,7 +317,7 @@ TECPLOT POINT output
 precipitation + irrigation - potential_soil_evaporation
 ```
 
-Корневое водопотребление, динамические грунтовые воды и дренаж уже присутствуют в XLSX и архитектурном контракте, но в текущем минимальном `pflotran.in` пока не активированы как полноценные time-dependent `SOURCE_SINK`/drain boundary. Это следующий слой разработки.
+Корневое водопотребление, динамические грунтовые воды и дренаж уже присутствуют в JSON-структуре и архитектурном контракте; специализированная дренажная постановка вынесена в сценарий `floodplain_controlled_drainage`.
 
 ## 13. Связь с официальной документацией PFLOTRAN
 
@@ -376,14 +394,14 @@ output/runs/demo_richards/
 3. dynamic groundwater boundary;
 4. drain boundary / linear drain sink;
 5. постпроцессинг водного баланса;
-6. генерация 2D/3D сеток и boundary patches из XLSX/GIS;
+6. генерация 2D/3D сеток и boundary patches из JSON/GIS;
 7. внешняя модель ET/T через отдельный adapter.
 ```
 
 
 ## Графические схемы
 
-Схемы алгоритма, компонентов и XLSX-контракта добавлены в файл [`docs/SCHEMA_ALGORITHM_COMPONENTS_RU.md`](docs/SCHEMA_ALGORITHM_COMPONENTS_RU.md).
+Схемы алгоритма, компонентов и контракта данных добавлены в файл [`docs/SCHEMA_ALGORITHM_COMPONENTS_RU.md`](docs/SCHEMA_ALGORITHM_COMPONENTS_RU.md). Актуальную архитектуру web/SQLite/JSON см. в [`docs/EXTERNAL_CONTEXT_RU.md`](docs/EXTERNAL_CONTEXT_RU.md).
 
 ---
 
@@ -412,10 +430,10 @@ make test-hydrostatic
 make test-unit-gradient
 ```
 
-Параметры теста находятся в XLSX на листе:
+Параметры тестов находятся в JSON-шаблоне:
 
 ```text
-_test
+input/soilflow_pflotran_demo.json
 ```
 
 Запуск:
@@ -451,7 +469,7 @@ qz = -Ks * d(P/(rho*g) + z)/dz
 P(z) = P_bottom - rho*g*(1 + qz/Ks)*z
 ```
 
-Параметры теста находятся в XLSX на листе `_test`.
+Параметры теста находятся в `test_scenarios` JSON-шаблона.
 
 Запуск:
 
@@ -465,16 +483,10 @@ make test
 docker/run_test.sh
 ```
 
-или через скрипт из `scripts/`:
-
-```bash
-scripts/run_test_docker.sh input/soilflow_pflotran_demo.xlsx /work/runs/_test_linearized_column
-```
-
 Результаты:
 
 ```text
-output/runs/_test_linearized_column/
+output/runs/_test_linear_darcy/
   pflotran.in
   analytical_solution.csv
   analytical_test_summary.txt
@@ -494,10 +506,10 @@ qz = -Ks * d(P/(rho*g) + z)/dz
 P(z) = P_bottom - rho*g*(1 + qz/Ks)*z
 ```
 
-Параметры теста находятся в XLSX на листе:
+Параметры теста находятся в `test_scenarios` JSON-шаблона:
 
 ```text
-_test
+input/soilflow_pflotran_demo.json
 ```
 
 Запуск после сборки образа:

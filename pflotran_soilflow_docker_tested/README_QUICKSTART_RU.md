@@ -1,51 +1,82 @@
 # Быстрый старт
 
+Актуальный рабочий режим проекта - web-first: исходные данные редактируются в интерфейсе, сохраняются в SQLite как `расчет №...`, затем backend генерирует JSON-снимок и PFLOTRAN input deck. XLSX не используется как внутреннее хранилище проекта.
+
+## Запуск web-сервиса
+
 ```bash
-cd pflotran_soilflow_docker
-chmod +x docker/*.sh
-docker/build_image.sh
-docker/check_image.sh
-docker/run_demo.sh
+cd /home/zenbook/SF/pflotran_soilflow_docker_tested
+WEB_PORT=18080 docker compose up -d soilflow-web
 ```
 
-Результаты:
+Интерфейс:
 
 ```text
-output/demo_richards/
+http://localhost:18080/
 ```
 
-Сохранить переносимый образ:
+Основные разделы:
+
+```text
+/ishodnye   исходные данные
+/status     задания и прогресс
+/testy      аналитические и verification-тесты
+/raschety   сохраненные расчеты
+/grafiki    графики результатов
+/sistema    состояние окружения
+```
+
+## Проверка здоровья сервиса
 
 ```bash
-docker/save_image.sh
+curl -fsS http://localhost:18080/api/health
+curl -fsS http://localhost:18080/api/system/info
 ```
 
-Подробности: `README_DOCKER_RU.md`.
-
-## Быстрый верификационный тест
+## Локальная проверка проекта
 
 ```bash
-./scripts/build_image.sh
-./scripts/run_test_docker.sh
-cat output/runs/_test_linear_darcy/TEST_STATUS.txt
+make project-check
 ```
 
-Описание: `docs/VERIFICATION_TEST_RU.md`.
+Эта команда:
 
-## Проверочный `_test`
+1. компилирует Python-код backend и расчетных скриптов;
+2. собирает frontend через Linux `node:20`;
+3. удаляет локальный generated `web/frontend/dist`;
+4. перезапускает `soilflow-web`;
+5. проверяет `/api/health` и `/api/system/info`.
+
+## Синхронизация работающего контейнера без полной пересборки
+
+Если образ уже собран, а изменились только backend/frontend/scripts, можно обновить запущенный контейнер:
+
+```bash
+make web-sync
+```
+
+Команда собирает frontend, копирует актуальные исходники и `dist` в `/opt/soilflow` внутри контейнера, удаляет локальный generated `dist` и перезапускает контейнер. Для релизной сборки все равно предпочтительна полная пересборка Docker image.
+
+## Запуск тестов
+
+Через web-интерфейс откройте:
+
+```text
+http://localhost:18080/testy
+```
+
+CLI-вариант:
 
 ```bash
 make test
 ```
 
-или:
+Результаты расчетов пишутся в runtime workspace контейнера и локальные `output/runs`. Эти файлы считаются generated artifacts и не должны попадать в git.
 
-```bash
-docker/run_test.sh
-```
+## Где продолжать разработку
 
-Результат будет в:
+Для восстановления контекста в новом чате используйте:
 
 ```text
-output/runs/_test_linearized_column/
+docs/EXTERNAL_CONTEXT_RU.md
 ```

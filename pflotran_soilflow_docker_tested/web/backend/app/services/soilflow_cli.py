@@ -34,7 +34,7 @@ def default_input_json(settings: Settings) -> Path:
     return settings.bundled_default_input_json
 
 
-def demo_command(settings: Settings, run_name: str = "demo_richards", input_json: Path | None = None) -> tuple[list[str], str, Path]:
+def calculation_command(settings: Settings, run_name: str = "demo_richards", input_json: Path | None = None) -> tuple[list[str], str, Path]:
     run_name = safe_run_name(run_name)
     output_dir = settings.runs_dir / run_name
     command = _python_script(settings, "soilflow_pflotran.py") + [
@@ -49,6 +49,10 @@ def demo_command(settings: Settings, run_name: str = "demo_richards", input_json
         str(settings.pflotran_exe),
     ]
     return command, run_name, output_dir
+
+
+def demo_command(settings: Settings, run_name: str = "demo_richards", input_json: Path | None = None) -> tuple[list[str], str, Path]:
+    return calculation_command(settings, run_name, input_json)
 
 
 def test_command(settings: Settings, test_name: str) -> tuple[list[str], str | None, Path]:

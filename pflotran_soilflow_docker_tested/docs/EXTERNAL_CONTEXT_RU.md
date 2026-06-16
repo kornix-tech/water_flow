@@ -53,6 +53,8 @@ pflotran_soilflow_docker_tested/
   scripts/
     soilflow_pflotran.py             генератор PFLOTRAN deck, runner, тесты, сравнения
     soilflow_visualize.py            HTML/SVG/CSV визуализация 1D/XY/XZ профилей
+    check_project.sh                 единая проверка: Python compile, frontend build, restart, health-check
+    sync_to_running_container.sh     документированный hot-copy workflow для запущенного контейнера
     *.sh                             вспомогательные Docker-команды
 
   web/backend/app/
@@ -79,10 +81,10 @@ pflotran_soilflow_docker_tested/
     SCHEMA_ALGORITHM_COMPONENTS_RU.md
     schema_*.dot/png/svg             существующие схемы
 
-  output/runs/                       локальные результаты в репозитории
+  output/runs/                       generated результаты расчетов, исключены из git
 ```
 
-В работающем контейнере результаты и база находятся не в этой папке, а в Docker volume `/workspace`:
+Результаты расчетов считаются generated artifacts и не должны попадать в git. В работающем контейнере результаты и база находятся в Docker volume `/workspace`:
 
 ```text
 /workspace/input/
@@ -331,6 +333,10 @@ web/frontend/src/pages/ResultsPage.tsx
 web/frontend/src/pages/TestsPage.tsx
   тесты в раскрывающихся группах, запуск отдельного теста,
   автозапуск визуализации после расчета
+
+web/frontend/src/testDefinitions.ts
+  предметные описания аналитических и verification-тестов; UI-страница
+  остается слоем workflow и представления
 
 web/frontend/src/pages/VisualizationPage.tsx
   выбор run, запуск визуализации, iframe HTML-графиков, список файлов
@@ -593,7 +599,7 @@ scripts/__pycache__/
 
 ## 14. Известные расхождения и технический долг
 
-1. Некоторые README еще описывают старый XLSX-first workflow. Актуальное состояние: JSON/SQLite-first, XLSX только как вывод/legacy.
+1. Часть старых схем и исторической документации еще использует термин "XLSX-контракт"; актуальные README переведены на JSON/SQLite-first, XLSX только вывод/legacy.
 2. Docker image может отставать от исходников, потому что часть последних правок была hot-copied в контейнер.
 3. SQLite-схема растет вручную, без Alembic/миграционного слоя.
 4. Нет полноценной модели пользователей/ролей/проектов; `projects` пока фактически stub для default project.
@@ -615,14 +621,12 @@ scripts/__pycache__/
 
 ## 16. Рекомендуемый следующий план разработки
 
-1. Зафиксировать текущую архитектуру в git отдельным коммитом после осознанного отбора файлов и исключения generated artifacts.
-2. Синхронизировать Docker image с исходниками полной пересборкой или документированным hot-copy workflow.
-3. Обновить устаревшие README под JSON/SQLite-first архитектуру.
-4. Ввести легкий миграционный механизм SQLite.
-5. Довести аналитические тесты без PFLOTRAN-профилей до полноценного численного сравнения.
-6. Спроектировать `soil_curve_tables` в SQLite для табличных экспериментальных кривых и формат генерации PFLOTRAN input.
-7. Для дренажной задачи вынести исследовательские сценарии в отдельный воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`, `УГВ`, `C`, `G`, `Z`.
-8. Отдельно решить, остается ли регулируемый колодец эквивалентным sink или нужен явный модуль hydraulic network.
+1. Для релизного состояния выполнить полную пересборку Docker image и сверить ее с hot-copy workflow.
+2. Ввести легкий миграционный механизм SQLite.
+3. Довести аналитические тесты без PFLOTRAN-профилей до полноценного численного сравнения.
+4. Спроектировать `soil_curve_tables` в SQLite для табличных экспериментальных кривых и формат генерации PFLOTRAN input.
+5. Для дренажной задачи вынести исследовательские сценарии в отдельный воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`, `УГВ`, `C`, `G`, `Z`.
+6. Отдельно решить, остается ли регулируемый колодец эквивалентным sink или нужен явный модуль hydraulic network.
 
 ## 17. Быстрые команды для нового чата
 

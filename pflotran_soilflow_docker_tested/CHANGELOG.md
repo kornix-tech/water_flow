@@ -1,6 +1,9 @@
 ## [Unreleased]
 
 ### Added
+- Добавлен `scripts/check_project.sh` и Makefile-цель `project-check` для единой проверки Python compile, frontend build, restart web-сервиса и health-check.
+- Добавлен `scripts/sync_to_running_container.sh` и Makefile-цель `web-sync` для документированной синхронизации исходников и frontend dist в уже запущенный контейнер без полной пересборки образа.
+- Добавлен frontend-модуль `testDefinitions.ts` для предметных описаний analytical/verification-тестов отдельно от UI-страницы.
 - Добавлен режим плановых двумерных расчетов `2D_XY`: генератор PFLOTRAN формирует сетку `nx × ny × 1`, поддерживает опциональные боковые давления WEST/EAST/SOUTH/NORTH и строит XY-карты влажности/давления.
 - Добавлена визуализация двумерных вертикальных разрезов `2D_XZ`: расчёты `nx × 1 × nz` автоматически отображаются как XZ-карты влажности и давления.
 - Добавлена специализированная постановка `floodplain_controlled_drainage`: двухслойная пойменная почва, река, водоупор и регулируемая закрытая дрена как pressure-regulated internal sink.
@@ -21,6 +24,9 @@
 - Добавлена панель прогресса задач в левом меню: общий индикатор по последним задачам и отдельный индикатор текущего запуска.
 
 ### Changed
+- README и quickstart переведены на актуальный JSON/SQLite/web-first workflow; XLSX описан только как legacy/экспортный формат.
+- Внутренний backend helper запуска расчета переименован с demo-oriented `demo_command` на `calculation_command`; публичный endpoint `/run-demo` сохранен как совместимый wrapper.
+- Страница `Тесты` теперь импортирует описания тестов из отдельного модуля и содержит только UI/workflow-логику.
 - Frontend-router очищен от legacy alias-адресов прошлых этапов разработки; публичными маршрутами интерфейса теперь остаются только короткие русские URL.
 - Улучшены внутренние имена frontend workflow тестов и backend helpers для SQLite/job/application settings, чтобы код читался ближе к предметной модели.
 - Видимое название проекта во frontend заменено на `Влагоперенос в почве`, включая заголовок браузерной вкладки и боковую панель.
@@ -56,6 +62,7 @@
 - Восстановлено отображение интерактивных HTML-графиков на странице `Графики`: iframe теперь открывает backend HTML напрямую, чтобы CSP графиков разрешал встроенный Plotly.
 
 ### Removed
+- `output/runs` и вложенные расчетные артефакты удалены из git-индекса; локальные результаты остаются generated files и игнорируются.
 - Удалены старые frontend alias-маршруты `/inputs`, `/vvod`, `/jobs`, `/zadachi`, `/tests`, `/results`, `/rezultaty`, `/visualization`, `/system`.
 
 ### Technical
