@@ -30,7 +30,7 @@ docker run --rm \
 echo "[5/6] Restart web service"
 WEB_PORT="$WEB_PORT" docker compose restart soilflow-web
 
-echo "[6/6] API contract checks"
+echo "[6/6] API contract and workflow checks"
 for attempt in $(seq 1 30); do
   if curl -fsS "http://localhost:${WEB_PORT}/api/health" >/dev/null 2>&1; then
     break
@@ -43,5 +43,6 @@ for attempt in $(seq 1 30); do
 done
 curl -fsS "http://localhost:${WEB_PORT}/api/system/info" >/dev/null
 WEB_PORT="$WEB_PORT" ./scripts/api_smoke.sh
+WEB_PORT="$WEB_PORT" ./scripts/api_tabular_workflow_smoke.sh
 
 echo "OK: project checks passed on http://localhost:${WEB_PORT}"

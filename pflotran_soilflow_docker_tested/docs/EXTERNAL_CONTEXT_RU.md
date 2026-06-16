@@ -36,6 +36,7 @@ PFLOTRAN: /opt/pflotran/src/pflotran/pflotran
 7. Для безопасности backend валидирует имена расчетов, job id, пути к файлам, размер API body и архивов; добавлены CSP/security headers, rate-limit и опциональный Bearer-token режим.
 8. SQLite schema version 2 содержит табличные экспериментальные кривые почвы: `soil_curve_tables` и `soil_curve_points`; backend API и frontend-редактор доступны на странице `Исходные данные`.
 9. Страница `Тесты` содержит workflow `Табличная почва`: он создает расчет в SQLite, сохраняет демо-кривые Pc(S)/kr(S), запускает PFLOTRAN и затем строит графики.
+10. Полный API-контур табличной почвы закреплен в `scripts/api_tabular_workflow_smoke.sh` и включен в `scripts/check_project.sh`; smoke удаляет созданный расчет, если не задано `KEEP_TABULAR_API_SMOKE=1`.
 
 ## 3. Карта каталогов
 
@@ -636,7 +637,7 @@ scripts/__pycache__/
 1. Для релизного состояния выполнить полную пересборку Docker image и сверить ее с hot-copy workflow.
 2. Продолжить перенос блоков `soilflow_pflotran.py` в `soilflow_pflotran_modules`: следующий безопасный кандидат - writer основного PFLOTRAN deck'а и parser результатов.
 3. Довести расширенные profile carrier тесты до строгих физических deck'ов PFLOTRAN для transport/heat/two-phase/groundwater задач.
-4. Добавить автоматизированный frontend/API тест web workflow `Табличная почва`, чтобы проверять создание расчета, запись кривых и запуск без ручного браузерного клика.
+4. Продолжить перенос блоков `soilflow_pflotran.py` в `soilflow_pflotran_modules`: следующий безопасный кандидат - writer основного PFLOTRAN deck'а.
 5. Для дренажной задачи вынести исследовательские сценарии в отдельный воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`, `УГВ`, `C`, `G`, `Z`.
 6. Отдельно решить, остается ли регулируемый колодец эквивалентным sink или нужен явный модуль hydraulic network.
 
