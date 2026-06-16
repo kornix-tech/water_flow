@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { getJob, runTest, runTestSuite, runVisualization } from "../api/client";
+import { createSoilCurve, getInputWorkbook, getJob, runCalculation, runTest, runTestSuite, runVisualization, saveInputWorkbook } from "../api/client";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { JobStatusBadge } from "../components/JobStatusBadge";
 import { ROUTES } from "../routes";
 import { analyticalTestGroups } from "../testDefinitions";
-import type { JobCreated, JobRead, JobStatus } from "../types";
+import type { InputTab, InputWorkbook, JobCreated, JobRead, JobStatus, SoilCurveTableCreate } from "../types";
 
 interface TestExecutionWorkflow {
   testJobId: string;
@@ -23,6 +23,64 @@ function isTerminal(status: JobStatus): boolean {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function updateWorkbookField(tab: InputTab, key: string, value: string | number | boolean | null): InputTab {
+  return {
+    ...tab,
+    fields: tab.fields.map((field) => (field.key === key ? { ...field, value } : field))
+  };
+}
+
+function updateWorkbookFields(workbook: InputWorkbook, updates: Record<string, string | number | boolean | null>): InputWorkbook {
+  return {
+    ...workbook,
+    calculation_id: null,
+    calculation_title: null,
+    calculation_created_at: null,
+    calculation_status: null,
+    tabs: workbook.tabs.map((tab) => {
+      if (tab.kind !== "fields") {
+        return tab;
+      }
+      return Object.entries(updates).reduce((nextTab, [key, value]) => updateWorkbookField(nextTab, key, value), tab);
+    })
+  };
+}
+
+function tabularDemoCurves(): SoilCurveTableCreate[] {
+  return [
+    {
+      curve_name: "tabular_demo_retention",
+      curve_kind: "retention",
+      retention_model: "tabular",
+      conductivity_model: null,
+      pressure_unit: "Па",
+      saturation_unit: "безразмерная насыщенность",
+      conductivity_unit: "безразмерная",
+      comment: "Демо-кривая Pc(S) для проверки полного табличного расчетного workflow.",
+      points: [
+        { point_index: 0, pressure_head_m: null, pressure_pa: 100000, water_content: null, saturation: 0.2, relative_permeability: null, hydraulic_conductivity_m_s: null, comment: "остаточная область" },
+        { point_index: 1, pressure_head_m: null, pressure_pa: 20000, water_content: null, saturation: 0.6, relative_permeability: null, hydraulic_conductivity_m_s: null, comment: "переходная область" },
+        { point_index: 2, pressure_head_m: null, pressure_pa: 0, water_content: null, saturation: 1.0, relative_permeability: null, hydraulic_conductivity_m_s: null, comment: "насыщение" }
+      ]
+    },
+    {
+      curve_name: "tabular_demo_conductivity",
+      curve_kind: "conductivity",
+      retention_model: "tabular",
+      conductivity_model: "tabular",
+      pressure_unit: "Па",
+      saturation_unit: "безразмерная насыщенность",
+      conductivity_unit: "безразмерная",
+      comment: "Демо-кривая kr(S) для проверки PCHIP_LIQ.",
+      points: [
+        { point_index: 0, pressure_head_m: null, pressure_pa: null, water_content: null, saturation: 0.2, relative_permeability: 0.0, hydraulic_conductivity_m_s: null, comment: "остаточная область" },
+        { point_index: 1, pressure_head_m: null, pressure_pa: null, water_content: null, saturation: 0.6, relative_permeability: 0.25, hydraulic_conductivity_m_s: null, comment: "переходная область" },
+        { point_index: 2, pressure_head_m: null, pressure_pa: null, water_content: null, saturation: 1.0, relative_permeability: 1.0, hydraulic_conductivity_m_s: null, comment: "насыщение" }
+      ]
+    }
+  ];
 }
 
 export function TestsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
@@ -59,6 +117,7 @@ export function TestsPage({ onNavigate }: { onNavigate: (path: string) => void }
       });
     });
     if (finishedTest.status !== "success") {
+      setWorkflowErrorMessage(finishedTest.error_message ?? "Расчетное задание завершилось ошибкой");
       return;
     }
     if (!finishedTest.run_name) {
@@ -84,7 +143,7 @@ export function TestsPage({ onNavigate }: { onNavigate: (path: string) => void }
   async function startTestWorkflow(testName: string) {
     setWorkflowErrorMessage("");
     try {
-      const job = testName === "all" ? await runTestSuite() : await runTest(testName);
+      const job = testName === "tabular_full_demo" ? await startTabularDemoCalculation() : testName === "all" ? await runTestSuite() : await runTest(testName);
       setLatestCreatedJob(job);
       setWorkflowByTestName((current) => ({
         ...current,
@@ -103,6 +162,26 @@ export function TestsPage({ onNavigate }: { onNavigate: (path: string) => void }
     } catch (caught) {
       setWorkflowErrorMessage(caught instanceof Error ? caught.message : "Не удалось поставить тест в очередь");
     }
+  }
+
+  async function startTabularDemoCalculation(): Promise<JobCreated> {
+    const workbook = await getInputWorkbook();
+    const demoWorkbook = updateWorkbookFields(workbook, {
+      project_name: "tabular_full_demo",
+      retention_model: "tabular",
+      conductivity_model: "tabular",
+      final_time_days: 0.01,
+      maximum_timestep_days: 0.005,
+      output_interval_days: 0.005
+    });
+    const savedWorkbook = await saveInputWorkbook(demoWorkbook);
+    if (!savedWorkbook.calculation_id) {
+      throw new Error("Не удалось создать расчет для табличного демо-сценария");
+    }
+    for (const curve of tabularDemoCurves()) {
+      await createSoilCurve(savedWorkbook.calculation_id, curve);
+    }
+    return runCalculation(savedWorkbook.calculation_id);
   }
 
   return (

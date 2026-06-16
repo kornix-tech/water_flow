@@ -3,6 +3,8 @@
 ### Added
 - Добавлена расчетная поддержка полной пары `tabular + tabular`: CLI строит PFLOTRAN `SATURATION_FUNCTION LOOKUP_TABLE` и `PERMEABILITY_FUNCTION PCHIP_LIQ` из сохраненных `soil_curve_tables`.
 - Добавлен smoke-скрипт `scripts/smoke_tabular_permeability.sh` и Makefile-цель `smoke-tabular-permeability` для быстрой проверки табличных кривых.
+- Добавлен web workflow `Табличная почва`: страница `Тесты` создает расчет в SQLite, сохраняет табличные кривые Pc(S)/kr(S), запускает PFLOTRAN и автоматически строит графики.
+- Добавлены валидация и SVG-предпросмотр табличных кривых на странице `Исходные данные`.
 - Добавлен модуль `soilflow_pflotran_modules.tabular_curves` с нормализацией табличных кривых, записью PFLOTRAN `.dat` файлов и unit-тестами монотонности.
 - Добавлен интерфейс редактирования табличных кривых почвы на странице `Исходные данные`: паспорт кривой, точки `h/P/theta/S/kr/K`, сохранение, обновление и удаление через SQLite API.
 - Добавлен модуль `soilflow_pflotran_modules.profile_carrier` для генерации PFLOTRAN profile-carrier deck'ов расширенных аналитических тестов.
@@ -39,6 +41,7 @@
 
 ### Changed
 - В интерфейсе `Исходные данные` табличная кривая стала разрешенной моделью водоудерживания и влагопроводности для проверенных пар `van_genuchten + tabular`, `brooks_corey + tabular` и `tabular + tabular`.
+- Сообщение об ошибке failed-задания теперь извлекает предметную строку `ERROR`/`Traceback` из job log, если она есть.
 - JSON-снимок расчета, передаваемый в CLI при запуске расчета или визуализации, теперь включает `soil_curve_tables` сохраненного расчета.
 - Генератор profile-carrier deck'ов вынесен из `soilflow_pflotran.py`, чтобы продолжить декомпозицию монолита без изменения CLI-контракта.
 - Из `soilflow_pflotran.py` вынесен блок extended analytical helpers; основной скрипт стал ближе к CLI-фасаду.

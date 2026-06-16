@@ -24,6 +24,7 @@ docker cp web/backend/app "$CONTAINER_NAME:/opt/soilflow/web/backend/"
 docker exec "$CONTAINER_NAME" sh -lc "rm -rf /opt/soilflow/scripts"
 docker cp scripts "$CONTAINER_NAME:/opt/soilflow/"
 docker cp input/soilflow_pflotran_demo.json "$CONTAINER_NAME:/opt/soilflow/input/soilflow_pflotran_demo.json"
+docker exec "$CONTAINER_NAME" sh -lc "rm -rf /opt/soilflow/web/frontend/dist"
 docker cp web/frontend/dist "$CONTAINER_NAME:/opt/soilflow/web/frontend/"
 docker exec "$CONTAINER_NAME" sh -lc "find /opt/soilflow/scripts -type d -name __pycache__ -prune -exec rm -rf {} +"
 

@@ -780,6 +780,44 @@ tr.selected {
   margin-top: 12px;
 }
 
+.curve-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 320px));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.curve-preview-card {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #d8e0e8;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.curve-preview-svg {
+  width: 100%;
+  height: auto;
+  background: #ffffff;
+  border: 1px solid #e3e8ef;
+}
+
+.curve-axis {
+  stroke: #1c2430;
+  stroke-width: 1.5;
+}
+
+.curve-line {
+  fill: none;
+  stroke: #1f6feb;
+  stroke-width: 2;
+}
+
+.curve-point {
+  fill: #ef4444;
+}
+
 .curve-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

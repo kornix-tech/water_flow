@@ -136,6 +136,125 @@ function numericOrNull(value: string): number | null {
   return value === "" ? null : Number(value);
 }
 
+function finiteNumber(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function numericFieldValue(workbook: InputWorkbook | null, key: string, fallback: number): number {
+  const rawValue = fieldByKey(workbook, key)?.value;
+  return typeof rawValue === "number" && Number.isFinite(rawValue) ? rawValue : fallback;
+}
+
+function curveRequiresRetention(curveKind: string): boolean {
+  return curveKind === "retention" || curveKind === "retention_conductivity";
+}
+
+function curveRequiresConductivity(curveKind: string): boolean {
+  return curveKind === "conductivity" || curveKind === "retention_conductivity";
+}
+
+function normalizedCurvePoint(point: SoilCurvePoint, thetaS: number, ksatMS: number) {
+  const saturation = finiteNumber(point.saturation) ? point.saturation : finiteNumber(point.water_content) && thetaS > 0 ? point.water_content / thetaS : null;
+  const capillaryPressurePa = finiteNumber(point.pressure_pa) ? Math.max(0, point.pressure_pa) : finiteNumber(point.pressure_head_m) ? Math.max(0, -1000 * 9.80665 * point.pressure_head_m) : null;
+  const relativePermeability = finiteNumber(point.relative_permeability)
+    ? point.relative_permeability
+    : finiteNumber(point.hydraulic_conductivity_m_s) && ksatMS > 0
+      ? point.hydraulic_conductivity_m_s / ksatMS
+      : null;
+  return { saturation, capillaryPressurePa, relativePermeability };
+}
+
+function sortedPreviewRows(points: SoilCurvePoint[], workbook: InputWorkbook | null) {
+  const thetaS = numericFieldValue(workbook, "theta_s", 0.43);
+  const ksatMS = numericFieldValue(workbook, "ksat_m_s", 1e-5);
+  return points
+    .map((point) => normalizedCurvePoint(point, thetaS, ksatMS))
+    .filter((point) => finiteNumber(point.saturation))
+    .sort((left, right) => Number(left.saturation) - Number(right.saturation));
+}
+
+function isMonotonic(values: number[]): boolean {
+  if (values.length < 2) {
+    return true;
+  }
+  const nondecreasing = values.every((value, index) => index === 0 || value >= values[index - 1]);
+  const nonincreasing = values.every((value, index) => index === 0 || value <= values[index - 1]);
+  return nondecreasing || nonincreasing;
+}
+
+function soilCurveValidationMessage(draft: SoilCurveTableCreate, workbook: InputWorkbook | null): string {
+  const rows = sortedPreviewRows(draft.points, workbook);
+  if (rows.length < 2) {
+    return "Для табличной кривой нужны минимум две точки с насыщенностью S или влажностью θ.";
+  }
+  if (rows.some((row) => Number(row.saturation) < 0 || Number(row.saturation) > 1)) {
+    return "Насыщенность S должна быть в диапазоне от 0 до 1.";
+  }
+  if (rows.some((row, index) => index > 0 && Number(row.saturation) <= Number(rows[index - 1].saturation))) {
+    return "Значения насыщенности S не должны повторяться.";
+  }
+  if (curveRequiresRetention(draft.curve_kind)) {
+    const pressures = rows.map((row) => row.capillaryPressurePa);
+    if (pressures.some((value) => !finiteNumber(value))) {
+      return "Для кривой водоудерживания заполните P, Па или h, м для каждой точки.";
+    }
+    if (!isMonotonic(pressures as number[])) {
+      return "Капиллярное давление Pc(S) должно быть монотонным.";
+    }
+  }
+  if (curveRequiresConductivity(draft.curve_kind)) {
+    const relativePermeabilities = rows.map((row) => row.relativePermeability);
+    if (relativePermeabilities.some((value) => !finiteNumber(value))) {
+      return "Для кривой влагопроводности заполните kr или K, м/с для каждой точки.";
+    }
+    if (relativePermeabilities.some((value) => Number(value) < 0 || Number(value) > 1)) {
+      return "Относительная проницаемость kr должна быть в диапазоне от 0 до 1.";
+    }
+    if (!isMonotonic(relativePermeabilities as number[])) {
+      return "Кривая kr(S) должна быть монотонной.";
+    }
+  }
+  return "";
+}
+
+function CurvePreview({ title, rows, valueKey, unit }: { title: string; rows: ReturnType<typeof sortedPreviewRows>; valueKey: "capillaryPressurePa" | "relativePermeability"; unit: string }) {
+  const points = rows.filter((row) => finiteNumber(row[valueKey]));
+  if (points.length < 2) {
+    return null;
+  }
+  const width = 320;
+  const height = 180;
+  const padding = 28;
+  const values = points.map((point) => Number(point[valueKey]));
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const spanValue = maxValue - minValue || 1;
+  const polyline = points
+    .map((point) => {
+      const x = padding + Number(point.saturation) * (width - 2 * padding);
+      const y = height - padding - ((Number(point[valueKey]) - minValue) / spanValue) * (height - 2 * padding);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return (
+    <div className="curve-preview-card">
+      <strong>{title}</strong>
+      <svg className="curve-preview-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
+        <line className="curve-axis" x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} />
+        <line className="curve-axis" x1={padding} y1={padding} x2={padding} y2={height - padding} />
+        <polyline className="curve-line" points={polyline} />
+        {points.map((point, index) => {
+          const x = padding + Number(point.saturation) * (width - 2 * padding);
+          const y = height - padding - ((Number(point[valueKey]) - minValue) / spanValue) * (height - 2 * padding);
+          return <circle key={`${title}:${index}`} className="curve-point" cx={x} cy={y} r="3" />;
+        })}
+        <text x={width / 2} y={height - 6} textAnchor="middle">S</text>
+        <text x={8} y={16}>{unit}</text>
+      </svg>
+    </div>
+  );
+}
+
 function calculationIdFromLocation(): number | null {
   const rawValue = new URLSearchParams(window.location.search).get("calculation_id");
   if (!rawValue) {
@@ -168,6 +287,8 @@ export function InputsPage() {
 
   const activeTab = useMemo(() => workbook?.tabs.find((tab) => tab.id === activeTabId) ?? workbook?.tabs[0] ?? null, [workbook, activeTabId]);
   const soilModelError = useMemo(() => soilModelValidationMessage(workbook), [workbook]);
+  const soilCurveError = useMemo(() => soilCurveValidationMessage(soilCurveDraft, workbook), [soilCurveDraft, workbook]);
+  const soilCurvePreviewRows = useMemo(() => sortedPreviewRows(soilCurveDraft.points, workbook), [soilCurveDraft.points, workbook]);
 
   async function loadWorkbook() {
     try {
@@ -299,6 +420,10 @@ export function InputsPage() {
       setError("Сначала сохраните расчет в базу данных проекта.");
       return;
     }
+    if (soilCurveError) {
+      setError(soilCurveError);
+      return;
+    }
     try {
       await createSoilCurve(workbook.calculation_id, soilCurveDraft);
       setSoilCurveDraft(emptySoilCurveDraft());
@@ -396,7 +521,7 @@ export function InputsPage() {
                 <button type="button" onClick={() => refreshSoilCurves()} disabled={!workbook.calculation_id}>
                   Обновить
                 </button>
-                <button type="button" onClick={saveSoilCurve} disabled={!workbook.calculation_id}>
+                <button type="button" onClick={saveSoilCurve} disabled={!workbook.calculation_id || Boolean(soilCurveError)}>
                   Сохранить кривую
                 </button>
               </div>
@@ -464,6 +589,11 @@ export function InputsPage() {
                   <button type="button" onClick={() => updateCurveDraft({ points: [...soilCurveDraft.points, emptyCurvePoint(soilCurveDraft.points.length)] })}>
                     Добавить точку
                   </button>
+                </div>
+                {soilCurveError && <p className="inline-error">{soilCurveError}</p>}
+                <div className="curve-preview-grid">
+                  {curveRequiresRetention(soilCurveDraft.curve_kind) && <CurvePreview title="Pc(S)" rows={soilCurvePreviewRows} valueKey="capillaryPressurePa" unit="Па" />}
+                  {curveRequiresConductivity(soilCurveDraft.curve_kind) && <CurvePreview title="kr(S)" rows={soilCurvePreviewRows} valueKey="relativePermeability" unit="kr" />}
                 </div>
                 <div className="curve-list">
                   {soilCurves.length === 0 && <p className="muted">Для этого расчета табличные кривые пока не сохранены.</p>}

@@ -33,6 +33,15 @@ export const analyticalTestGroups: AnalyticalTestGroup[] = [
     description: "Вертикальные колонки, одномерные линейные задачи и lumped/manufactured-постановки без двумерной сетки.",
     tests: [
       {
+        name: "tabular_full_demo",
+        label: "Табличная почва",
+        title: "Полный табличный расчет водоудерживания и влагопроводности",
+        description:
+          "Создает расчет в базе проекта, записывает табличные кривые Pc(S) и kr(S), запускает PFLOTRAN с LOOKUP_TABLE + PCHIP_LIQ и строит графики результата.",
+        analytical:
+          "Это smoke/contract-сценарий для пользовательских экспериментальных кривых: проверяется прохождение полного расчетного контура от формы и SQLite до TECPLOT-профилей PFLOTRAN."
+      },
+      {
         name: "linear_darcy",
         label: "Линейный Darcy",
         title: "Насыщенная колонка с постоянным потоком",

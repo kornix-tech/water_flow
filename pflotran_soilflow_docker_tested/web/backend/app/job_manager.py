@@ -24,10 +24,28 @@ from .services.command_runner import CommandRunner
 
 
 JOB_ID_RE = re.compile(r"^[a-f0-9]{32}$")
+LOG_ERROR_RE = re.compile(r"(ERROR|Error|Traceback|Exception)[:\s].*")
 
 
 def _utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _job_failure_message(exit_code: int, log_path: Path) -> str:
+    default_message = f"Command exited with code {exit_code}"
+    if not log_path.exists():
+        return default_message
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="replace")[-120_000:]
+    except OSError:
+        return default_message
+    # Для PFLOTRAN и Python-обвязки первая строка ERROR/Traceback обычно
+    # содержит предметную причину; код выхода сам по себе пользователю мало помогает.
+    for line in reversed(text.splitlines()):
+        stripped = line.strip()
+        if stripped and LOG_ERROR_RE.search(stripped):
+            return stripped[:500]
+    return default_message
 
 
 class JobManager:
@@ -127,7 +145,7 @@ class JobManager:
                 error_message = "Cancelled by user"
             else:
                 status = JOB_STATUS_SUCCESS if exit_code == 0 else JOB_STATUS_FAILED
-                error_message = None if exit_code == 0 else f"Command exited with code {exit_code}"
+                error_message = None if exit_code == 0 else _job_failure_message(exit_code, log_path)
             self.store.update(
                 job_id,
                 status=status,
