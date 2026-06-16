@@ -91,6 +91,10 @@ class Settings:
     def default_input_json(self) -> Path:
         return self.input_dir / "soilflow_pflotran_demo.json"
 
+    @property
+    def bundled_default_input_json(self) -> Path:
+        return self.bundled_input_dir / "soilflow_pflotran_demo.json"
+
 
 def load_settings() -> Settings:
     auth_mode = os.getenv("SOILFLOW_AUTH_MODE", "none").lower()

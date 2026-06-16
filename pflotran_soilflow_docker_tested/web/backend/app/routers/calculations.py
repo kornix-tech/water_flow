@@ -6,12 +6,12 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from ..schemas import CalculationRead, CalculationSummary, GenericMessage, JobCreated
-from ..services.input_json_service import calculation_read, calculation_summary
+from ..services.input_json_service import calculation_read, calculation_summary, read_seed_workbook
 
 router = APIRouter()
 
 
-def _store(request: Request):
+def _job_store(request: Request):
     return request.app.state.job_store
 
 
@@ -21,26 +21,27 @@ def list_calculations(
     q: str | None = Query(default=None, max_length=120),
     limit: int = Query(default=100, ge=1, le=500),
 ) -> list[CalculationSummary]:
-    return [calculation_summary(item) for item in _store(request).list_calculations(query=q, limit=limit)]
+    return [calculation_summary(item) for item in _job_store(request).list_calculations(query=q, limit=limit)]
 
 
 @router.get("/{calculation_id}", response_model=CalculationRead)
 def get_calculation(calculation_id: int, request: Request) -> CalculationRead:
-    calculation = _store(request).get_calculation(calculation_id)
+    calculation = _job_store(request).get_calculation(calculation_id)
     if calculation is None:
         raise HTTPException(status_code=404, detail="Расчет не найден")
-    return calculation_read(calculation)
+    seed = read_seed_workbook(request.app.state.settings.bundled_default_input_json)
+    return calculation_read(calculation, seed)
 
 
 @router.delete("/{calculation_id}", response_model=GenericMessage)
 def delete_calculation(calculation_id: int, request: Request) -> GenericMessage:
-    store = _store(request)
-    calculation = store.get_calculation(calculation_id)
+    project_job_store = _job_store(request)
+    calculation = project_job_store.get_calculation(calculation_id)
     if calculation is None:
         raise HTTPException(status_code=404, detail="Расчет не найден")
 
     if calculation.job_id:
-        job = store.get(calculation.job_id)
+        job = project_job_store.get(calculation.job_id)
         if job is not None and job.status in {"queued", "running"}:
             raise HTTPException(status_code=409, detail="Нельзя удалить расчет, пока его задание выполняется")
 
@@ -55,7 +56,7 @@ def delete_calculation(calculation_id: int, request: Request) -> GenericMessage:
         # Удаляем только папку конкретного расчета внутри output/runs; внешние пути и symlink запрещены выше.
         shutil.rmtree(resolved_result_dir)
 
-    store.delete_calculation(calculation_id)
+    project_job_store.delete_calculation(calculation_id)
     return GenericMessage(status="deleted", detail=f"{calculation.title} удален")
 
 

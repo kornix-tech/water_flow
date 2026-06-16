@@ -3,6 +3,44 @@ import { getCalculation, getInputWorkbook, listCalculations, resetInputWorkbook,
 import { ErrorNotice } from "../components/ErrorNotice";
 import type { CalculationSummary, InputField, InputTab, InputWorkbook, WeatherRow } from "../types";
 
+const retentionOptions = [
+  ["van_genuchten", "van Genuchten"],
+  ["brooks_corey", "Brooks-Corey"],
+  ["gardner", "Gardner"]
+] as const;
+
+const conductivityOptions = [
+  ["mualem", "Mualem"],
+  ["burdine", "Burdine"],
+  ["corey", "Corey"],
+  ["gardner", "Gardner"]
+] as const;
+
+const supportedSoilModelPairs = new Set(["van_genuchten:mualem", "van_genuchten:burdine", "brooks_corey:mualem", "brooks_corey:burdine"]);
+
+function fieldByKey(workbook: InputWorkbook | null, key: string): InputField | null {
+  for (const tab of workbook?.tabs ?? []) {
+    const field = tab.fields.find((candidate) => candidate.key === key);
+    if (field) {
+      return field;
+    }
+  }
+  return null;
+}
+
+function soilModelValidationMessage(workbook: InputWorkbook | null): string {
+  const retentionModel = String(fieldByKey(workbook, "retention_model")?.value ?? "van_genuchten");
+  const conductivityModel = String(fieldByKey(workbook, "conductivity_model")?.value ?? "mualem");
+  if (supportedSoilModelPairs.has(`${retentionModel}:${conductivityModel}`)) {
+    return "";
+  }
+  return [
+    `Несовместимая или пока не проверенная пара моделей: ${retentionModel} + ${conductivityModel}.`,
+    "Разрешены: van_genuchten + mualem, van_genuchten + burdine, brooks_corey + mualem, brooks_corey + burdine.",
+    "Corey и Gardner показаны как варианты развития, но пока не включены в расчётный запуск."
+  ].join(" ");
+}
+
 function fieldInputType(field: InputField): string {
   if (field.value_type === "number") {
     return "number";
@@ -76,6 +114,7 @@ export function InputsPage() {
   const [search, setSearch] = useState("");
 
   const activeTab = useMemo(() => workbook?.tabs.find((tab) => tab.id === activeTabId) ?? workbook?.tabs[0] ?? null, [workbook, activeTabId]);
+  const soilModelError = useMemo(() => soilModelValidationMessage(workbook), [workbook]);
 
   async function loadWorkbook() {
     try {
@@ -115,6 +154,10 @@ export function InputsPage() {
 
   async function save() {
     if (!workbook) {
+      return;
+    }
+    if (soilModelError) {
+      setError(soilModelError);
       return;
     }
     setSaving(true);
@@ -181,12 +224,13 @@ export function InputsPage() {
           <button type="button" onClick={reset} disabled={saving}>
             Сбросить
           </button>
-          <button className="primary" type="button" onClick={save} disabled={!workbook || saving}>
+          <button className="primary" type="button" onClick={save} disabled={!workbook || saving || Boolean(soilModelError)}>
             {saving ? "Сохранение..." : "Сохранить"}
           </button>
         </div>
       </div>
       <ErrorNotice message={error} />
+      <ErrorNotice message={soilModelError} />
       {message && <div className="notice">{message}</div>}
       {workbook && (
         <>
@@ -246,6 +290,14 @@ export function InputsPage() {
                       checked={Boolean(field.value)}
                       onChange={(event) => replaceTab(updateField(activeTab, field.key, event.target.checked))}
                     />
+                  ) : field.key === "retention_model" || field.key === "conductivity_model" ? (
+                    <select value={String(field.value ?? "")} onChange={(event) => replaceTab(updateField(activeTab, field.key, event.target.value))}>
+                      {(field.key === "retention_model" ? retentionOptions : conductivityOptions).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
                   ) : (
                     <input
                       type={fieldInputType(field)}

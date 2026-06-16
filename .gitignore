@@ -1,0 +1,10 @@
+# Локальные зависимости и сборочные артефакты
+node_modules/
+web/frontend/dist/
+__pycache__/
+*.py[cod]
+
+# Результаты расчетов и временные рабочие файлы
+output/runs/
+pflotran_soilflow_docker_tested/output/runs/
+pflotran_soilflow_docker_tested/web/frontend/node_modules/

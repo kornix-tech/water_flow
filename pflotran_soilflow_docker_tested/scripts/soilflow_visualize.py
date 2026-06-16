@@ -6,7 +6,9 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import csv
+import html
 import json
 import math
 import re
@@ -37,6 +39,25 @@ class ProfileSeries:
     frames: list[ProfileFrame]
     profile_axis: str
     depth_column: str
+    source_files: list[Path]
+
+
+@dataclass
+class AnalyticalProfileSeries:
+    frames: dict[int, pd.DataFrame]
+    static_frame: pd.DataFrame | None
+    source_file: Path
+
+
+@dataclass
+class XYMapSeries:
+    frames: list[ProfileFrame]
+    source_files: list[Path]
+
+
+@dataclass
+class XZMapSeries:
+    frames: list[ProfileFrame]
     source_files: list[Path]
 
 
@@ -312,6 +333,109 @@ def collect_profile_frames(
     return ProfileSeries(frames=frames, profile_axis=axis, depth_column="depth_m", source_files=files)
 
 
+def is_xy_single_layer(df: pd.DataFrame) -> bool:
+    data = normalize_columns(df)
+    x_count = data["coord_x_m"].round(10).nunique()
+    y_count = data["coord_y_m"].round(10).nunique()
+    z_count = data["coord_z_m"].round(10).nunique()
+    return x_count > 1 and y_count > 1 and z_count == 1
+
+
+def is_xz_section(df: pd.DataFrame) -> bool:
+    data = normalize_columns(df)
+    x_count = data["coord_x_m"].round(10).nunique()
+    y_count = data["coord_y_m"].round(10).nunique()
+    z_count = data["coord_z_m"].round(10).nunique()
+    return x_count > 1 and y_count == 1 and z_count > 1
+
+
+def run_dir_has_xy_single_layer(run_dir: Path) -> bool:
+    files = find_tecplot_files(run_dir)
+    if not files:
+        return False
+    frames = parse_tecplot_zones(files[0], 0)
+    return bool(frames and is_xy_single_layer(frames[0].data))
+
+
+def run_dir_has_xz_section(run_dir: Path) -> bool:
+    files = find_tecplot_files(run_dir)
+    if not files:
+        return False
+    frames = parse_tecplot_zones(files[0], 0)
+    return bool(frames and is_xz_section(frames[0].data))
+
+
+def collect_xy_map_frames(
+    run_dir: Path,
+    *,
+    input_defaults: dict[str, float],
+) -> XYMapSeries:
+    files = find_tecplot_files(run_dir)
+    if not files:
+        raise FileNotFoundError(f"В {run_dir} не найдены snapshot TECPLOT-файлы вида pflotran-NNN.tec")
+    raw_frames: list[ProfileFrame] = []
+    for path in files:
+        raw_frames.extend(parse_tecplot_zones(path, len(raw_frames)))
+    if not raw_frames:
+        raise ValueError("TECPLOT-файлы найдены, но числовые кадры не прочитаны")
+
+    frames: list[ProfileFrame] = []
+    for index, frame in enumerate(sorted(raw_frames, key=lambda f: (f.time_value, f.frame_index))):
+        data = normalize_columns(frame.data)
+        if "porosity" not in data:
+            data["porosity"] = input_defaults["porosity"]
+        data["liquid_pressure_kpa"] = data["liquid_pressure_pa"] / 1000.0
+        data["pressure_head_m"] = (data["liquid_pressure_pa"] - input_defaults["atmospheric_pressure_pa"]) / (
+            input_defaults["rho_water_kg_m3"] * input_defaults["gravity_m_s2"]
+        )
+        data["theta_m3_m3"] = data["porosity"] * data["liquid_saturation"]
+        frames.append(
+            ProfileFrame(
+                time_value=frame.time_value,
+                time_unit=frame.time_unit,
+                frame_index=index,
+                data=data.sort_values(["coord_y_m", "coord_x_m"]).reset_index(drop=True),
+            )
+        )
+    return XYMapSeries(frames=frames, source_files=files)
+
+
+def collect_xz_map_frames(
+    run_dir: Path,
+    *,
+    input_defaults: dict[str, float],
+) -> XZMapSeries:
+    files = find_tecplot_files(run_dir)
+    if not files:
+        raise FileNotFoundError(f"В {run_dir} не найдены snapshot TECPLOT-файлы вида pflotran-NNN.tec")
+    raw_frames: list[ProfileFrame] = []
+    for path in files:
+        raw_frames.extend(parse_tecplot_zones(path, len(raw_frames)))
+    if not raw_frames:
+        raise ValueError("TECPLOT-файлы найдены, но числовые кадры не прочитаны")
+
+    frames: list[ProfileFrame] = []
+    for index, frame in enumerate(sorted(raw_frames, key=lambda f: (f.time_value, f.frame_index))):
+        data = normalize_columns(frame.data)
+        if "porosity" not in data:
+            data["porosity"] = input_defaults["porosity"]
+        data["depth_m"] = float(data["coord_z_m"].max()) - data["coord_z_m"]
+        data["liquid_pressure_kpa"] = data["liquid_pressure_pa"] / 1000.0
+        data["pressure_head_m"] = (data["liquid_pressure_pa"] - input_defaults["atmospheric_pressure_pa"]) / (
+            input_defaults["rho_water_kg_m3"] * input_defaults["gravity_m_s2"]
+        )
+        data["theta_m3_m3"] = data["porosity"] * data["liquid_saturation"]
+        frames.append(
+            ProfileFrame(
+                time_value=frame.time_value,
+                time_unit=frame.time_unit,
+                frame_index=index,
+                data=data.sort_values(["depth_m", "coord_x_m"]).reset_index(drop=True),
+            )
+        )
+    return XZMapSeries(frames=frames, source_files=files)
+
+
 def series_to_long_dataframe(profile_series: ProfileSeries) -> pd.DataFrame:
     rows = []
     for frame in profile_series.frames:
@@ -360,8 +484,213 @@ def write_profile_csvs(profile_series: ProfileSeries, output_dir: Path) -> tuple
     return long_path, summary_path
 
 
+def xy_grid_values(frame: ProfileFrame, value_column: str) -> tuple[list[float], list[float], list[list[float]]]:
+    data = frame.data.copy()
+    x_values = sorted(float(v) for v in data["coord_x_m"].dropna().unique())
+    y_values = sorted(float(v) for v in data["coord_y_m"].dropna().unique())
+    pivot = data.pivot_table(index="coord_y_m", columns="coord_x_m", values=value_column, aggfunc="mean")
+    pivot = pivot.reindex(index=y_values, columns=x_values)
+    return x_values, y_values, pivot.values.tolist()
+
+
+def xz_grid_values(frame: ProfileFrame, value_column: str) -> tuple[list[float], list[float], list[list[float]]]:
+    data = frame.data.copy()
+    x_values = sorted(float(v) for v in data["coord_x_m"].dropna().unique())
+    depth_values = sorted(float(v) for v in data["depth_m"].dropna().unique())
+    pivot = data.pivot_table(index="depth_m", columns="coord_x_m", values=value_column, aggfunc="mean")
+    pivot = pivot.reindex(index=depth_values, columns=x_values)
+    return x_values, depth_values, pivot.values.tolist()
+
+
+def write_xy_map_csvs(map_series: XYMapSeries, output_dir: Path) -> tuple[Path, Path]:
+    rows = []
+    for frame in map_series.frames:
+        data = frame.data.copy()
+        data.insert(0, "time_unit", frame.time_unit)
+        data.insert(0, "time_value", frame.time_value)
+        data.insert(0, "frame_index", frame.frame_index)
+        rows.append(data)
+    long_df = pd.concat(rows, ignore_index=True)
+    fields = [
+        "frame_index",
+        "time_value",
+        "time_unit",
+        "coord_x_m",
+        "coord_y_m",
+        "coord_z_m",
+        "theta_m3_m3",
+        "pressure_head_m",
+        "liquid_pressure_pa",
+        "liquid_pressure_kpa",
+        "liquid_saturation",
+        "porosity",
+    ]
+    long_path = output_dir / "xy_map_frames_long.csv"
+    long_df[[c for c in fields if c in long_df.columns]].to_csv(long_path, index=False)
+    summary = long_df.groupby(["frame_index", "time_value", "time_unit"], as_index=False).agg(
+        x_min_m=("coord_x_m", "min"),
+        x_max_m=("coord_x_m", "max"),
+        y_min_m=("coord_y_m", "min"),
+        y_max_m=("coord_y_m", "max"),
+        theta_min=("theta_m3_m3", "min"),
+        theta_max=("theta_m3_m3", "max"),
+        theta_mean=("theta_m3_m3", "mean"),
+        pressure_head_min_m=("pressure_head_m", "min"),
+        pressure_head_max_m=("pressure_head_m", "max"),
+        pressure_head_mean_m=("pressure_head_m", "mean"),
+        saturation_min=("liquid_saturation", "min"),
+        saturation_max=("liquid_saturation", "max"),
+    )
+    summary_path = output_dir / "xy_map_summary.csv"
+    summary.to_csv(summary_path, index=False)
+    return long_path, summary_path
+
+
+def write_xz_map_csvs(map_series: XZMapSeries, output_dir: Path) -> tuple[Path, Path]:
+    rows = []
+    for frame in map_series.frames:
+        data = frame.data.copy()
+        data.insert(0, "time_unit", frame.time_unit)
+        data.insert(0, "time_value", frame.time_value)
+        data.insert(0, "frame_index", frame.frame_index)
+        rows.append(data)
+    long_df = pd.concat(rows, ignore_index=True)
+    fields = [
+        "frame_index",
+        "time_value",
+        "time_unit",
+        "coord_x_m",
+        "coord_z_m",
+        "depth_m",
+        "theta_m3_m3",
+        "pressure_head_m",
+        "liquid_pressure_pa",
+        "liquid_pressure_kpa",
+        "liquid_saturation",
+        "porosity",
+    ]
+    long_path = output_dir / "xz_map_frames_long.csv"
+    long_df[[c for c in fields if c in long_df.columns]].to_csv(long_path, index=False)
+    summary = long_df.groupby(["frame_index", "time_value", "time_unit"], as_index=False).agg(
+        x_min_m=("coord_x_m", "min"),
+        x_max_m=("coord_x_m", "max"),
+        depth_min_m=("depth_m", "min"),
+        depth_max_m=("depth_m", "max"),
+        theta_min=("theta_m3_m3", "min"),
+        theta_max=("theta_m3_m3", "max"),
+        theta_mean=("theta_m3_m3", "mean"),
+        pressure_head_min_m=("pressure_head_m", "min"),
+        pressure_head_max_m=("pressure_head_m", "max"),
+        pressure_head_mean_m=("pressure_head_m", "mean"),
+        saturation_min=("liquid_saturation", "min"),
+        saturation_max=("liquid_saturation", "max"),
+    )
+    summary_path = output_dir / "xz_map_summary.csv"
+    summary.to_csv(summary_path, index=False)
+    return long_path, summary_path
+
+
+def _first_existing_column(df: pd.DataFrame, aliases: tuple[str, ...]) -> str | None:
+    normalized = {str(c).lower().replace("_", " "): str(c) for c in df.columns}
+    for alias in aliases:
+        alias_normalized = alias.lower().replace("_", " ")
+        for key, original in normalized.items():
+            if alias_normalized in key:
+                return original
+    return None
+
+
+def _normalize_analytical_profile(
+    df: pd.DataFrame,
+    *,
+    porosity_default: float,
+    rho_water_kg_m3: float,
+    gravity_m_s2: float,
+    atmospheric_pressure_pa: float,
+) -> pd.DataFrame | None:
+    if df.empty:
+        return None
+    out = pd.DataFrame(index=df.index)
+    depth_col = _first_existing_column(df, ("depth_m", "depth"))
+    coord_col = _first_existing_column(df, ("z_center_m", "x_center_m", "coord_z_m", "coord_x_m"))
+    if depth_col is not None:
+        out["depth_m"] = pd.to_numeric(df[depth_col], errors="coerce")
+    elif coord_col is not None:
+        coord = pd.to_numeric(df[coord_col], errors="coerce")
+        # В тестовых CSV координата обычно задана от нижней границы; для графика
+        # приводим ее к той же глубине от верхней границы, что и TECPLOT-профиль.
+        out["depth_m"] = float(coord.max()) - coord
+    else:
+        return None
+
+    pressure_head_col = _first_existing_column(df, ("pressure_head_m", "pressure_head_analytical_m"))
+    pressure_col = _first_existing_column(df, ("pressure_analytical_pa", "liquid_pressure_pa", "pressure_pa"))
+    if pressure_head_col is not None:
+        out["pressure_head_m"] = pd.to_numeric(df[pressure_head_col], errors="coerce")
+    elif pressure_col is not None:
+        pressure = pd.to_numeric(df[pressure_col], errors="coerce")
+        out["pressure_head_m"] = (pressure - atmospheric_pressure_pa) / (rho_water_kg_m3 * gravity_m_s2)
+
+    theta_col = _first_existing_column(df, ("theta_m3_m3", "theta_analytical", "water_content"))
+    saturation_col = _first_existing_column(df, ("saturation_analytical", "liquid_saturation", "saturation"))
+    if theta_col is not None:
+        out["theta_m3_m3"] = pd.to_numeric(df[theta_col], errors="coerce")
+    elif saturation_col is not None:
+        out["theta_m3_m3"] = porosity_default * pd.to_numeric(df[saturation_col], errors="coerce")
+
+    useful = [c for c in ("theta_m3_m3", "pressure_head_m") if c in out.columns]
+    if not useful:
+        return None
+    out = out.dropna(subset=["depth_m"]).sort_values("depth_m").reset_index(drop=True)
+    return out if not out.empty else None
+
+
+def load_analytical_profile_series(
+    run_dir: Path,
+    *,
+    input_defaults: dict[str, float],
+) -> AnalyticalProfileSeries | None:
+    candidates = [run_dir / "analytical_profiles.csv", run_dir / "analytical_solution.csv"]
+    source = next((path for path in candidates if path.is_file()), None)
+    if source is None:
+        return None
+    normalize_kwargs = {
+        "porosity_default": input_defaults["porosity"],
+        "rho_water_kg_m3": input_defaults["rho_water_kg_m3"],
+        "gravity_m_s2": input_defaults["gravity_m_s2"],
+        "atmospheric_pressure_pa": input_defaults["atmospheric_pressure_pa"],
+    }
+    df = pd.read_csv(source)
+    frame_col = _first_existing_column(df, ("frame_index",))
+    if frame_col is None:
+        static = _normalize_analytical_profile(df, **normalize_kwargs)
+        return AnalyticalProfileSeries(frames={}, static_frame=static, source_file=source) if static is not None else None
+
+    frames: dict[int, pd.DataFrame] = {}
+    for frame_index, group in df.groupby(frame_col):
+        normalized = _normalize_analytical_profile(group, **normalize_kwargs)
+        if normalized is not None:
+            frames[int(frame_index)] = normalized
+    return AnalyticalProfileSeries(frames=frames, static_frame=None, source_file=source) if frames else None
+
+
 def _frame_title(frame: ProfileFrame) -> str:
     return f"t = {frame.time_value:.6g} {frame.time_unit}, кадр {frame.frame_index}"
+
+
+def analytical_frame_for(
+    analytical: AnalyticalProfileSeries | None,
+    frame: ProfileFrame,
+) -> pd.DataFrame | None:
+    if analytical is None:
+        return None
+    if frame.frame_index in analytical.frames:
+        return analytical.frames[frame.frame_index]
+    return analytical.static_frame
+
+
+def empty_scatter(name: str, color: str) -> go.Scatter:
+    return go.Scatter(x=[], y=[], mode="lines", name=name, line={"width": 2, "color": color, "dash": "dash"})
 
 
 def write_interactive_profile_html(
@@ -370,9 +699,11 @@ def write_interactive_profile_html(
     *,
     speed_ms: int,
     title: str,
+    analytical_series: AnalyticalProfileSeries | None = None,
 ) -> None:
     first = profile_series.frames[0]
-    fig = make_subplots(rows=1, cols=2, subplot_titles=("Объёмная влажность θ", "Напор давления h"))
+    first_analytical = analytical_frame_for(analytical_series, first)
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("Объёмная влажность θ", "Давление почвенной влаги h"))
     line_style = {"width": 3}
     marker_style = {"size": 6}
     fig.add_trace(
@@ -380,7 +711,7 @@ def write_interactive_profile_html(
             x=first.data["theta_m3_m3"],
             y=first.data["depth_m"],
             mode="lines+markers",
-            name="θ",
+            name="PFLOTRAN θ",
             line={**line_style, "color": "#2563eb"},
             marker={**marker_style, "color": "#2563eb"},
         ),
@@ -392,15 +723,46 @@ def write_interactive_profile_html(
             x=first.data["pressure_head_m"],
             y=first.data["depth_m"],
             mode="lines+markers",
-            name="h",
+            name="PFLOTRAN h",
             line={**line_style, "color": "#dc2626"},
             marker={**marker_style, "color": "#dc2626"},
         ),
         row=1,
         col=2,
     )
+    theta_analytical_available = first_analytical is not None and "theta_m3_m3" in first_analytical.columns
+    pressure_analytical_available = first_analytical is not None and "pressure_head_m" in first_analytical.columns
+    fig.add_trace(
+        go.Scatter(
+            x=first_analytical["theta_m3_m3"] if theta_analytical_available else [],
+            y=first_analytical["depth_m"] if theta_analytical_available else [],
+            mode="lines",
+            name="Аналитика θ",
+            line={"width": 2.5, "color": "#0f766e", "dash": "dash"},
+        )
+        if theta_analytical_available
+        else empty_scatter("Аналитика θ", "#0f766e"),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=first_analytical["pressure_head_m"] if pressure_analytical_available else [],
+            y=first_analytical["depth_m"] if pressure_analytical_available else [],
+            mode="lines",
+            name="Аналитика h",
+            line={"width": 2.5, "color": "#7c2d12", "dash": "dash"},
+        )
+        if pressure_analytical_available
+        else empty_scatter("Аналитика h", "#7c2d12"),
+        row=1,
+        col=2,
+    )
     frames = []
     for frame in profile_series.frames:
+        analytical_frame = analytical_frame_for(analytical_series, frame)
+        has_theta_analytical = analytical_frame is not None and "theta_m3_m3" in analytical_frame.columns
+        has_pressure_analytical = analytical_frame is not None and "pressure_head_m" in analytical_frame.columns
         frames.append(
             go.Frame(
                 name=str(frame.frame_index),
@@ -418,6 +780,18 @@ def write_interactive_profile_html(
                         mode="lines+markers",
                         line={**line_style, "color": "#dc2626"},
                         marker={**marker_style, "color": "#dc2626"},
+                    ),
+                    go.Scatter(
+                        x=analytical_frame["theta_m3_m3"] if has_theta_analytical else [],
+                        y=analytical_frame["depth_m"] if has_theta_analytical else [],
+                        mode="lines",
+                        line={"width": 2.5, "color": "#0f766e", "dash": "dash"},
+                    ),
+                    go.Scatter(
+                        x=analytical_frame["pressure_head_m"] if has_pressure_analytical else [],
+                        y=analytical_frame["depth_m"] if has_pressure_analytical else [],
+                        mode="lines",
+                        line={"width": 2.5, "color": "#7c2d12", "dash": "dash"},
                     ),
                 ],
                 layout=go.Layout(title_text=f"{title}<br><sup>{_frame_title(frame)}</sup>"),
@@ -483,7 +857,7 @@ def write_interactive_profile_html(
         "title_standoff": 10,
     }
     fig.update_xaxes(title_text="Объёмная влажность θ, м³/м³", range=[0, theta_upper], **axis_style, row=1, col=1)
-    fig.update_xaxes(title_text="Напор давления h, м", **axis_style, row=1, col=2)
+    fig.update_xaxes(title_text="Давление почвенной влаги h, м", **axis_style, row=1, col=2)
     fig.update_yaxes(title_text="Глубина, м", autorange="reversed", range=[max_depth, 0], **axis_style, row=1, col=1)
     fig.update_yaxes(title_text="", autorange="reversed", range=[max_depth, 0], **axis_style, row=1, col=2)
     fig.update_annotations(font={"family": "DejaVu Sans, Arial, sans-serif", "size": 14, "color": "#1f2937"})
@@ -703,6 +1077,7 @@ def write_static_profile_snapshots(
     *,
     snapshot_every: int,
     formats: list[str],
+    analytical_series: AnalyticalProfileSeries | None = None,
 ) -> int:
     written = 0
     plt.rcParams.update(
@@ -716,14 +1091,49 @@ def write_static_profile_snapshots(
         }
     )
     for frame in profile_series.frames[:: max(1, snapshot_every)]:
+        analytical_frame = analytical_frame_for(analytical_series, frame)
         fig, axes = plt.subplots(1, 2, figsize=(10, 6), sharey=True)
-        axes[0].plot(frame.data["theta_m3_m3"], frame.data["depth_m"], marker="o", color="#2563eb", linewidth=2.0, markersize=4)
+        axes[0].plot(
+            frame.data["theta_m3_m3"],
+            frame.data["depth_m"],
+            marker="o",
+            color="#2563eb",
+            linewidth=2.0,
+            markersize=4,
+            label="PFLOTRAN θ",
+        )
+        if analytical_frame is not None and "theta_m3_m3" in analytical_frame.columns:
+            axes[0].plot(
+                analytical_frame["theta_m3_m3"],
+                analytical_frame["depth_m"],
+                color="#0f766e",
+                linewidth=2.2,
+                linestyle="--",
+                label="Аналитика θ",
+            )
         axes[0].set_xlabel("Объёмная влажность θ, м³/м³")
         axes[0].set_ylabel("Глубина, м")
         axes[0].set_xlim(left=0)
         axes[0].grid(True, color="#e5e7eb", linewidth=0.8)
-        axes[1].plot(frame.data["pressure_head_m"], frame.data["depth_m"], marker="o", color="#dc2626", linewidth=2.0, markersize=4)
-        axes[1].set_xlabel("Напор давления h, м")
+        axes[1].plot(
+            frame.data["pressure_head_m"],
+            frame.data["depth_m"],
+            marker="o",
+            color="#dc2626",
+            linewidth=2.0,
+            markersize=4,
+            label="PFLOTRAN h",
+        )
+        if analytical_frame is not None and "pressure_head_m" in analytical_frame.columns:
+            axes[1].plot(
+                analytical_frame["pressure_head_m"],
+                analytical_frame["depth_m"],
+                color="#7c2d12",
+                linewidth=2.2,
+                linestyle="--",
+                label="Аналитика h",
+            )
+        axes[1].set_xlabel("Давление почвенной влаги h, м")
         axes[1].grid(True, color="#e5e7eb", linewidth=0.8)
         for axis in axes:
             axis.spines["top"].set_visible(False)
@@ -733,10 +1143,286 @@ def write_static_profile_snapshots(
             axis.spines["left"].set_linewidth(1.6)
             axis.spines["bottom"].set_linewidth(1.6)
             axis.tick_params(width=1.4)
+            axis.legend(loc="best", frameon=False)
         axes[0].invert_yaxis()
         fig.suptitle(_frame_title(frame))
         fig.tight_layout()
         stem = output_dir / f"profile_theta_h_t{frame.frame_index:04d}"
+        for fmt in formats:
+            fig.savefig(stem.with_suffix(f".{fmt}"), dpi=150)
+            written += 1
+        plt.close(fig)
+    return written
+
+
+def write_interactive_xy_map_html(map_series: XYMapSeries, output_html: Path, *, title: str) -> None:
+    first = map_series.frames[0]
+    x_theta, y_theta, z_theta = xy_grid_values(first, "theta_m3_m3")
+    x_pressure, y_pressure, z_pressure = xy_grid_values(first, "pressure_head_m")
+    theta_min = min(float(frame.data["theta_m3_m3"].min()) for frame in map_series.frames)
+    theta_max = max(float(frame.data["theta_m3_m3"].max()) for frame in map_series.frames)
+    pressure_min = min(float(frame.data["pressure_head_m"].min()) for frame in map_series.frames)
+    pressure_max = max(float(frame.data["pressure_head_m"].max()) for frame in map_series.frames)
+
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("Объёмная влажность θ, карта XY", "Давление почвенной влаги h, карта XY"))
+    fig.add_trace(
+        go.Heatmap(
+            x=x_theta,
+            y=y_theta,
+            z=z_theta,
+            colorscale="Viridis",
+            zmin=theta_min,
+            zmax=theta_max,
+            colorbar={"title": "θ, м³/м³", "x": 0.46},
+            name="θ",
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Heatmap(
+            x=x_pressure,
+            y=y_pressure,
+            z=z_pressure,
+            colorscale="RdBu",
+            zmin=pressure_min,
+            zmax=pressure_max,
+            reversescale=True,
+            colorbar={"title": "h, м", "x": 1.02},
+            name="h",
+        ),
+        row=1,
+        col=2,
+    )
+
+    frames = []
+    for frame in map_series.frames:
+        _, _, frame_theta = xy_grid_values(frame, "theta_m3_m3")
+        _, _, frame_pressure = xy_grid_values(frame, "pressure_head_m")
+        frames.append(
+            go.Frame(
+                name=str(frame.frame_index),
+                data=[go.Heatmap(z=frame_theta), go.Heatmap(z=frame_pressure)],
+                layout=go.Layout(title_text=f"{title}<br><sup>{_frame_title(frame)}</sup>"),
+            )
+        )
+    fig.frames = frames
+    fig.update_layout(
+        title={
+            "text": f"{title}<br><sup>{_frame_title(first)}</sup>",
+            "x": 0.0,
+            "xanchor": "left",
+            "y": 0.98,
+            "yanchor": "top",
+        },
+        sliders=[
+            {
+                "active": 0,
+                "x": 0.0,
+                "y": -0.08,
+                "len": 0.92,
+                "pad": {"t": 34, "b": 8},
+                "currentvalue": {"prefix": "Кадр: ", "font": {"size": 13}},
+                "steps": [
+                    {
+                        "label": str(frame.frame_index),
+                        "method": "animate",
+                        "args": [
+                            [str(frame.frame_index)],
+                            {"mode": "immediate", "frame": {"duration": 0, "redraw": True}, "transition": {"duration": 0}},
+                        ],
+                    }
+                    for frame in map_series.frames
+                ],
+            }
+        ],
+        height=700,
+        margin={"l": 70, "r": 80, "t": 104, "b": 120},
+        font={"family": "DejaVu Sans, Arial, sans-serif", "size": 13, "color": "#1f2937"},
+        plot_bgcolor="#ffffff",
+        paper_bgcolor="#ffffff",
+    )
+    axis_style = {
+        "showline": True,
+        "linecolor": "#111827",
+        "linewidth": 2,
+        "ticks": "outside",
+        "tickcolor": "#111827",
+        "tickwidth": 2,
+        "gridcolor": "#e5e7eb",
+        "gridwidth": 1,
+        "zeroline": False,
+        "title_standoff": 10,
+    }
+    fig.update_xaxes(title_text="X, м", **axis_style, row=1, col=1)
+    fig.update_xaxes(title_text="X, м", **axis_style, row=1, col=2)
+    fig.update_yaxes(title_text="Y, м", scaleanchor="x", scaleratio=1, **axis_style, row=1, col=1)
+    fig.update_yaxes(title_text="Y, м", scaleanchor="x2", scaleratio=1, **axis_style, row=1, col=2)
+    fig.write_html(output_html, include_plotlyjs="cdn", full_html=True, config={"responsive": True})
+
+
+def write_static_xy_map_snapshots(
+    map_series: XYMapSeries,
+    output_dir: Path,
+    *,
+    snapshot_every: int,
+    formats: list[str],
+) -> int:
+    written = 0
+    for frame in map_series.frames[:: max(1, snapshot_every)]:
+        x_theta, y_theta, z_theta = xy_grid_values(frame, "theta_m3_m3")
+        x_pressure, y_pressure, z_pressure = xy_grid_values(frame, "pressure_head_m")
+        fig, axes = plt.subplots(1, 2, figsize=(11, 5), constrained_layout=True)
+        theta_mesh = axes[0].pcolormesh(x_theta, y_theta, z_theta, shading="auto", cmap="viridis")
+        pressure_mesh = axes[1].pcolormesh(x_pressure, y_pressure, z_pressure, shading="auto", cmap="RdBu_r")
+        axes[0].set_title("Объёмная влажность θ")
+        axes[1].set_title("Давление почвенной влаги h")
+        for axis in axes:
+            axis.set_xlabel("X, м")
+            axis.set_ylabel("Y, м")
+            axis.set_aspect("equal", adjustable="box")
+            axis.grid(True, color="#e5e7eb", linewidth=0.8)
+        fig.colorbar(theta_mesh, ax=axes[0], label="θ, м³/м³")
+        fig.colorbar(pressure_mesh, ax=axes[1], label="h, м")
+        fig.suptitle(_frame_title(frame))
+        stem = output_dir / f"xy_map_theta_h_t{frame.frame_index:04d}"
+        for fmt in formats:
+            fig.savefig(stem.with_suffix(f".{fmt}"), dpi=150)
+            written += 1
+        plt.close(fig)
+    return written
+
+
+def write_interactive_xz_map_html(map_series: XZMapSeries, output_html: Path, *, title: str) -> None:
+    first = map_series.frames[0]
+    x_theta, depth_theta, z_theta = xz_grid_values(first, "theta_m3_m3")
+    x_pressure, depth_pressure, z_pressure = xz_grid_values(first, "pressure_head_m")
+    theta_min = min(float(frame.data["theta_m3_m3"].min()) for frame in map_series.frames)
+    theta_max = max(float(frame.data["theta_m3_m3"].max()) for frame in map_series.frames)
+    pressure_min = min(float(frame.data["pressure_head_m"].min()) for frame in map_series.frames)
+    pressure_max = max(float(frame.data["pressure_head_m"].max()) for frame in map_series.frames)
+
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("Объёмная влажность θ, разрез XZ", "Давление почвенной влаги h, разрез XZ"))
+    fig.add_trace(
+        go.Heatmap(
+            x=x_theta,
+            y=depth_theta,
+            z=z_theta,
+            colorscale="Viridis",
+            zmin=theta_min,
+            zmax=theta_max,
+            colorbar={"title": "θ, м³/м³", "x": 0.46},
+            name="θ",
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Heatmap(
+            x=x_pressure,
+            y=depth_pressure,
+            z=z_pressure,
+            colorscale="RdBu",
+            zmin=pressure_min,
+            zmax=pressure_max,
+            reversescale=True,
+            colorbar={"title": "h, м", "x": 1.02},
+            name="h",
+        ),
+        row=1,
+        col=2,
+    )
+    frames = []
+    for frame in map_series.frames:
+        _, _, frame_theta = xz_grid_values(frame, "theta_m3_m3")
+        _, _, frame_pressure = xz_grid_values(frame, "pressure_head_m")
+        frames.append(
+            go.Frame(
+                name=str(frame.frame_index),
+                data=[go.Heatmap(z=frame_theta), go.Heatmap(z=frame_pressure)],
+                layout=go.Layout(title_text=f"{title}<br><sup>{_frame_title(frame)}</sup>"),
+            )
+        )
+    fig.frames = frames
+    fig.update_layout(
+        title={
+            "text": f"{title}<br><sup>{_frame_title(first)}</sup>",
+            "x": 0.0,
+            "xanchor": "left",
+            "y": 0.98,
+            "yanchor": "top",
+        },
+        sliders=[
+            {
+                "active": 0,
+                "x": 0.0,
+                "y": -0.08,
+                "len": 0.92,
+                "pad": {"t": 34, "b": 8},
+                "currentvalue": {"prefix": "Кадр: ", "font": {"size": 13}},
+                "steps": [
+                    {
+                        "label": str(frame.frame_index),
+                        "method": "animate",
+                        "args": [
+                            [str(frame.frame_index)],
+                            {"mode": "immediate", "frame": {"duration": 0, "redraw": True}, "transition": {"duration": 0}},
+                        ],
+                    }
+                    for frame in map_series.frames
+                ],
+            }
+        ],
+        height=700,
+        margin={"l": 70, "r": 80, "t": 104, "b": 120},
+        font={"family": "DejaVu Sans, Arial, sans-serif", "size": 13, "color": "#1f2937"},
+        plot_bgcolor="#ffffff",
+        paper_bgcolor="#ffffff",
+    )
+    axis_style = {
+        "showline": True,
+        "linecolor": "#111827",
+        "linewidth": 2,
+        "ticks": "outside",
+        "tickcolor": "#111827",
+        "tickwidth": 2,
+        "gridcolor": "#e5e7eb",
+        "gridwidth": 1,
+        "zeroline": False,
+        "title_standoff": 10,
+    }
+    fig.update_xaxes(title_text="X, м", **axis_style, row=1, col=1)
+    fig.update_xaxes(title_text="X, м", **axis_style, row=1, col=2)
+    fig.update_yaxes(title_text="Глубина, м", autorange="reversed", **axis_style, row=1, col=1)
+    fig.update_yaxes(title_text="Глубина, м", autorange="reversed", **axis_style, row=1, col=2)
+    fig.write_html(output_html, include_plotlyjs="cdn", full_html=True, config={"responsive": True})
+
+
+def write_static_xz_map_snapshots(
+    map_series: XZMapSeries,
+    output_dir: Path,
+    *,
+    snapshot_every: int,
+    formats: list[str],
+) -> int:
+    written = 0
+    for frame in map_series.frames[:: max(1, snapshot_every)]:
+        x_theta, depth_theta, z_theta = xz_grid_values(frame, "theta_m3_m3")
+        x_pressure, depth_pressure, z_pressure = xz_grid_values(frame, "pressure_head_m")
+        fig, axes = plt.subplots(1, 2, figsize=(11, 5), constrained_layout=True)
+        theta_mesh = axes[0].pcolormesh(x_theta, depth_theta, z_theta, shading="auto", cmap="viridis")
+        pressure_mesh = axes[1].pcolormesh(x_pressure, depth_pressure, z_pressure, shading="auto", cmap="RdBu_r")
+        axes[0].set_title("Объёмная влажность θ")
+        axes[1].set_title("Давление почвенной влаги h")
+        for axis in axes:
+            axis.set_xlabel("X, м")
+            axis.set_ylabel("Глубина, м")
+            axis.invert_yaxis()
+            axis.grid(True, color="#e5e7eb", linewidth=0.8)
+        fig.colorbar(theta_mesh, ax=axes[0], label="θ, м³/м³")
+        fig.colorbar(pressure_mesh, ax=axes[1], label="h, м")
+        fig.suptitle(_frame_title(frame))
+        stem = output_dir / f"xz_map_theta_h_t{frame.frame_index:04d}"
         for fmt in formats:
             fig.savefig(stem.with_suffix(f".{fmt}"), dpi=150)
             written += 1
@@ -751,14 +1437,83 @@ def write_visualization_status(
     run_dir: Path,
     output_dir: Path,
     profile_series: ProfileSeries | None = None,
+    xy_map_series: XYMapSeries | None = None,
+    xz_map_series: XZMapSeries | None = None,
     profile_mode: str = "",
     snapshots_written: int = 0,
     speed_ms: int = 0,
+    analytical_series: AnalyticalProfileSeries | None = None,
     error: str | None = None,
 ) -> None:
     if status == "FAIL":
         path.write_text(f"VISUALIZATION_STATUS=FAIL\nerror={error}\n", encoding="utf-8")
         return
+    if xy_map_series is not None:
+        long_df = pd.concat(
+            [
+                frame.data.assign(frame_index=frame.frame_index, time_value=frame.time_value, time_unit=frame.time_unit)
+                for frame in xy_map_series.frames
+            ],
+            ignore_index=True,
+        )
+        lines = [
+            "VISUALIZATION_STATUS=PASS",
+            "visualization_type=xy_map",
+            f"run_dir={run_dir}",
+            f"output_dir={output_dir}",
+            f"frames_total={len(xy_map_series.frames)}",
+            f"x_min_m={long_df['coord_x_m'].min():.12g}",
+            f"x_max_m={long_df['coord_x_m'].max():.12g}",
+            f"y_min_m={long_df['coord_y_m'].min():.12g}",
+            f"y_max_m={long_df['coord_y_m'].max():.12g}",
+            f"theta_min={long_df['theta_m3_m3'].min():.12g}",
+            f"theta_max={long_df['theta_m3_m3'].max():.12g}",
+            f"pressure_head_min_m={long_df['pressure_head_m'].min():.12g}",
+            f"pressure_head_max_m={long_df['pressure_head_m'].max():.12g}",
+            f"saturation_min={long_df['liquid_saturation'].min():.12g}",
+            f"saturation_max={long_df['liquid_saturation'].max():.12g}",
+            "interactive_html=profiles_animation.html",
+            "xy_map_frames_long_csv=xy_map_frames_long.csv",
+            "xy_map_summary_csv=xy_map_summary.csv",
+            f"snapshots_written={snapshots_written}",
+            f"speed_ms={speed_ms}",
+        ]
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return
+
+    if xz_map_series is not None:
+        long_df = pd.concat(
+            [
+                frame.data.assign(frame_index=frame.frame_index, time_value=frame.time_value, time_unit=frame.time_unit)
+                for frame in xz_map_series.frames
+            ],
+            ignore_index=True,
+        )
+        lines = [
+            "VISUALIZATION_STATUS=PASS",
+            "visualization_type=xz_map",
+            f"run_dir={run_dir}",
+            f"output_dir={output_dir}",
+            f"frames_total={len(xz_map_series.frames)}",
+            f"x_min_m={long_df['coord_x_m'].min():.12g}",
+            f"x_max_m={long_df['coord_x_m'].max():.12g}",
+            f"depth_min_m={long_df['depth_m'].min():.12g}",
+            f"depth_max_m={long_df['depth_m'].max():.12g}",
+            f"theta_min={long_df['theta_m3_m3'].min():.12g}",
+            f"theta_max={long_df['theta_m3_m3'].max():.12g}",
+            f"pressure_head_min_m={long_df['pressure_head_m'].min():.12g}",
+            f"pressure_head_max_m={long_df['pressure_head_m'].max():.12g}",
+            f"saturation_min={long_df['liquid_saturation'].min():.12g}",
+            f"saturation_max={long_df['liquid_saturation'].max():.12g}",
+            "interactive_html=profiles_animation.html",
+            "xz_map_frames_long_csv=xz_map_frames_long.csv",
+            "xz_map_summary_csv=xz_map_summary.csv",
+            f"snapshots_written={snapshots_written}",
+            f"speed_ms={speed_ms}",
+        ]
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return
+
     assert profile_series is not None
     long_df = series_to_long_dataframe(profile_series)
     lines = [
@@ -779,10 +1534,79 @@ def write_visualization_status(
         "interactive_html=profiles_animation.html",
         "profile_frames_long_csv=profile_frames_long.csv",
         "profile_summary_csv=profile_summary.csv",
+        f"analytical_profile_overlay={'yes' if analytical_series is not None else 'no'}",
+        f"analytical_profile_source={analytical_series.source_file.name if analytical_series is not None else 'NA'}",
         f"snapshots_written={snapshots_written}",
         f"speed_ms={speed_ms}",
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_analytical_reference_html(run_dir: Path, output_dir: Path, status_path: Path) -> bool:
+    svg_names = [
+        "test_comparison.svg",
+        "test_pressure_comparison.svg",
+        "analytical_solution.svg",
+    ]
+    svg_paths = [run_dir / name for name in svg_names if (run_dir / name).is_file()]
+    if not svg_paths:
+        return False
+
+    cards: list[str] = []
+    for svg_path in svg_paths:
+        encoded = base64.b64encode(svg_path.read_bytes()).decode("ascii")
+        cards.append(
+            "\n".join(
+                [
+                    '<section class="plot-card">',
+                    f"  <h2>{html.escape(svg_path.name)}</h2>",
+                    f'  <img src="data:image/svg+xml;base64,{encoded}" alt="{html.escape(svg_path.name)}">',
+                    "</section>",
+                ]
+            )
+        )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "profiles_animation.html").write_text(
+        "\n".join(
+            [
+                "<!doctype html>",
+                '<html lang="ru">',
+                "<head>",
+                '  <meta charset="utf-8">',
+                "  <title>Графики аналитического теста SoilFlow</title>",
+                "  <style>",
+                "    body { margin: 0; padding: 18px; font-family: Arial, sans-serif; color: #0f172a; background: #f8fafc; }",
+                "    h1 { margin: 0 0 14px; font-size: 20px; }",
+                "    .plot-card { margin: 0 0 16px; padding: 14px; border: 1px solid #d8e0e8; background: #fff; }",
+                "    .plot-card h2 { margin: 0 0 10px; font-size: 15px; }",
+                "    img { display: block; max-width: 100%; height: auto; }",
+                "  </style>",
+                "</head>",
+                "<body>",
+                f"  <h1>Аналитические графики: {html.escape(run_dir.name)}</h1>",
+                *cards,
+                "</body>",
+                "</html>",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    status_path.write_text(
+        "\n".join(
+            [
+                "VISUALIZATION_STATUS=PASS",
+                "visualization_type=analytical_reference",
+                f"run_dir={run_dir}",
+                f"output_dir={output_dir}",
+                "interactive_html=profiles_animation.html",
+                "source_svg_files=" + ",".join(path.name for path in svg_paths),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return True
 
 
 def make_self_test_series() -> ProfileSeries:
@@ -826,24 +1650,95 @@ def run_visualization(args: argparse.Namespace) -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     status_path = output_dir / "VISUALIZATION_STATUS.txt"
     try:
+        input_json = args.input_json if args.input_json is not None else default_input_json_path()
+        defaults = read_input_defaults(input_json)
         if args.self_test:
             profile_series = make_self_test_series()
             run_dir = Path("SELF_TEST")
             profile_mode = "raw_1d"
         else:
-            input_json = args.input_json if args.input_json is not None else default_input_json_path()
-            defaults = read_input_defaults(input_json)
-            profile_series = collect_profile_frames(
-                args.run_dir,
-                profile_axis=args.profile_axis,
-                depth_origin=args.depth_origin,
-                profile_mode=args.profile_mode,
-                input_defaults=defaults,
-                x_slice=args.x_slice,
-                y_slice=args.y_slice,
-            )
+            if args.view_mode in {"auto", "xy_map"} and run_dir_has_xy_single_layer(args.run_dir):
+                map_series = collect_xy_map_frames(args.run_dir, input_defaults=defaults)
+                write_xy_map_csvs(map_series, output_dir)
+                formats = [part.strip().lower() for part in args.snapshot_format.split(",") if part.strip()]
+                snapshots_written = 0
+                if not args.html_only:
+                    snapshots_written = write_static_xy_map_snapshots(
+                        map_series,
+                        output_dir,
+                        snapshot_every=args.snapshot_every,
+                        formats=formats,
+                    )
+                if not args.static_only:
+                    write_interactive_xy_map_html(
+                        map_series,
+                        output_dir / "profiles_animation.html",
+                        title="Карта влажности и давления SoilFlow/PFLOTRAN",
+                    )
+                write_visualization_status(
+                    status_path,
+                    status="PASS",
+                    run_dir=args.run_dir,
+                    output_dir=output_dir,
+                    xy_map_series=map_series,
+                    snapshots_written=snapshots_written,
+                    speed_ms=args.speed_ms,
+                )
+                print(f"[OK] XY map visualization written: {output_dir}")
+                return 0
+            if args.view_mode == "xy_map":
+                raise ValueError("Режим xy_map требует плановую сетку с nx > 1, ny > 1 и nz = 1")
+            if args.view_mode in {"auto", "xz_map"} and run_dir_has_xz_section(args.run_dir):
+                map_series = collect_xz_map_frames(args.run_dir, input_defaults=defaults)
+                write_xz_map_csvs(map_series, output_dir)
+                formats = [part.strip().lower() for part in args.snapshot_format.split(",") if part.strip()]
+                snapshots_written = 0
+                if not args.html_only:
+                    snapshots_written = write_static_xz_map_snapshots(
+                        map_series,
+                        output_dir,
+                        snapshot_every=args.snapshot_every,
+                        formats=formats,
+                    )
+                if not args.static_only:
+                    write_interactive_xz_map_html(
+                        map_series,
+                        output_dir / "profiles_animation.html",
+                        title="Разрез влажности и давления SoilFlow/PFLOTRAN",
+                    )
+                write_visualization_status(
+                    status_path,
+                    status="PASS",
+                    run_dir=args.run_dir,
+                    output_dir=output_dir,
+                    xz_map_series=map_series,
+                    snapshots_written=snapshots_written,
+                    speed_ms=args.speed_ms,
+                )
+                print(f"[OK] XZ map visualization written: {output_dir}")
+                return 0
+            if args.view_mode == "xz_map":
+                raise ValueError("Режим xz_map требует вертикальный разрез с nx > 1, ny = 1 и nz > 1")
+            try:
+                profile_series = collect_profile_frames(
+                    args.run_dir,
+                    profile_axis=args.profile_axis,
+                    depth_origin=args.depth_origin,
+                    profile_mode=args.profile_mode,
+                    input_defaults=defaults,
+                    x_slice=args.x_slice,
+                    y_slice=args.y_slice,
+                )
+            except FileNotFoundError:
+                # Аналитические benchmarks без PFLOTRAN TECPLOT всё равно должны
+                # давать пользователю страницу просмотра уже построенного эталона.
+                if write_analytical_reference_html(args.run_dir, output_dir, status_path):
+                    print(f"[OK] Analytical visualization written: {output_dir}")
+                    return 0
+                raise
             run_dir = args.run_dir
             profile_mode = args.profile_mode
+        analytical_series = None if args.self_test else load_analytical_profile_series(run_dir, input_defaults=defaults)
         write_profile_csvs(profile_series, output_dir)
         snapshots_written = 0
         formats = [part.strip().lower() for part in args.snapshot_format.split(",") if part.strip()]
@@ -853,6 +1748,7 @@ def run_visualization(args: argparse.Namespace) -> int:
                 output_dir,
                 snapshot_every=args.snapshot_every,
                 formats=formats,
+                analytical_series=analytical_series,
             )
         if not args.static_only:
             write_interactive_profile_html(
@@ -860,6 +1756,7 @@ def run_visualization(args: argparse.Namespace) -> int:
                 output_dir / "profiles_animation.html",
                 speed_ms=args.speed_ms,
                 title="Эпюры влажности и давления SoilFlow/PFLOTRAN",
+                analytical_series=analytical_series,
             )
         write_visualization_status(
             status_path,
@@ -870,6 +1767,7 @@ def run_visualization(args: argparse.Namespace) -> int:
             profile_mode=profile_mode,
             snapshots_written=snapshots_written,
             speed_ms=args.speed_ms,
+            analytical_series=analytical_series,
         )
         print(f"[OK] Visualization written: {output_dir}")
         return 0
@@ -893,6 +1791,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--profile-axis", choices=["x", "y", "z", "auto"], default="auto")
     parser.add_argument("--depth-origin", choices=["top", "bottom"], default="top")
     parser.add_argument("--profile-mode", choices=["mean_by_depth", "nearest_column", "raw_1d"], default="mean_by_depth")
+    parser.add_argument("--view-mode", choices=["auto", "profile", "xy_map", "xz_map"], default="auto")
     parser.add_argument("--x-slice", type=float, default=None)
     parser.add_argument("--y-slice", type=float, default=None)
     parser.add_argument("--speed-ms", type=int, default=500)

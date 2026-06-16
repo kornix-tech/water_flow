@@ -16,31 +16,68 @@ def read_seed_workbook(path: Path) -> InputWorkbook:
     if not path.exists():
         raise HTTPException(status_code=404, detail="JSON-шаблон исходных данных не найден")
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        workbook_snapshot = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=500, detail=f"JSON-шаблон исходных данных поврежден: {exc}") from exc
-    return InputWorkbook.model_validate(data)
+    return InputWorkbook.model_validate(workbook_snapshot)
 
 
 def workbook_to_json(workbook: InputWorkbook) -> dict[str, Any]:
-    data = workbook.model_dump(mode="json")
+    workbook_snapshot = workbook.model_dump(mode="json")
     # Снимок расчета не должен наследовать служебные метки предыдущего сохранения.
     for key in ("calculation_id", "calculation_title", "calculation_created_at", "calculation_status"):
-        data.pop(key, None)
-    data["filename"] = "project_database"
-    data["updated_at"] = datetime.utcnow().isoformat()
-    return data
+        workbook_snapshot.pop(key, None)
+    workbook_snapshot["filename"] = "project_database"
+    workbook_snapshot["updated_at"] = datetime.utcnow().isoformat()
+    return workbook_snapshot
 
 
 def seed_workbook_to_json(workbook: InputWorkbook) -> dict[str, Any]:
-    data = workbook.model_dump(mode="json")
-    data["filename"] = "project_database"
-    return data
+    workbook_snapshot = workbook.model_dump(mode="json")
+    workbook_snapshot["filename"] = "project_database"
+    return workbook_snapshot
 
 
-def calculation_to_workbook(calculation: Calculation) -> InputWorkbook:
-    data = deepcopy(calculation.input_json)
-    data.update(
+def _merge_seed_fields(saved_workbook_snapshot: dict[str, Any], seed_workbook: InputWorkbook | None) -> dict[str, Any]:
+    if seed_workbook is None:
+        return saved_workbook_snapshot
+    merged_workbook_snapshot = deepcopy(saved_workbook_snapshot)
+    merged_tabs = merged_workbook_snapshot.get("tabs")
+    if not isinstance(merged_tabs, list):
+        return merged_workbook_snapshot
+    seed_tabs = {tab.id: tab.model_dump(mode="json") for tab in seed_workbook.tabs}
+    for index, tab in enumerate(merged_tabs):
+        if not isinstance(tab, dict):
+            continue
+        seed_tab = seed_tabs.get(str(tab.get("id", "")))
+        if not seed_tab or tab.get("kind") != "fields":
+            continue
+        fields = tab.get("fields")
+        if not isinstance(fields, list):
+            continue
+        existing_by_key = {field.get("key"): field for field in fields if isinstance(field, dict)}
+        used_keys: set[str] = set()
+        merged_fields: list[dict[str, Any]] = []
+        for seed_field in seed_tab.get("fields", []):
+            key = seed_field.get("key")
+            existing = existing_by_key.get(key)
+            if isinstance(existing, dict):
+                # Сохраняем введенное пользователем значение, но подтягиваем новые
+                # описания, типы и порядок полей из актуального шаблона.
+                next_field = {**seed_field, "value": existing.get("value", seed_field.get("value"))}
+                merged_fields.append(next_field)
+                used_keys.add(str(key))
+            else:
+                merged_fields.append(seed_field)
+        merged_fields.extend(field for field in fields if isinstance(field, dict) and str(field.get("key")) not in used_keys)
+        merged_tabs[index] = {**tab, "fields": merged_fields}
+    return merged_workbook_snapshot
+
+
+def calculation_to_workbook(calculation: Calculation, seed_workbook: InputWorkbook | None = None) -> InputWorkbook:
+    workbook_snapshot = deepcopy(calculation.input_json)
+    workbook_snapshot = _merge_seed_fields(workbook_snapshot, seed_workbook)
+    workbook_snapshot.update(
         {
             "calculation_id": calculation.id,
             "calculation_title": calculation.title,
@@ -49,7 +86,7 @@ def calculation_to_workbook(calculation: Calculation) -> InputWorkbook:
             "updated_at": calculation.updated_at.isoformat(),
         }
     )
-    return InputWorkbook.model_validate(data)
+    return InputWorkbook.model_validate(workbook_snapshot)
 
 
 def calculation_summary(calculation: Calculation) -> CalculationSummary:
@@ -66,8 +103,8 @@ def calculation_summary(calculation: Calculation) -> CalculationSummary:
     )
 
 
-def calculation_read(calculation: Calculation) -> CalculationRead:
-    return CalculationRead(**calculation_summary(calculation).model_dump(), input=calculation_to_workbook(calculation))
+def calculation_read(calculation: Calculation, seed_workbook: InputWorkbook | None = None) -> CalculationRead:
+    return CalculationRead(**calculation_summary(calculation).model_dump(), input=calculation_to_workbook(calculation, seed_workbook))
 
 
 def write_workbook_json(workbook: InputWorkbook, path: Path) -> None:

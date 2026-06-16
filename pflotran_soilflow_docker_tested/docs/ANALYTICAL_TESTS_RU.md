@@ -69,7 +69,24 @@ max_abs_saturation_error <= saturation_abs_tolerance
 abs(q_from_gradient_m_s - q_expected_m_s) <= max(1e-12, flux_relative_tolerance*abs(q_expected_m_s))
 ```
 
-## 4. _test_transient_uniform_storage_vg
+## 4. _test_brooks_corey_burdine
+
+Гидростатическое равновесие в однородной колонке с парой `Brooks-Corey + Burdine`. Тест нужен как первый контроль того, что генератор входных файлов не привязан только к `van Genuchten + Mualem`.
+
+Формулы:
+
+```text
+P(z) = P_bottom - rho*g*z
+h(z) = (P(z) - P_atm)/(rho*g)
+Se(h) = 1, если alpha*abs(h) <= 1
+Se(h) = (alpha*abs(h))^(-lambda), если alpha*abs(h) > 1
+kr = Se^(3 + 2/lambda)
+qz = 0
+```
+
+Критерии PASS такие же, как у hydrostatic no-flow теста: давление, насыщенность и восстановленный поток должны оставаться в заданных допусках.
+
+## 5. _test_transient_uniform_storage_vg
 
 Нестационарная manufactured-задача для горизонтальной no-flow области с равномерным `SOURCE_SINK` через `RATE LIST`. Область остаётся пространственно однородной, а средняя насыщенность должна следовать заданному закону хранения.
 
@@ -166,8 +183,35 @@ make dry-test-transient
 
 ## Будущие тесты
 
-1. Ogata-Banks 1D advection-dispersion test для solute transport.
-2. Theis radial groundwater flow test для saturated groundwater module.
-3. Philip infiltration / sorptivity test как полуаналитический benchmark инфильтрации.
+Расширенный suite уже содержит отдельно запускаемые аналитические эталоны:
 
-Эти тесты не включены в текущий `make test`, потому что они требуют отдельных transport/radial-flow/инфильтрационных постановок и не должны смешиваться с 1D verification-suite влагопереноса.
+```text
+theis_radial_flow
+ogata_banks_1d_transport
+terzaghi_1d_consolidation
+philip_infiltration
+green_ampt_infiltration
+heat_conduction_1d
+buckley_leverett
+richards_mms
+boussinesq_groundwater_mound
+```
+
+Для `philip_infiltration`, `green_ampt_infiltration` и `richards_mms` дополнительно
+генерируется `pflotran.in` и запускается PFLOTRAN `RICHARDS`, чтобы получить расчетные
+TECPLOT-профили влажности и давления. Эти проверки имеют статус `PASS_WITH_WARNINGS`:
+профили solver'а уже доступны для просмотра, но строгая метрика сравнения с аналитическим
+законом будет подключена отдельным этапом.
+
+Для всех расчетных профилей визуализация ищет аналитический профиль и накладывает его
+на тот же график. Приоритетный файл - `analytical_profiles.csv` с колонками
+`frame_index`, `depth_m`, `theta_m3_m3`, `pressure_head_m`; если его нет, используется
+статический `analytical_solution.csv`. В легенде линии подписываются отдельно:
+`PFLOTRAN θ`, `Аналитика θ`, `PFLOTRAN h`, `Аналитика h`.
+
+Остальные расширенные постановки пока генерируют `analytical_solution.csv`,
+`analytical_solution.svg`, `analytical_test_summary.txt` и `TEST_STATUS.txt` со статусом
+`SKIP`, потому что они требуют не только `RICHARDS`, а отдельных transport/heat/two-phase
+или groundwater deck'ов PFLOTRAN. Статус `SKIP` означает, что аналитический benchmark уже
+доступен и отдельно запускается, но соответствующий численный deck ещё должен быть
+подключён к solver-слою.

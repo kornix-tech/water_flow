@@ -97,7 +97,7 @@ export function Layout({ path, onNavigate, onLogout, children }: LayoutProps) {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <strong>SoilFlow</strong>
+          <strong>Влагоперенос в почве</strong>
           <span>PFLOTRAN</span>
         </div>
         <nav>

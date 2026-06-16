@@ -94,6 +94,42 @@ export function DashboardPage({ onNavigate, onJobCreated }: DashboardPageProps) 
           Открыть графики
         </button>
       </div>
+      <div className="overview-grid">
+        <section className="panel">
+          <h2>Архитектура решения</h2>
+          <ul className="overview-list">
+            <li>React/Vite SPA отвечает за русскоязычный интерфейс, ввод параметров, мониторинг задач, просмотр расчётов и графиков.</li>
+            <li>FastAPI backend предоставляет REST API, авторизацию токеном, очередь задач, доступ к SQLite и безопасную выдачу файлов результатов.</li>
+            <li>Python-адаптер формирует постановку PFLOTRAN из JSON-снимка расчёта, запускает solver и собирает диагностические файлы.</li>
+            <li>PFLOTRAN/PETSc выполняют конечно-объёмный расчёт уравнения Ричардса; Plotly/Matplotlib строят интерактивные и статические графики.</li>
+            <li>Docker Compose объединяет web-сервис, рабочую область `/workspace`, базу расчётов и папки результатов.</li>
+          </ul>
+        </section>
+        <section className="panel">
+          <h2>Модули и лицензии</h2>
+          <ul className="overview-list">
+            <li>PFLOTRAN — внешний FVM-решатель, заявленная лицензия LGPL.</li>
+            <li>PETSc — численная библиотека и MPI-инфраструктура, BSD-подобная 2-clause лицензия.</li>
+            <li>FastAPI, Uvicorn, Pydantic — backend API и валидация данных, открытые Python-лицензии экосистемы.</li>
+            <li>NumPy, pandas, h5py, PyYAML — подготовка данных, диагностика и чтение/запись расчётных артефактов.</li>
+            <li>React, Vite, TypeScript — frontend-сборка и интерфейс; Plotly и Matplotlib — визуализация результатов.</li>
+            <li>Ubuntu/Docker packages поставляются из apt/npm/PyPI-репозиториев; перед коммерческим распространением нужен отдельный license review.</li>
+          </ul>
+        </section>
+        <section className="panel">
+          <h2>Этап разработки</h2>
+          <dl className="kv overview-kv">
+            <dt>Стадия</dt>
+            <dd>инженерный прототип, подготовка к внутреннему релизу</dd>
+            <dt>Готово</dt>
+            <dd>web-интерфейс, база расчётов, запуск PFLOTRAN, аналитические тесты, графики и архивирование результатов</dd>
+            <dt>Контроль качества</dt>
+            <dd>контейнерный check, dry-run генерации, verification-suite и ручная проверка основных сценариев UI</dd>
+            <dt>Ограничения</dt>
+            <dd>лицензии сторонних компонентов и production-политики безопасности требуют финального юридического и эксплуатационного review</dd>
+          </dl>
+        </section>
+      </div>
     </section>
   );
 }
