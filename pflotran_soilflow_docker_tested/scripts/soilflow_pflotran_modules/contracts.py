@@ -18,7 +18,7 @@ GENERATED_FILE_CONTRACTS: tuple[GeneratedFileContract, ...] = (
 
 
 MODULE_BOUNDARIES = {
-    "input_contract": "Чтение и валидация JSON-снимка исходных данных расчета.",
+    "input_contract": "Чтение, приведение типов и базовая валидация JSON-снимка исходных данных расчета.",
     "physical_models": "Модели водоудерживания, влагопроводности и проверка допустимых пар.",
     "deck_writer": "Генерация PFLOTRAN input deck без запуска внешнего solver-а.",
     "analytical_tests": "Аналитические профили и метрики сравнения численных тестов.",

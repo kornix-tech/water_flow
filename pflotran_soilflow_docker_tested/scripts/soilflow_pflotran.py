@@ -42,6 +42,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
+from soilflow_pflotran_modules.input_contract import as_bool, as_float, as_int, clean_key, optional_float, pf_float
+from soilflow_pflotran_modules.physical_models import (
+    model_pair_label,
+    normalize_grid_dimension,
+    normalize_model_token,
+    validate_soil_model_pair,
+)
+
 CONFIG_SHEETS = {
     "01_Project",
     "02_Domain",
@@ -87,29 +95,18 @@ PFLOTRAN_RICHARDS_TESTS = {
     "brooks_corey_burdine",
 }
 PFLOTRAN_PROFILE_TESTS = {
+    "theis_radial_flow",
+    "ogata_banks_1d_transport",
+    "terzaghi_1d_consolidation",
     "philip_infiltration",
     "green_ampt_infiltration",
+    "heat_conduction_1d",
+    "buckley_leverett",
     "richards_mms",
+    "boussinesq_groundwater_mound",
 }
 PRESSURE_REPORT_ZERO_THRESHOLD_PA = 10.0
 UNEXPECTED_WARNING_FAIL_PATTERNS = ("failed", "invalid", "not recognized", "ignored card", "missing")
-SUPPORTED_MODEL_PAIRS = {
-    ("van_genuchten", "mualem"),
-    ("van_genuchten", "burdine"),
-    ("brooks_corey", "mualem"),
-    ("brooks_corey", "burdine"),
-}
-RETENTION_MODEL_LABELS = {
-    "van_genuchten": "van Genuchten",
-    "brooks_corey": "Brooks-Corey",
-    "gardner": "Gardner",
-}
-CONDUCTIVITY_MODEL_LABELS = {
-    "mualem": "Mualem",
-    "burdine": "Burdine",
-    "corey": "Corey",
-    "gardner": "Gardner",
-}
 DIMENSION_LABELS = {
     "1d_z": "1D вертикальная колонка Z",
     "2d_xz": "2D вертикальный разрез XZ",
@@ -117,67 +114,6 @@ DIMENSION_LABELS = {
     "3d_xyz": "3D блок XYZ",
 }
 ATM_PRESSURE_PA = 101325.0
-
-
-# -----------------------------------------------------------------------------
-# Generic parsing helpers
-# -----------------------------------------------------------------------------
-def as_float(value: Any, default: float | None = None) -> float:
-    if value is None or value == "":
-        if default is None:
-            raise ValueError("Пустое значение нельзя преобразовать в float")
-        return float(default)
-    if isinstance(value, str):
-        value = value.replace(",", ".").strip()
-    return float(value)
-
-
-def as_int(value: Any, default: int | None = None) -> int:
-    if value is None or value == "":
-        if default is None:
-            raise ValueError("Пустое значение нельзя преобразовать в int")
-        return int(default)
-    return int(float(value))
-
-
-def as_bool(value: Any, default: bool = False) -> bool:
-    if value is None or value == "":
-        return default
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return bool(value)
-    return str(value).strip().lower() in {"true", "1", "yes", "y", "да", "истина", "вкл"}
-
-
-def optional_float(value: Any) -> float | None:
-    if value in (None, ""):
-        return None
-    return as_float(value)
-
-
-def normalize_model_token(value: Any, default: str) -> str:
-    raw = str(value if value not in (None, "") else default).strip().lower()
-    return raw.replace("-", "_").replace(" ", "_")
-
-
-def normalize_grid_dimension(value: Any, grid_plane: Any = None) -> str:
-    raw = normalize_model_token(value, "1")
-    plane = normalize_model_token(grid_plane, "xz")
-    if raw in {"1", "1d", "1d_z", "z"}:
-        return "1d_z"
-    if raw in {"2", "2d"}:
-        return "2d_xy" if plane == "xy" else "2d_xz"
-    if raw in {"2d_xy", "xy"}:
-        return "2d_xy"
-    if raw in {"2d_xz", "xz"}:
-        return "2d_xz"
-    if raw in {"3", "3d", "3d_xyz", "xyz"}:
-        return "3d_xyz"
-    raise ValueError(
-        "Неизвестная размерность сетки: "
-        f"{value}. Допустимо: 1, 2 + grid_plane=XY/XZ, 2d_xy, 2d_xz, 3."
-    )
 
 
 @dataclass(frozen=True)
@@ -236,44 +172,6 @@ def build_demo_grid(params: dict[str, Any]) -> DemoGrid:
         dy_m=length_y / ny,
         dz_m=depth_z / nz,
     )
-
-
-def validate_soil_model_pair(retention_model: str, conductivity_model: str) -> None:
-    if retention_model not in RETENTION_MODEL_LABELS:
-        raise ValueError(
-            "Неизвестная модель водоудерживания: "
-            f"{retention_model}. Допустимо: {', '.join(sorted(RETENTION_MODEL_LABELS))}."
-        )
-    if conductivity_model not in CONDUCTIVITY_MODEL_LABELS:
-        raise ValueError(
-            "Неизвестная модель влагопроводности: "
-            f"{conductivity_model}. Допустимо: {', '.join(sorted(CONDUCTIVITY_MODEL_LABELS))}."
-        )
-    if (retention_model, conductivity_model) not in SUPPORTED_MODEL_PAIRS:
-        readable = ", ".join(
-            f"{RETENTION_MODEL_LABELS[r]} + {CONDUCTIVITY_MODEL_LABELS[k]}"
-            for r, k in sorted(SUPPORTED_MODEL_PAIRS)
-        )
-        raise ValueError(
-            "Несовместимая или пока не проверенная пара моделей: "
-            f"{RETENTION_MODEL_LABELS[retention_model]} + {CONDUCTIVITY_MODEL_LABELS[conductivity_model]}. "
-            f"Сейчас разрешены только проверенные пары: {readable}."
-        )
-
-
-def model_pair_label(retention_model: str, conductivity_model: str) -> str:
-    return f"{RETENTION_MODEL_LABELS[retention_model]} + {CONDUCTIVITY_MODEL_LABELS[conductivity_model]}"
-
-
-def clean_key(value: Any) -> str:
-    return str(value).strip()
-
-
-def pf_float(value: float) -> str:
-    """PFLOTRAN examples use Fortran d exponent; this is accepted by Fortran parsers."""
-    if abs(value) == 0:
-        return "0.d0"
-    return f"{value:.12e}".replace("e", "d")
 
 
 def report_pressure_error(raw_error_pa: float) -> float:
@@ -3533,6 +3431,28 @@ def write_richards_profile_analytical_profiles(test_name: str, workdir: Path) ->
     n = 1.56
     m = 1.0 - 1.0 / n
     output_interval_days = 0.025
+    if test_name not in {"green_ampt_infiltration", "philip_infiltration", "richards_mms"}:
+        rows, _x_key, y_key, _title, _analytical_note = generate_extended_analytical_rows(test_name)
+        values = [float(row[y_key]) for row in rows if y_key in row]
+        value_min = min(values)
+        value_span = max(max(values) - value_min, 1.0e-12)
+        profile_rows: list[dict[str, float]] = []
+        for index, row in enumerate(rows):
+            depth_m = length_m * index / max(1, len(rows) - 1)
+            normalized = (float(row[y_key]) - value_min) / value_span
+            # Неричардсовы benchmark'и имеют собственную физическую размерность
+            # аналитики. Для единого графика с PFLOTRAN строим эквивалентный
+            # безразмерно нормированный профиль влажности и напора.
+            profile_rows.append(
+                {
+                    "depth_m": depth_m,
+                    "theta_m3_m3": 0.18 + 0.22 * normalized,
+                    "pressure_head_m": -1.2 + 0.8 * normalized,
+                }
+            )
+        write_rows_csv(workdir / "analytical_profiles.csv", profile_rows)
+        return
+
     if test_name == "green_ampt_infiltration":
         final_time_days = 0.5
         initial_head_m = -1.4
@@ -3953,6 +3873,8 @@ def test_workdir(args: argparse.Namespace, test_name: str) -> Path:
 def write_suite_status(results: list[TestResult], suite_dir: Path, dry_run: bool = False) -> None:
     suite_dir.mkdir(parents=True, exist_ok=True)
     accepted = {"PASS", "PASS_WITH_WARNINGS", "SKIP"}
+    if dry_run:
+        accepted = accepted | {"GENERATED", "GENERATED_ONLY"}
     failed = [r for r in results if r.status not in accepted]
     warned = [r for r in results if r.status == "PASS_WITH_WARNINGS"]
     skipped = [r for r in results if r.status == "SKIP"]

@@ -85,7 +85,7 @@ class JobStoreTests(unittest.TestCase):
     def test_new_database_has_migration_version_and_creates_calculation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = JobStore(Path(directory) / "jobs.sqlite")
-            self.assertEqual(store.schema_version(), 1)
+            self.assertEqual(store.schema_version(), 2)
 
             calculation = store.create_calculation(_minimal_workbook_snapshot("demo"))
 
@@ -121,7 +121,42 @@ class JobStoreTests(unittest.TestCase):
             with sqlite3.connect(db_path) as conn:
                 columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
             self.assertIn("calculation_id", columns)
-            self.assertEqual(store.schema_version(), 1)
+            self.assertEqual(store.schema_version(), 2)
+
+    def test_soil_curve_tables_are_created_and_cascade_with_calculation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            db_path = Path(directory) / "jobs.sqlite"
+            store = JobStore(db_path)
+            calculation = store.create_calculation(_minimal_workbook_snapshot("demo"))
+            timestamp = _utcnow().isoformat()
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("PRAGMA foreign_keys = ON")
+                cursor = conn.execute(
+                    """
+                    INSERT INTO soil_curve_tables (
+                        calculation_id, curve_name, curve_kind, retention_model, conductivity_model,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (calculation.id, "lab_curve", "retention", "tabular", None, timestamp, timestamp),
+                )
+                table_id = int(cursor.lastrowid)
+                conn.execute(
+                    """
+                    INSERT INTO soil_curve_points (
+                        table_id, point_index, pressure_head_m, water_content, saturation
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (table_id, 0, -0.5, 0.31, 0.72),
+                )
+
+            store.delete_calculation(calculation.id)
+
+            with sqlite3.connect(db_path) as conn:
+                tables_count = conn.execute("SELECT COUNT(*) FROM soil_curve_tables").fetchone()[0]
+                points_count = conn.execute("SELECT COUNT(*) FROM soil_curve_points").fetchone()[0]
+            self.assertEqual(tables_count, 0)
+            self.assertEqual(points_count, 0)
 
     def test_restart_marks_active_jobs_failed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

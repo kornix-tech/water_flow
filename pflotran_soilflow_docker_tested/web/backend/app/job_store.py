@@ -70,8 +70,52 @@ def _migration_001_create_jobs_and_calculations(conn: sqlite3.Connection) -> Non
     )
 
 
+def _migration_002_create_soil_curve_tables(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS soil_curve_tables (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            calculation_id INTEGER NOT NULL,
+            curve_name TEXT NOT NULL,
+            curve_kind TEXT NOT NULL,
+            retention_model TEXT,
+            conductivity_model TEXT,
+            pressure_unit TEXT NOT NULL DEFAULT 'Pa',
+            saturation_unit TEXT NOT NULL DEFAULT 'm3/m3',
+            conductivity_unit TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            comment TEXT,
+            UNIQUE(calculation_id, curve_name),
+            FOREIGN KEY(calculation_id) REFERENCES calculations(id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS soil_curve_points (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            table_id INTEGER NOT NULL,
+            point_index INTEGER NOT NULL,
+            pressure_head_m REAL,
+            pressure_pa REAL,
+            water_content REAL,
+            saturation REAL,
+            relative_permeability REAL,
+            hydraulic_conductivity_m_s REAL,
+            comment TEXT,
+            UNIQUE(table_id, point_index),
+            FOREIGN KEY(table_id) REFERENCES soil_curve_tables(id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_soil_curve_tables_calculation ON soil_curve_tables(calculation_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_soil_curve_points_table ON soil_curve_points(table_id, point_index)")
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "Создание таблиц jobs/calculations и совместимость с calculation_id", _migration_001_create_jobs_and_calculations),
+    (2, "Табличные кривые водоудерживания и влагопроводности для расчетов", _migration_002_create_soil_curve_tables),
 )
 
 
@@ -85,6 +129,7 @@ class JobStore:
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
     def _init_db(self) -> None:

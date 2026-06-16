@@ -1,6 +1,8 @@
 ## [Unreleased]
 
 ### Added
+- Добавлена SQLite-миграция schema version 2 с таблицами `soil_curve_tables` и `soil_curve_points` для будущих табличных экспериментальных кривых водоудерживания/влагопроводности.
+- Добавлены модули `soilflow_pflotran_modules.input_contract` и `soilflow_pflotran_modules.physical_models`, а также unit-тесты перенесенных контрактов.
 - Добавлен endpoint `/api/health/ready` для проверки готовности расчетной среды: PFLOTRAN, workspace/tmp, frontend dist и SQLite schema version.
 - Добавлен `scripts/api_smoke.sh` и Makefile-цель `api-smoke` для read-only проверки базового backend API-контракта живого сервиса.
 - Добавлены backend unit-тесты для безопасных путей, SQLite-миграций и обработки активных заданий после рестарта.
@@ -29,6 +31,9 @@
 - Добавлена панель прогресса задач в левом меню: общий индикатор по последним задачам и отдельный индикатор текущего запуска.
 
 ### Changed
+- Первый блок `soilflow_pflotran.py` вынесен из монолита в модули: парсинг входных значений, PFLOTRAN float-format и валидация пар моделей почвы.
+- Все расширенные аналитические benchmarks теперь генерируют PFLOTRAN `RICHARDS` profile carrier, `pflotran.in` и `analytical_profiles.csv`, чтобы после запуска были расчетные TECPLOT-профили для графиков.
+- Dry-run suite больше не считает статусы `GENERATED`/`GENERATED_ONLY` failed при `TEST_SUITE_STATUS=DRY_RUN`.
 - `scripts/check_project.sh` теперь дополнительно запускает backend unit-тесты и read-only API smoke после рестарта web-сервиса.
 - `scripts/sync_to_running_container.sh` синхронизирует весь каталог `scripts`, чтобы новые вспомогательные модули попадали в работающий контейнер.
 - Актуальные web/API документы и текстовые источники схем переведены с XLSX-first формулировок на JSON/SQLite-first контракт.
@@ -45,7 +50,7 @@
 - Тесты в web-интерфейсе разделены на раскрывающиеся группы: служебный запуск, 1D/пространственно-однородные benchmarks и 2D/радиальные/профильные benchmarks.
 - При запуске отдельного теста web-интерфейс автоматически отслеживает расчет, запускает построение графиков и показывает кнопку просмотра результата.
 - В исходные данные добавлен выбор `retention_model` и `conductivity_model` с проверкой совместимости пар моделей почвы.
-- Добавлены отдельно запускаемые расширенные аналитические benchmarks: Theis, Ogata-Banks, Terzaghi, Philip, Green-Ampt, heat conduction, Buckley-Leverett, Richards MMS и Boussinesq; Philip, Green-Ampt и Richards MMS теперь дополнительно запускают PFLOTRAN `RICHARDS` для расчетных TECPLOT-профилей, остальные пока генерируют эталонные CSV/SVG и статус `SKIP` до подключения численного deck.
+- Добавлены отдельно запускаемые расширенные аналитические benchmarks: Theis, Ogata-Banks, Terzaghi, Philip, Green-Ampt, heat conduction, Buckley-Leverett, Richards MMS и Boussinesq.
 - Добавлен verification-test `_test_brooks_corey_burdine` для пары Brooks-Corey + Burdine.
 - Demo-Richards переведен на 3600 расчетных шагов за 7 суток: `maximum_timestep_days` изменен на `0.0019444444444444444` сут.
 - Подготовка demo- и `_test`-расчетов переведена с XLSX на JSON-снимки из базы данных проекта; XLSX больше не используется как этап подготовки входных данных.

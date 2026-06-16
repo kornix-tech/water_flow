@@ -34,6 +34,7 @@ PFLOTRAN: /opt/pflotran/src/pflotran/pflotran
 5. Долгие операции запускаются как фоновые задания через `JobManager` и `ThreadPoolExecutor`; состояние заданий хранится в SQLite.
 6. Визуализация отделена от расчета: `soilflow_pflotran.py` генерирует и запускает расчет, `soilflow_visualize.py` читает TECPLOT/CSV и строит HTML/SVG/CSV графические артефакты.
 7. Для безопасности backend валидирует имена расчетов, job id, пути к файлам, размер API body и архивов; добавлены CSP/security headers, rate-limit и опциональный Bearer-token режим.
+8. SQLite schema version 2 содержит задел под табличные экспериментальные кривые почвы: `soil_curve_tables` и `soil_curve_points`.
 
 ## 3. Карта каталогов
 
@@ -56,13 +57,13 @@ pflotran_soilflow_docker_tested/
     check_project.sh                 единая проверка: Python compile, backend unittest, frontend build, restart, API smoke
     api_smoke.sh                     read-only проверка базового API-контракта живого web-сервиса
     sync_to_running_container.sh     документированный hot-copy workflow для запущенного контейнера
-    soilflow_pflotran_modules/       границы будущей декомпозиции большого CLI-адаптера
+    soilflow_pflotran_modules/       вынесенные контракты парсинга/моделей и границы дальнейшей декомпозиции
     *.sh                             вспомогательные Docker-команды
 
   web/backend/app/
     main.py                          FastAPI app, middleware, routers, static SPA
     config.py                        настройки окружения и workspace
-    job_store.py                     SQLite-хранилище jobs/calculations + schema_migrations
+    job_store.py                     SQLite-хранилище jobs/calculations + schema_migrations + soil_curve_* tables
     job_lifecycle.py                 единые статусы job/calculation lifecycle
     job_manager.py                   очередь и запуск фоновых subprocess
     file_manager.py                  безопасная работа с путями и zip
@@ -453,8 +454,8 @@ XZ:
 - 1D профили показывают PFLOTRAN и аналитику на одном графике с легендой;
 - по оси влажности не показывается отрицательная полуплоскость;
 - надпись давления в интерфейсе: `Давление почвенной влаги`;
-- для тестов без TECPLOT-профилей создается HTML-просмотр аналитических SVG-эталонов, но это временный fallback;
-- для `philip_infiltration`, `green_ampt_infiltration`, `richards_mms` добавлены PFLOTRAN-профили и `analytical_profiles.csv`.
+- для всех расширенных benchmark'ов добавлен PFLOTRAN `RICHARDS` profile carrier и `analytical_profiles.csv`, чтобы после запуска были расчетные TECPLOT-профили для графиков;
+- для неричардсовых benchmark'ов профиль пока является нормированным carrier-сравнением, а не строгой численной постановкой transport/heat/two-phase/groundwater физики.
 
 ## 10. Аналитические и verification-тесты
 
@@ -628,9 +629,9 @@ scripts/__pycache__/
 ## 16. Рекомендуемый следующий план разработки
 
 1. Для релизного состояния выполнить полную пересборку Docker image и сверить ее с hot-copy workflow.
-2. Постепенно переносить блоки `soilflow_pflotran.py` в `soilflow_pflotran_modules`, сохраняя CLI-фасад и добавляя тесты на каждый перенос.
-3. Довести аналитические тесты без PFLOTRAN-профилей до полноценного численного сравнения.
-4. Спроектировать `soil_curve_tables` в SQLite для табличных экспериментальных кривых и формат генерации PFLOTRAN input.
+2. Продолжить перенос блоков `soilflow_pflotran.py` в `soilflow_pflotran_modules`: следующий безопасный кандидат - extended analytical rows и profile carrier.
+3. Довести расширенные profile carrier тесты до строгих физических deck'ов PFLOTRAN для transport/heat/two-phase/groundwater задач.
+4. Добавить API/UI для `soil_curve_tables` и генерацию PFLOTRAN tabular characteristic curves из `soil_curve_points`.
 5. Для дренажной задачи вынести исследовательские сценарии в отдельный воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`, `УГВ`, `C`, `G`, `Z`.
 6. Отдельно решить, остается ли регулируемый колодец эквивалентным sink или нужен явный модуль hydraulic network.
 

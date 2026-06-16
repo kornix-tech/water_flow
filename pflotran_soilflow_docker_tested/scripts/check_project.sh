@@ -12,6 +12,7 @@ python3 -m compileall -q web/backend/app scripts/soilflow_pflotran.py scripts/so
 
 echo "[2/6] Backend unit tests"
 python3 -m unittest discover -s web/backend/tests
+python3 -m unittest discover -s tests
 
 echo "[3/6] Frontend production build"
 docker run --rm \
