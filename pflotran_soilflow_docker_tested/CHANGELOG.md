@@ -8,6 +8,7 @@
 - Добавлены валидация и SVG-предпросмотр табличных кривых на странице `Исходные данные`.
 - Добавлен модуль `soilflow_pflotran_modules.demo_deck_writer` для стандартного PFLOTRAN RICHARDS deck writer и unit-тесты его совместимости с прежним wrapper'ом.
 - Добавлен модуль `soilflow_pflotran_modules.result_diagnostics` для Tecplot parser, solver/warning diagnostics, direct flux probe и unified status writer.
+- Добавлены модули `soilflow_pflotran_modules.solver_runner` и `soilflow_pflotran_modules.surface_balance` как replaceable adapter boundaries для solver-а и блока верхнего водного баланса/испарения.
 - Добавлен модуль `soilflow_pflotran_modules.tabular_curves` с нормализацией табличных кривых, записью PFLOTRAN `.dat` файлов и unit-тестами монотонности.
 - Добавлен интерфейс редактирования табличных кривых почвы на странице `Исходные данные`: паспорт кривой, точки `h/P/theta/S/kr/K`, сохранение, обновление и удаление через SQLite API.
 - Добавлен модуль `soilflow_pflotran_modules.profile_carrier` для генерации PFLOTRAN profile-carrier deck'ов расширенных аналитических тестов.
@@ -53,6 +54,7 @@
 - `scripts/check_project.sh` теперь включает полный расчетный smoke для табличной почвы через публичный API.
 - Стандартный PFLOTRAN deck writer вынесен из `soilflow_pflotran.py`; основной скрипт оставлен совместимым CLI-фасадом и отдельно маршрутизирует `floodplain_controlled_drainage`.
 - Парсинг результатов PFLOTRAN, solver diagnostics и запись `TEST_STATUS.txt` вынесены из `soilflow_pflotran.py` в модуль с unit-тестами.
+- Поиск/запуск PFLOTRAN и расчет производных параметров верхнего потока вынесены из `soilflow_pflotran.py`; фасад больше не содержит прямого `subprocess` runner-а и текущая ET-логика изолирована для будущей замены.
 - Первый блок `soilflow_pflotran.py` вынесен из монолита в модули: парсинг входных значений, PFLOTRAN float-format и валидация пар моделей почвы.
 - Все расширенные аналитические benchmarks теперь генерируют PFLOTRAN `RICHARDS` profile carrier, `pflotran.in` и `analytical_profiles.csv`, чтобы после запуска были расчетные TECPLOT-профили для графиков.
 - Dry-run suite больше не считает статусы `GENERATED`/`GENERATED_ONLY` failed при `TEST_SUITE_STATUS=DRY_RUN`.

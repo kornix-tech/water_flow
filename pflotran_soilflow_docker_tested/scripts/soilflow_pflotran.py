@@ -31,11 +31,7 @@ import argparse
 import csv
 import json
 import math
-import os
 import re
-import shlex
-import shutil
-import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime
@@ -73,6 +69,18 @@ from soilflow_pflotran_modules.result_diagnostics import (
     parse_pflotran_solver_diagnostics,
     records_to_z_pressure_saturation,
     write_unified_status,
+)
+from soilflow_pflotran_modules.solver_runner import (
+    find_pflotran_native,
+    find_pflotran_wsl,
+    run_native,
+    run_wsl,
+)
+from soilflow_pflotran_modules.surface_balance import (
+    Derived,
+    compute_derived,
+    normalize_weather_row,
+    write_weather_csv,
 )
 from soilflow_pflotran_modules.tabular_curves import build_tabular_characteristic_curve_assets, build_tabular_permeability_assets
 
@@ -192,26 +200,9 @@ def read_weather(input_json: Path) -> list[dict[str, Any]]:
         if tab.get("id") != "10_Weather_Daily":
             continue
         for row in tab.get("weather", []):
-            date_text = str(row.get("date") or "")
-            if not date_text:
-                continue
-            precip = as_float(row.get("precipitation_mm_day"), 0.0)
-            irrigation = as_float(row.get("irrigation_mm_day"), 0.0)
-            epot = as_float(row.get("epot_mm_day"), 0.0)
-            tpot = as_float(row.get("tpot_mm_day"), 0.0)
-            gw_depth = as_float(row.get("groundwater_depth_m"), math.nan)
-            net = precip + irrigation - epot
-            rows.append(
-                {
-                    "date": date_text,
-                    "precipitation_mm_day": precip,
-                    "irrigation_mm_day": irrigation,
-                    "epot_mm_day": epot,
-                    "tpot_mm_day": tpot,
-                    "groundwater_depth_m": gw_depth,
-                    "net_surface_input_mm_day": net,
-                }
-            )
+            normalized_row = normalize_weather_row(row)
+            if normalized_row is not None:
+                rows.append(normalized_row)
     if not rows:
         raise ValueError("JSON исходных данных не содержит строк погодного форсинга")
     return rows
@@ -220,90 +211,6 @@ def read_weather(input_json: Path) -> list[dict[str, Any]]:
 # -----------------------------------------------------------------------------
 # Demo mode
 # -----------------------------------------------------------------------------
-@dataclass
-class Derived:
-    residual_saturation: float
-    retention_model: str
-    conductivity_model: str
-    vg_m: float
-    alpha_pa_inv: float
-    bc_lambda: float
-    intrinsic_perm_x_m2: float
-    intrinsic_perm_y_m2: float
-    intrinsic_perm_z_m2: float
-    mean_top_flux_m_s: float
-
-
-def compute_derived(params: dict[str, Any], weather: list[dict[str, Any]]) -> Derived:
-    theta_s = as_float(params.get("theta_s"))
-    theta_r = as_float(params.get("theta_r"))
-    retention_model = normalize_model_token(params.get("retention_model"), "van_genuchten")
-    conductivity_model = normalize_model_token(params.get("conductivity_model"), "mualem")
-    vg_alpha_1_m = as_float(params.get("vg_alpha_1_m"))
-    vg_n = as_float(params.get("vg_n"))
-    bc_lambda = as_float(params.get("bc_lambda"), 2.0)
-    ksat_m_s = as_float(params.get("ksat_m_s"))
-    rho = as_float(params.get("rho_water_kg_m3"), 997.0)
-    mu = as_float(params.get("mu_water_pa_s"), 0.00089)
-    g = as_float(params.get("gravity_m_s2"), 9.80665)
-    ax = as_float(params.get("anisotropy_x"), 1.0)
-    ay = as_float(params.get("anisotropy_y"), 1.0)
-    az = as_float(params.get("anisotropy_z"), 1.0)
-
-    if not (0.0 < theta_r < theta_s < 0.9):
-        raise ValueError("Ожидается 0 < theta_r < theta_s < 0.9")
-    validate_soil_model_pair(retention_model, conductivity_model)
-    if vg_n <= 1.0:
-        raise ValueError("Для van Genuchten должно быть n > 1")
-    if bc_lambda <= 0.0:
-        raise ValueError("Для Brooks-Corey должно быть bc_lambda > 0")
-    if ksat_m_s <= 0:
-        raise ValueError("ksat_m_s должен быть > 0")
-
-    residual_saturation = theta_r / theta_s
-    vg_m = 1.0 - 1.0 / vg_n
-    alpha_pa_inv = vg_alpha_1_m / (rho * g)
-    intrinsic_perm = ksat_m_s * mu / (rho * g)
-
-    top_flux_override = params.get("top_flux_override_m_s")
-    if top_flux_override not in (None, ""):
-        mean_top_flux = as_float(top_flux_override)
-    else:
-        mean_net_mm_day = sum(r["net_surface_input_mm_day"] for r in weather) / len(weather)
-        mean_top_flux = mean_net_mm_day / 1000.0 / 86400.0
-
-    return Derived(
-        residual_saturation=residual_saturation,
-        retention_model=retention_model,
-        conductivity_model=conductivity_model,
-        vg_m=vg_m,
-        alpha_pa_inv=alpha_pa_inv,
-        bc_lambda=bc_lambda,
-        intrinsic_perm_x_m2=intrinsic_perm * ax,
-        intrinsic_perm_y_m2=intrinsic_perm * ay,
-        intrinsic_perm_z_m2=intrinsic_perm * az,
-        mean_top_flux_m_s=mean_top_flux,
-    )
-
-
-def write_weather_csv(weather: list[dict[str, Any]], path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fields = [
-        "date",
-        "precipitation_mm_day",
-        "irrigation_mm_day",
-        "epot_mm_day",
-        "tpot_mm_day",
-        "groundwater_depth_m",
-        "net_surface_input_mm_day",
-    ]
-    with path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fields)
-        writer.writeheader()
-        for row in weather:
-            writer.writerow(row)
-
-
 def generate_pflotran_input(
     params: dict[str, Any],
     derived: Derived,
@@ -1792,95 +1699,6 @@ def write_transient_test_summary(test: TransientStorageTest, path: Path, status:
         f"saturation_abs_tolerance = {test.saturation_abs_tolerance:.8g}",
     ]
     path.write_text("\n".join(lines), encoding="utf-8")
-
-
-# -----------------------------------------------------------------------------
-# PFLOTRAN execution helpers
-# -----------------------------------------------------------------------------
-def find_pflotran_native(params: dict[str, Any], cli_exe: str | None) -> str | None:
-    candidates: list[str] = []
-    if cli_exe:
-        candidates.append(cli_exe)
-    env_exe = os.environ.get("PFLOTRAN_EXE")
-    if env_exe:
-        candidates.append(env_exe)
-    configured_exe = params.get("pflotran_exe") if params else None
-    if configured_exe not in (None, ""):
-        candidates.append(str(configured_exe))
-    path_exe = shutil.which("pflotran")
-    if path_exe:
-        candidates.append(path_exe)
-
-    for c in candidates:
-        p = Path(str(c).strip('"'))
-        if p.exists():
-            return str(p)
-        if shutil.which(str(c)):
-            return str(c)
-    return None
-
-
-def has_wsl() -> bool:
-    return shutil.which("wsl") is not None
-
-
-def wsl_path(win_path: Path) -> str:
-    completed = subprocess.run(
-        ["wsl", "wslpath", "-a", str(win_path)],
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    if completed.returncode != 0:
-        raise RuntimeError(f"wslpath failed: {completed.stderr}")
-    return completed.stdout.strip()
-
-
-def find_pflotran_wsl() -> str | None:
-    if not has_wsl():
-        return None
-    cmd = (
-        "if command -v pflotran >/dev/null 2>&1; then command -v pflotran; "
-        "elif [ -x \"$HOME/pflotran/src/pflotran/pflotran\" ]; then echo \"$HOME/pflotran/src/pflotran/pflotran\"; "
-        "elif [ -x \"$HOME/pflotran_build/pflotran/src/pflotran/pflotran\" ]; then echo \"$HOME/pflotran_build/pflotran/src/pflotran/pflotran\"; "
-        "else true; fi"
-    )
-    completed = subprocess.run(["wsl", "bash", "-lc", cmd], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if completed.returncode != 0:
-        return None
-    out = completed.stdout.strip()
-    return out if out else None
-
-
-def run_native(workdir: Path, pflotran_exe: str, mpi_processes: int) -> int:
-    log_path = workdir / "run_pflotran.log"
-    mpirun = shutil.which("mpirun") or shutil.which("mpiexec")
-    if mpirun and mpi_processes >= 1:
-        cmd = [mpirun, "-n", str(mpi_processes), pflotran_exe, "-pflotranin", "pflotran.in"]
-    else:
-        cmd = [pflotran_exe, "-pflotranin", "pflotran.in"]
-
-    with log_path.open("w", encoding="utf-8", errors="replace") as log:
-        log.write("COMMAND: " + " ".join(shlex.quote(x) for x in cmd) + "\n\n")
-        proc = subprocess.run(cmd, cwd=workdir, stdout=log, stderr=subprocess.STDOUT, text=True)
-    return proc.returncode
-
-
-def run_wsl(workdir: Path, pflotran_wsl: str, mpi_processes: int) -> int:
-    log_path = workdir / "run_pflotran_wsl.log"
-    workdir_wsl = wsl_path(workdir)
-
-    run_line = (
-        f"cd {shlex.quote(workdir_wsl)} && "
-        f"if command -v mpirun >/dev/null 2>&1; then "
-        f"mpirun -n {int(mpi_processes)} {shlex.quote(pflotran_wsl)} -pflotranin pflotran.in; "
-        f"else {shlex.quote(pflotran_wsl)} -pflotranin pflotran.in; fi"
-    )
-
-    with log_path.open("w", encoding="utf-8", errors="replace") as log:
-        log.write("WSL COMMAND: " + run_line + "\n\n")
-        proc = subprocess.run(["wsl", "bash", "-lc", run_line], stdout=log, stderr=subprocess.STDOUT, text=True)
-    return proc.returncode
 
 
 def write_test_comparison(test: LinearDarcyTest, numerical: list[tuple[float, float]], path: Path) -> tuple[float, float, int]:

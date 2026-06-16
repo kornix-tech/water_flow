@@ -10,6 +10,7 @@ SCRIPTS_ROOT = Path(__file__).resolve().parents[1] / "scripts"
 if str(SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_ROOT))
 
+from soilflow_pflotran_modules.contracts import MODULE_BOUNDARIES, REPLACEABLE_ADAPTERS
 from soilflow_pflotran_modules.demo_deck_writer import build_demo_grid, generate_standard_pflotran_input
 from soilflow_pflotran_modules.extended_analytical import (
     buckley_fractional_flow,
@@ -36,6 +37,8 @@ from soilflow_pflotran_modules.result_diagnostics import (
     records_to_z_pressure_saturation,
     write_unified_status,
 )
+from soilflow_pflotran_modules.solver_runner import find_pflotran_native, run_native
+from soilflow_pflotran_modules.surface_balance import compute_mean_top_flux_m_s, normalize_weather_row, write_weather_csv
 from soilflow_pflotran_modules.tabular_curves import build_tabular_characteristic_curve_assets, build_tabular_permeability_assets
 from soilflow_pflotran import compute_derived, generate_pflotran_input, read_params, read_weather, run_demo_mode
 
@@ -54,6 +57,16 @@ class InputContractTests(unittest.TestCase):
     def test_pf_float_uses_fortran_d_exponent(self) -> None:
         self.assertEqual(pf_float(0.0), "0.d0")
         self.assertIn("d", pf_float(1.0e-6))
+
+
+class ArchitectureContractTests(unittest.TestCase):
+    def test_replaceable_adapter_boundaries_are_declared(self) -> None:
+        adapter_names = {adapter.name for adapter in REPLACEABLE_ADAPTERS}
+
+        self.assertTrue({"solver", "surface_balance", "result_parser"}.issubset(adapter_names))
+        self.assertIn("solver_runner", MODULE_BOUNDARIES)
+        self.assertIn("surface_balance", MODULE_BOUNDARIES)
+        self.assertIn("result_diagnostics", MODULE_BOUNDARIES)
 
 
 class PhysicalModelTests(unittest.TestCase):
@@ -219,6 +232,46 @@ class DemoDeckWriterTests(unittest.TestCase):
         self.assertEqual(generate_standard_pflotran_input(params, derived), generate_pflotran_input(params, derived))
 
 
+class SurfaceBalanceTests(unittest.TestCase):
+    def test_weather_row_keeps_transpiration_but_excludes_it_from_surface_flux(self) -> None:
+        row = normalize_weather_row(
+            {
+                "date": "2026-06-16",
+                "precipitation_mm_day": "10",
+                "irrigation_mm_day": "2",
+                "epot_mm_day": "3",
+                "tpot_mm_day": "4",
+                "groundwater_depth_m": "1.5",
+            }
+        )
+
+        self.assertIsNotNone(row)
+        assert row is not None
+        self.assertEqual(row["tpot_mm_day"], 4.0)
+        self.assertEqual(row["net_surface_input_mm_day"], 9.0)
+
+    def test_mean_top_flux_uses_override_or_weather_average(self) -> None:
+        weather = [
+            {"net_surface_input_mm_day": 8.64},
+            {"net_surface_input_mm_day": 0.0},
+        ]
+
+        self.assertAlmostEqual(compute_mean_top_flux_m_s({}, weather), 5.0e-8)
+        self.assertAlmostEqual(compute_mean_top_flux_m_s({"top_flux_override_m_s": "-1e-8"}, weather), -1.0e-8)
+
+    def test_write_weather_csv_preserves_contract_columns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "forcing_daily.csv"
+            row = normalize_weather_row({"date": "2026-06-16", "precipitation_mm_day": 1})
+            assert row is not None
+
+            write_weather_csv([row], path)
+
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("net_surface_input_mm_day", text)
+            self.assertIn("2026-06-16", text)
+
+
 class ResultDiagnosticsTests(unittest.TestCase):
     def test_parse_tecpotran_records_and_aggregate_by_z(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -294,6 +347,27 @@ class ResultDiagnosticsTests(unittest.TestCase):
 
     def test_fit_line_slope(self) -> None:
         self.assertAlmostEqual(fit_line_slope([0.0, 1.0, 2.0], [1.0, 3.0, 5.0]), 2.0)
+
+
+class SolverRunnerTests(unittest.TestCase):
+    def test_find_pflotran_native_prefers_cli_executable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            executable = Path(tmpdir) / "fake_pflotran.sh"
+            executable.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
+            executable.chmod(0o755)
+
+            self.assertEqual(find_pflotran_native({}, str(executable)), str(executable))
+
+    def test_run_native_returns_external_solver_exit_code(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            executable = tmpdir_path / "fake_pflotran.sh"
+            executable.write_text("#!/usr/bin/env sh\necho fake solver\nexit 7\n", encoding="utf-8")
+            executable.chmod(0o755)
+            (tmpdir_path / "pflotran.in").write_text("# smoke\n", encoding="utf-8")
+
+            self.assertEqual(run_native(tmpdir_path, str(executable), 0), 7)
+            self.assertIn("fake solver", (tmpdir_path / "run_pflotran.log").read_text(encoding="utf-8"))
 
 
 class CliContractTests(unittest.TestCase):

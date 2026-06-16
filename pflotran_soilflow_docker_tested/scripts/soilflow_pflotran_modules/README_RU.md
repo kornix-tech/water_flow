@@ -25,6 +25,13 @@ CLI и web-backend. Этот пакет задает безопасные гра
 - `result_diagnostics.py`: низкоуровневый разбор PFLOTRAN Tecplot output,
   агрегация профилей по глубине, solver/warning diagnostics, direct flux probe,
   transient snapshot loader и единая запись `TEST_STATUS.txt`.
+- `solver_runner.py`: поиск исполняемого PFLOTRAN, native/WSL запуск и запись
+  логов без знания физической постановки. Это текущий solver adapter.
+- `surface_balance.py`: нормализация погодных строк, расчет `net_surface_input`,
+  mean top flux и производных параметров почвы. Это текущий adapter блока
+  верхнего водного баланса/испарения.
+- `contracts.py`: декларация границ модулей и заменяемых adapter-слотов:
+  `solver`, `surface_balance`, `result_parser`.
 
 Планируемые границы:
 
@@ -35,7 +42,9 @@ CLI и web-backend. Этот пакет задает безопасные гра
   в тестовых deck'ах.
 - `analytical_tests`: строгие метрики сравнения профилей и физические PFLOTRAN
   deck'и для transport/heat/two-phase/groundwater задач.
-- `runner`: запуск PFLOTRAN и диагностические файлы.
+- `test_evaluation`: сборка метрик PASS/WARN/FAIL и CSV/JSON сравнений.
+- `floodplain_deck_writer`: специализированная постановка регулируемого
+  дренажа, которую нужно вынести из CLI-фасада отдельным крупным шагом.
 
 Правило дальнейшего рефакторинга: переносить по одному блоку, оставляя
 `soilflow_pflotran.py` тонким совместимым CLI-фасадом и добавляя тест на каждый
