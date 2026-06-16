@@ -15,7 +15,8 @@ import type { CalculationSummary, InputField, InputTab, InputWorkbook, SoilCurve
 const retentionOptions = [
   ["van_genuchten", "van Genuchten"],
   ["brooks_corey", "Brooks-Corey"],
-  ["gardner", "Gardner"]
+  ["gardner", "Gardner"],
+  ["tabular", "Табличная кривая"]
 ] as const;
 
 const conductivityOptions = [
@@ -32,7 +33,8 @@ const supportedSoilModelPairs = new Set([
   "van_genuchten:tabular",
   "brooks_corey:mualem",
   "brooks_corey:burdine",
-  "brooks_corey:tabular"
+  "brooks_corey:tabular",
+  "tabular:tabular"
 ]);
 
 function fieldByKey(workbook: InputWorkbook | null, key: string): InputField | null {
@@ -54,7 +56,7 @@ function soilModelValidationMessage(workbook: InputWorkbook | null): string {
   return [
     `Несовместимая или пока не проверенная пара моделей: ${retentionModel} + ${conductivityModel}.`,
     "Разрешены: van_genuchten + mualem, van_genuchten + burdine, brooks_corey + mualem, brooks_corey + burdine.",
-    "Также доступны пары van_genuchten + tabular и brooks_corey + tabular, если для расчета сохранена табличная кривая влагопроводности.",
+    "Также доступны пары van_genuchten + tabular, brooks_corey + tabular и tabular + tabular, если для расчета сохранены нужные табличные кривые.",
     "Corey и Gardner показаны как варианты развития, но пока не включены в расчётный запуск."
   ].join(" ");
 }

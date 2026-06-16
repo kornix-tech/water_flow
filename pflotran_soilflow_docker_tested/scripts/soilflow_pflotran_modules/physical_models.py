@@ -10,12 +10,14 @@ SUPPORTED_MODEL_PAIRS = {
     ("brooks_corey", "mualem"),
     ("brooks_corey", "burdine"),
     ("brooks_corey", "tabular"),
+    ("tabular", "tabular"),
 }
 
 RETENTION_MODEL_LABELS = {
     "van_genuchten": "van Genuchten",
     "brooks_corey": "Brooks-Corey",
     "gardner": "Gardner",
+    "tabular": "Табличная кривая",
 }
 
 CONDUCTIVITY_MODEL_LABELS = {

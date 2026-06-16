@@ -403,6 +403,7 @@ retention_model=van_genuchten + conductivity_model=tabular
 retention_model=brooks_corey + conductivity_model=mualem
 retention_model=brooks_corey + conductivity_model=burdine
 retention_model=brooks_corey + conductivity_model=tabular
+retention_model=tabular + conductivity_model=tabular
 ```
 
 Зарезервированные, но не полностью проверенные варианты:
@@ -410,7 +411,6 @@ retention_model=brooks_corey + conductivity_model=tabular
 ```text
 retention_model=gardner
 conductivity_model=gardner
-retention_model=tabular
 пара "Голованов-Аверьянов" / экспоненциальное водоудерживание + степенная влагопроводность
 ```
 
@@ -616,7 +616,7 @@ scripts/__pycache__/
 4. Нет полноценной модели пользователей/ролей/проектов; `projects` пока фактически stub для default project.
 5. Дренажная задача использует эквивалентный sink вместо явной гидравлической сети труб, коллектора и колодца.
 6. Для многофакторного исследования дождя/импеданса нужны более легкие расчетные сетки или план эксперимента, иначе серия 3 x 3 работает долго.
-7. Табличные экспериментальные кривые уже хранятся в SQLite, редактируются через frontend и попадают в временный JSON-снимок расчета как `soil_curve_tables`; табличная влагопроводность передается в PFLOTRAN через `PCHIP_LIQ` `.dat` файл при аналитическом водоудерживании VG/BC.
+7. Табличные экспериментальные кривые уже хранятся в SQLite, редактируются через frontend и попадают в временный JSON-снимок расчета как `soil_curve_tables`; табличное водоудерживание передается в PFLOTRAN через `LOOKUP_TABLE`, табличная влагопроводность - через `PCHIP_LIQ`.
 8. Пара `Голованов-Аверьянов` обозначена как предметная цель, но не доведена до проверенной PFLOTRAN-реализации.
 
 ## 15. Что важно сохранить в следующих итерациях
@@ -635,7 +635,7 @@ scripts/__pycache__/
 1. Для релизного состояния выполнить полную пересборку Docker image и сверить ее с hot-copy workflow.
 2. Продолжить перенос блоков `soilflow_pflotran.py` в `soilflow_pflotran_modules`: следующий безопасный кандидат - writer основного PFLOTRAN deck'а и parser результатов.
 3. Довести расширенные profile carrier тесты до строгих физических deck'ов PFLOTRAN для transport/heat/two-phase/groundwater задач.
-4. Исследовать рабочий PFLOTRAN-формат для табличного водоудерживания: текущий smoke-run отклоняет `SATURATION_FUNCTION PCHIP` из-за unsupported unsaturated extension.
+4. Добавить web workflow, который создаёт полный `tabular + tabular` smoke-расчет из интерфейса и сразу строит графики.
 5. Для дренажной задачи вынести исследовательские сценарии в отдельный воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`, `УГВ`, `C`, `G`, `Z`.
 6. Отдельно решить, остается ли регулируемый колодец эквивалентным sink или нужен явный модуль hydraulic network.
 

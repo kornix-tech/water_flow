@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 SCRIPTS_ROOT = Path(__file__).resolve().parents[1] / "scripts"
 if str(SCRIPTS_ROOT) not in sys.path:
@@ -23,7 +24,8 @@ from soilflow_pflotran_modules.physical_models import (
     validate_soil_model_pair,
 )
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
-from soilflow_pflotran_modules.tabular_curves import build_tabular_permeability_assets
+from soilflow_pflotran_modules.tabular_curves import build_tabular_characteristic_curve_assets, build_tabular_permeability_assets
+from soilflow_pflotran import run_demo_mode
 
 
 class InputContractTests(unittest.TestCase):
@@ -59,6 +61,7 @@ class PhysicalModelTests(unittest.TestCase):
     def test_tabular_pair_is_accepted(self) -> None:
         validate_soil_model_pair("van_genuchten", "tabular")
         self.assertEqual(model_pair_label("van_genuchten", "tabular"), "van Genuchten + Табличная кривая")
+        validate_soil_model_pair("tabular", "tabular")
 
 
 class ExtendedAnalyticalTests(unittest.TestCase):
@@ -136,6 +139,62 @@ class ExtendedAnalyticalTests(unittest.TestCase):
                     theta_s=0.45,
                     ksat_m_s=1.0e-5,
                 )
+
+    def test_tabular_curves_generate_lookup_retention_and_pchip_permeability(self) -> None:
+        tables = [
+            {
+                "curve_name": "lab_retention",
+                "curve_kind": "retention",
+                "points": [
+                    {"saturation": 0.2, "pressure_pa": 100000.0},
+                    {"saturation": 0.6, "pressure_pa": 20000.0},
+                    {"saturation": 1.0, "pressure_pa": 0.0},
+                ],
+            },
+            {
+                "curve_name": "lab_conductivity",
+                "curve_kind": "conductivity",
+                "points": [
+                    {"saturation": 0.2, "relative_permeability": 0.0},
+                    {"saturation": 0.6, "relative_permeability": 0.25},
+                    {"saturation": 1.0, "relative_permeability": 1.0},
+                ],
+            },
+        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            assets = build_tabular_characteristic_curve_assets(
+                tables=tables,
+                workdir=Path(tmpdir),
+                theta_s=0.45,
+                ksat_m_s=1.0e-5,
+                rho=997.0,
+                gravity=9.80665,
+            )
+            deck = "\n".join(assets.characteristic_curve_lines)
+            retention_file = Path(tmpdir) / "retention_lab_retention.dat"
+
+            self.assertIn("SATURATION_FUNCTION LOOKUP_TABLE", deck)
+            self.assertIn("PERMEABILITY_FUNCTION PCHIP_LIQ", deck)
+            self.assertIn("TIME_UNITS yr", retention_file.read_text(encoding="utf-8"))
+
+
+class CliContractTests(unittest.TestCase):
+    def test_demo_mode_returns_native_pflotran_exit_code(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            fake_pflotran = tmpdir_path / "fake_pflotran.sh"
+            fake_pflotran.write_text("#!/usr/bin/env sh\necho fake pflotran\nexit 7\n", encoding="utf-8")
+            fake_pflotran.chmod(0o755)
+            args = SimpleNamespace(
+                input_json=Path("input/soilflow_pflotran_demo.json"),
+                workdir=tmpdir_path / "run",
+                dry_run=False,
+                run=True,
+                pflotran_exe=fake_pflotran,
+                prefer_wsl=False,
+            )
+
+            self.assertEqual(run_demo_mode(args), 7)
 
 
 if __name__ == "__main__":

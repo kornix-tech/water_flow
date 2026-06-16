@@ -90,6 +90,12 @@ def _write_pairs(path: Path, rows: list[tuple[float, float]]) -> None:
     )
 
 
+def _write_lookup_table(path: Path, rows: list[tuple[float, float]]) -> None:
+    lines = ["TIME_UNITS yr", "DATA_UNITS unitless Pa"]
+    lines.extend(f"0.d0 {pf_float(saturation)} {pf_float(value)}" for saturation, value in rows)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def build_tabular_characteristic_curve_assets(
     *,
     tables: list[dict[str, Any]],
@@ -127,14 +133,15 @@ def build_tabular_characteristic_curve_assets(
 
     retention_path = workdir / _table_file_name("retention", retention_table)
     conductivity_path = workdir / _table_file_name("conductivity", conductivity_table)
-    _write_pairs(retention_path, retention_rows)
+    _write_lookup_table(retention_path, retention_rows)
     _write_pairs(conductivity_path, conductivity_rows)
 
     lines = [
         f"CHARACTERISTIC_CURVES {curve_name}",
-        "  SATURATION_FUNCTION PCHIP",
+        "  SATURATION_FUNCTION LOOKUP_TABLE",
         f"    FILE {retention_path.name}",
-        "    UNSATURATED_EXTENSION NONE",
+        f"    LIQUID_RESIDUAL_SATURATION {pf_float(min(saturation for saturation, _pc in retention_rows))}",
+        f"    MAX_CAPILLARY_PRESSURE {pf_float(max(pc for _saturation, pc in retention_rows))}",
         "  /",
         "  PERMEABILITY_FUNCTION PCHIP_LIQ",
         f"    FILE {conductivity_path.name}",

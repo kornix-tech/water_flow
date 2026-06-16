@@ -15,9 +15,9 @@ CLI и web-backend. Этот пакет задает безопасные гра
 - `profile_carrier.py`: генерация PFLOTRAN `RICHARDS` profile-carrier deck'ов
   для расширенных аналитических тестов, которым уже нужны расчетные TECPLOT-
   профили, но строгий физический deck подключается отдельным шагом.
-- `tabular_curves.py`: нормализация сохраненной табличной влагопроводности,
-  проверка монотонности и запись PFLOTRAN `PCHIP_LIQ` таблицы для
-  `conductivity_model=tabular`.
+- `tabular_curves.py`: нормализация сохраненных табличных кривых, проверка
+  монотонности и запись PFLOTRAN `LOOKUP_TABLE`/`PCHIP_LIQ` таблиц для
+  `retention_model=tabular` и `conductivity_model=tabular`.
 
 Планируемые границы:
 
