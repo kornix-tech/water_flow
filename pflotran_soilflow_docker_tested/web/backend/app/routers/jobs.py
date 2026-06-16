@@ -22,6 +22,7 @@ def _application_settings(request: Request):
 
 @router.post("/run-demo", response_model=JobCreated)
 def run_demo(request: Request) -> JobCreated:
+    # Совместимый endpoint старого UI; новые расчетные запуски идут через /api/calculations/{id}/run.
     latest = request.app.state.job_store.latest_calculation()
     if latest is None:
         workbook = read_seed_workbook(_application_settings(request).bundled_default_input_json)
@@ -60,6 +61,7 @@ def run_visualization(run_name: str, request: Request) -> JobCreated:
 
 @router.post("/run-custom", response_model=JobCreated)
 def run_custom(payload: CustomRunRequest, request: Request) -> JobCreated:
+    # Совместимый endpoint старого UI: сохраняем контракт, но привязываем запуск к расчету в SQLite.
     if payload.calculation_id is None:
         return run_demo(request)
     return submit_calculation_run(request, payload.calculation_id, payload.run_name)

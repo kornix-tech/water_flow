@@ -11,6 +11,14 @@ class HealthResponse(BaseModel):
     service: str
 
 
+class ReadinessResponse(BaseModel):
+    status: str
+    service: str
+    checks: dict[str, bool]
+    details: dict[str, str] = Field(default_factory=dict)
+    schema_version: int | None = None
+
+
 class SystemInfo(BaseModel):
     soilflow_home: str
     workspace: str

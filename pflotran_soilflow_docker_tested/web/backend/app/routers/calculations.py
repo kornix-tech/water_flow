@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from ..job_lifecycle import ACTIVE_JOB_STATUSES
 from ..schemas import CalculationRead, CalculationSummary, GenericMessage, JobCreated
 from ..services.input_json_service import calculation_read, calculation_summary, read_seed_workbook
 
@@ -42,7 +43,7 @@ def delete_calculation(calculation_id: int, request: Request) -> GenericMessage:
 
     if calculation.job_id:
         job = project_job_store.get(calculation.job_id)
-        if job is not None and job.status in {"queued", "running"}:
+        if job is not None and job.status in ACTIVE_JOB_STATUSES:
             raise HTTPException(status_code=409, detail="Нельзя удалить расчет, пока его задание выполняется")
 
     result_dir = Path(calculation.result_dir) if calculation.result_dir else None

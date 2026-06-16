@@ -1,9 +1,9 @@
 digraph soilflow_data_contract {
-	graph [fontname="DejaVu Sans" fontsize=13 label="Контракт данных XLSX → Python-адаптер → PFLOTRAN input/output" labelloc=t nodesep=0.5 rankdir=LR ranksep=0.8 splines=ortho]
+	graph [fontname="DejaVu Sans" fontsize=13 label="Контракт данных JSON/SQLite → Python-адаптер → PFLOTRAN input/output" labelloc=t nodesep=0.5 rankdir=LR ranksep=0.8 splines=ortho]
 	node [fontname="DejaVu Sans" fontsize=10 margin="0.08,0.05" shape=box style="rounded,filled"]
 	edge [fontname="DejaVu Sans" fontsize=9]
-	subgraph cluster_xlsx {
-		color="#93c47d" fontname="DejaVu Sans" fontsize=12 label="XLSX исходные данные" style=rounded
+	subgraph cluster_project_database {
+		color="#93c47d" fontname="DejaVu Sans" fontsize=12 label="SQLite + JSON-снимок расчета" style=rounded
 		s01 [label="01_Project
 имя проекта, режим" fillcolor="#d9ead3"]
 		s02 [label="02_Domain

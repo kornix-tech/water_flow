@@ -53,14 +53,17 @@ pflotran_soilflow_docker_tested/
   scripts/
     soilflow_pflotran.py             генератор PFLOTRAN deck, runner, тесты, сравнения
     soilflow_visualize.py            HTML/SVG/CSV визуализация 1D/XY/XZ профилей
-    check_project.sh                 единая проверка: Python compile, frontend build, restart, health-check
+    check_project.sh                 единая проверка: Python compile, backend unittest, frontend build, restart, API smoke
+    api_smoke.sh                     read-only проверка базового API-контракта живого web-сервиса
     sync_to_running_container.sh     документированный hot-copy workflow для запущенного контейнера
+    soilflow_pflotran_modules/       границы будущей декомпозиции большого CLI-адаптера
     *.sh                             вспомогательные Docker-команды
 
   web/backend/app/
     main.py                          FastAPI app, middleware, routers, static SPA
     config.py                        настройки окружения и workspace
-    job_store.py                     SQLite-хранилище jobs/calculations
+    job_store.py                     SQLite-хранилище jobs/calculations + schema_migrations
+    job_lifecycle.py                 единые статусы job/calculation lifecycle
     job_manager.py                   очередь и запуск фоновых subprocess
     file_manager.py                  безопасная работа с путями и zip
     routers/                         API endpoints
@@ -78,6 +81,7 @@ pflotran_soilflow_docker_tested/
     EXTERNAL_CONTEXT_RU.md           этот файл
     ANALYTICAL_TESTS_RU.md           аналитические тесты
     WEB_INTERFACE_RU.md              web-интерфейс
+    API_CONTRACT_RU.md               публичный backend API-контракт, статусы и legacy endpoints
     SCHEMA_ALGORITHM_COMPONENTS_RU.md
     schema_*.dot/png/svg             существующие схемы
 
@@ -158,6 +162,8 @@ sequenceDiagram
 - подключает routers;
 - отдает собранный frontend из `web/frontend/dist`;
 - добавляет middleware авторизации, rate-limit, лимита body и security headers.
+- `GET /api/health` остается быстрым liveness endpoint.
+- `GET /api/health/ready` проверяет PFLOTRAN, workspace/tmp, frontend dist и SQLite schema version.
 
 ### 6.2 Конфигурация
 
@@ -622,7 +628,7 @@ scripts/__pycache__/
 ## 16. Рекомендуемый следующий план разработки
 
 1. Для релизного состояния выполнить полную пересборку Docker image и сверить ее с hot-copy workflow.
-2. Ввести легкий миграционный механизм SQLite.
+2. Постепенно переносить блоки `soilflow_pflotran.py` в `soilflow_pflotran_modules`, сохраняя CLI-фасад и добавляя тесты на каждый перенос.
 3. Довести аналитические тесты без PFLOTRAN-профилей до полноценного численного сравнения.
 4. Спроектировать `soil_curve_tables` в SQLite для табличных экспериментальных кривых и формат генерации PFLOTRAN input.
 5. Для дренажной задачи вынести исследовательские сценарии в отдельный воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`, `УГВ`, `C`, `G`, `Z`.
@@ -635,6 +641,7 @@ cd /home/zenbook/SF/pflotran_soilflow_docker_tested
 git status --short
 docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
 curl -fsS http://localhost:18080/api/health
+curl -fsS http://localhost:18080/api/health/ready
 curl -fsS http://localhost:18080/api/system/info
 ```
 
@@ -644,6 +651,7 @@ curl -fsS http://localhost:18080/api/system/info
 curl -fsS http://localhost:18080/api/results/runs
 curl -fsS http://localhost:18080/api/jobs
 curl -fsS "http://localhost:18080/api/calculations"
+WEB_PORT=18080 ./scripts/api_smoke.sh
 ```
 
 Работа внутри контейнера:
@@ -656,8 +664,7 @@ cd /workspace/output/runs
 Горячее копирование скриптов в работающий контейнер, если полная пересборка отложена:
 
 ```bash
-docker cp scripts/soilflow_pflotran.py pflotran_soilflow_docker_tested-soilflow-web-1:/opt/soilflow/scripts/soilflow_pflotran.py
-docker cp scripts/soilflow_visualize.py pflotran_soilflow_docker_tested-soilflow-web-1:/opt/soilflow/scripts/soilflow_visualize.py
+./scripts/sync_to_running_container.sh
 ```
 
 ## 18. Минимальная графическая схема для отрисовки

@@ -1,6 +1,11 @@
 ## [Unreleased]
 
 ### Added
+- Добавлен endpoint `/api/health/ready` для проверки готовности расчетной среды: PFLOTRAN, workspace/tmp, frontend dist и SQLite schema version.
+- Добавлен `scripts/api_smoke.sh` и Makefile-цель `api-smoke` для read-only проверки базового backend API-контракта живого сервиса.
+- Добавлены backend unit-тесты для безопасных путей, SQLite-миграций и обработки активных заданий после рестарта.
+- Добавлена документация `docs/API_CONTRACT_RU.md` с описанием lifecycle-статусов, endpoints и совместимых legacy API.
+- Добавлен пакет `scripts/soilflow_pflotran_modules` как безопасный первый шаг декомпозиции большого `soilflow_pflotran.py`.
 - Добавлен `scripts/check_project.sh` и Makefile-цель `project-check` для единой проверки Python compile, frontend build, restart web-сервиса и health-check.
 - Добавлен `scripts/sync_to_running_container.sh` и Makefile-цель `web-sync` для документированной синхронизации исходников и frontend dist в уже запущенный контейнер без полной пересборки образа.
 - Добавлен frontend-модуль `testDefinitions.ts` для предметных описаний analytical/verification-тестов отдельно от UI-страницы.
@@ -24,6 +29,9 @@
 - Добавлена панель прогресса задач в левом меню: общий индикатор по последним задачам и отдельный индикатор текущего запуска.
 
 ### Changed
+- `scripts/check_project.sh` теперь дополнительно запускает backend unit-тесты и read-only API smoke после рестарта web-сервиса.
+- `scripts/sync_to_running_container.sh` синхронизирует весь каталог `scripts`, чтобы новые вспомогательные модули попадали в работающий контейнер.
+- Актуальные web/API документы и текстовые источники схем переведены с XLSX-first формулировок на JSON/SQLite-first контракт.
 - README и quickstart переведены на актуальный JSON/SQLite/web-first workflow; XLSX описан только как legacy/экспортный формат.
 - Внутренний backend helper запуска расчета переименован с demo-oriented `demo_command` на `calculation_command`; публичный endpoint `/run-demo` сохранен как совместимый wrapper.
 - Страница `Тесты` теперь импортирует описания тестов из отдельного модуля и содержит только UI/workflow-логику.
@@ -66,6 +74,9 @@
 - Удалены старые frontend alias-маршруты `/inputs`, `/vvod`, `/jobs`, `/zadachi`, `/tests`, `/results`, `/rezultaty`, `/visualization`, `/system`.
 
 ### Technical
+- SQLite-хранилище переведено на явный журнал `schema_migrations`; текущая миграция сохраняет обратную совместимость с базами без `jobs.calculation_id`.
+- Строковые статусы заданий и расчетов вынесены в общий backend-модуль `job_lifecycle.py`.
+- `.gitignore` расширен для SQLite WAL/SHM, frontend dist, Vite temp, локальных архивов, uploads/tmp и generated visualization artifacts.
 - Нумерация новых расчетов теперь опирается на SQLite AUTOINCREMENT и не переиспользует номер удаленного последнего расчета.
 - При старте backend незавершенные до перезапуска `queued/running` задачи помечаются как прерванные, чтобы прогресс и статус не зависали после рестарта контейнера.
 - Удалён backend-сервис сохранения исходных данных в XLSX и endpoint скачивания рабочего XLSX, чтобы исключить XLSX как хранилище данных проекта.

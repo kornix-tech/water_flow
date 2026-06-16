@@ -21,10 +21,11 @@ docker run --rm \
 
 echo "[2/4] Copy backend, scripts, input and frontend dist"
 docker cp web/backend/app "$CONTAINER_NAME:/opt/soilflow/web/backend/"
-docker cp scripts/soilflow_pflotran.py "$CONTAINER_NAME:/opt/soilflow/scripts/soilflow_pflotran.py"
-docker cp scripts/soilflow_visualize.py "$CONTAINER_NAME:/opt/soilflow/scripts/soilflow_visualize.py"
+docker exec "$CONTAINER_NAME" sh -lc "rm -rf /opt/soilflow/scripts"
+docker cp scripts "$CONTAINER_NAME:/opt/soilflow/"
 docker cp input/soilflow_pflotran_demo.json "$CONTAINER_NAME:/opt/soilflow/input/soilflow_pflotran_demo.json"
 docker cp web/frontend/dist "$CONTAINER_NAME:/opt/soilflow/web/frontend/"
+docker exec "$CONTAINER_NAME" sh -lc "find /opt/soilflow/scripts -type d -name __pycache__ -prune -exec rm -rf {} +"
 
 echo "[3/4] Cleanup local generated frontend dist"
 docker run --rm \

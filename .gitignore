@@ -3,8 +3,17 @@ node_modules/
 web/frontend/dist/
 __pycache__/
 *.py[cod]
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 
 # Результаты расчетов и временные рабочие файлы
 output/runs/
 pflotran_soilflow_docker_tested/output/runs/
 pflotran_soilflow_docker_tested/web/frontend/node_modules/
+pflotran_soilflow_docker_tested/web/frontend/dist/
+pflotran_soilflow_docker_tested/web/frontend/node_modules/.vite-temp/
+pflotran_soilflow_docker_tested/output/visualization_selftest/
+pflotran_soilflow_docker_tested/archives/
+pflotran_soilflow_docker_tested/uploads/
+pflotran_soilflow_docker_tested/tmp/

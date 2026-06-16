@@ -1,6 +1,6 @@
 # Графическая схема алгоритма и компонентов SoilFlow/PFLOTRAN Docker-пакета
 
-Этот документ описывает текущий демонстрационный код Docker-пакета: сборку контейнера, Python-адаптер, XLSX-контракт, генерацию `pflotran.in` и запуск PFLOTRAN в режиме `RICHARDS`.
+Этот документ описывает текущий демонстрационный код Docker-пакета: сборку контейнера, web-first поток JSON/SQLite, Python-адаптер, генерацию `pflotran.in` и запуск PFLOTRAN в режиме `RICHARDS`.
 
 ## 0. Обзорная схема, удобная для чтения
 
@@ -25,7 +25,7 @@ PNG-версия: [`schema_components.png`](schema_components.png)
 
 PNG-версия: [`schema_algorithm.png`](schema_algorithm.png)
 
-## 3. Контракт данных XLSX → PFLOTRAN
+## 3. Контракт данных JSON/SQLite → PFLOTRAN
 
 ![Контракт данных](schema_data_contract.svg)
 
@@ -36,7 +36,7 @@ PNG-версия: [`schema_data_contract.png`](schema_data_contract.png)
 Активный расчётный путь:
 
 ```text
-XLSX → Python/openpyxl → производные параметры → pflotran.in → PFLOTRAN RICHARDS → output/log
+web-форма → SQLite/JSON-снимок расчета → Python-адаптер → производные параметры → pflotran.in → PFLOTRAN RICHARDS → output/log
 ```
 
 Активные физические элементы текущего demo:
@@ -71,7 +71,7 @@ flowchart LR
     C --> D[Runtime image]
     D --> E[entrypoint.sh]
     E --> F[soilflow_pflotran.py]
-    G[XLSX input] --> F
+    G[SQLite + JSON snapshot] --> F
     F --> H[pflotran.in]
     F --> I[forcing_daily.csv]
     F --> J[soilflow_run_summary.txt]
@@ -84,8 +84,8 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    A[Start soilflow_pflotran.py] --> B[read_params: листы 01-09]
-    A --> C[read_weather: лист 10_Weather_Daily]
+    A[Start soilflow_pflotran.py] --> B[read_params: вкладки 01-09 из JSON]
+    A --> C[read_weather: вкладка 10_Weather_Daily из JSON]
     B --> D[compute_derived]
     C --> D
     D --> E[generate_pflotran_input]

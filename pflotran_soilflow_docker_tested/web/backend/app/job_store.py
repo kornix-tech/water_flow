@@ -3,9 +3,15 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Callable
 
+from .job_lifecycle import (
+    ACTIVE_JOB_STATUSES,
+    CALCULATION_STATUS_DRAFT,
+    JOB_STATUS_FAILED,
+)
 from .models import Calculation, Job
 
 
@@ -15,6 +21,58 @@ def _dt_to_text(value: datetime | None) -> str | None:
 
 def _text_to_dt(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+Migration = tuple[int, str, Callable[[sqlite3.Connection], None]]
+
+
+def _migration_001_create_jobs_and_calculations(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS jobs (
+            id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL,
+            status TEXT NOT NULL,
+            command_json TEXT NOT NULL,
+            run_name TEXT,
+            created_at TEXT NOT NULL,
+            started_at TEXT,
+            finished_at TEXT,
+            exit_code INTEGER,
+            log_path TEXT NOT NULL,
+            output_dir TEXT NOT NULL,
+            error_message TEXT,
+            calculation_id INTEGER
+        )
+        """
+    )
+    existing_columns = {row["name"] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+    if "calculation_id" not in existing_columns:
+        conn.execute("ALTER TABLE jobs ADD COLUMN calculation_id INTEGER")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS calculations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            input_json TEXT NOT NULL,
+            run_name TEXT UNIQUE,
+            job_id TEXT,
+            status TEXT NOT NULL,
+            result_dir TEXT
+        )
+        """
+    )
+
+
+MIGRATIONS: tuple[Migration, ...] = (
+    (1, "Создание таблиц jobs/calculations и совместимость с calculation_id", _migration_001_create_jobs_and_calculations),
+)
 
 
 class JobStore:
@@ -33,41 +91,33 @@ class JobStore:
         with self._connect() as conn:
             conn.execute(
                 """
-                CREATE TABLE IF NOT EXISTS jobs (
-                    id TEXT PRIMARY KEY,
-                    kind TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    command_json TEXT NOT NULL,
-                    run_name TEXT,
-                    created_at TEXT NOT NULL,
-                    started_at TEXT,
-                    finished_at TEXT,
-                    exit_code INTEGER,
-                    log_path TEXT NOT NULL,
-                    output_dir TEXT NOT NULL,
-                    error_message TEXT,
-                    calculation_id INTEGER
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version INTEGER PRIMARY KEY,
+                    applied_at TEXT NOT NULL,
+                    description TEXT NOT NULL
                 )
                 """
             )
-            existing_columns = {row["name"] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
-            if "calculation_id" not in existing_columns:
-                conn.execute("ALTER TABLE jobs ADD COLUMN calculation_id INTEGER")
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS calculations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    title TEXT NOT NULL UNIQUE,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    input_json TEXT NOT NULL,
-                    run_name TEXT UNIQUE,
-                    job_id TEXT,
-                    status TEXT NOT NULL,
-                    result_dir TEXT
+            applied_versions = {
+                int(row["version"]) for row in conn.execute("SELECT version FROM schema_migrations").fetchall()
+            }
+            for version, description, migration in MIGRATIONS:
+                if version in applied_versions:
+                    continue
+                migration(conn)
+                conn.execute(
+                    "INSERT INTO schema_migrations (version, applied_at, description) VALUES (?, ?, ?)",
+                    (version, _dt_to_text(_utcnow()), description),
                 )
-                """
-            )
+
+    def schema_version(self) -> int:
+        with self._lock, self._connect() as conn:
+            row = conn.execute("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations").fetchone()
+        return int(row["version"] if row else 0)
+
+    def ping(self) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute("SELECT 1").fetchone()
 
     def create(self, job: Job) -> None:
         with self._lock, self._connect() as conn:
@@ -131,22 +181,25 @@ class JobStore:
         return [self._row_to_job(row) for row in rows]
 
     def mark_incomplete_jobs_interrupted(self) -> int:
-        timestamp = datetime.utcnow()
+        timestamp = _utcnow()
+        active_statuses = tuple(ACTIVE_JOB_STATUSES)
         with self._lock, self._connect() as conn:
             rows = conn.execute(
-                "SELECT id, calculation_id FROM jobs WHERE status IN ('queued', 'running')",
+                f"SELECT id, calculation_id FROM jobs WHERE status IN ({','.join('?' for _ in active_statuses)})",
+                active_statuses,
             ).fetchall()
             if not rows:
                 return 0
+            active_placeholders = ",".join("?" for _ in active_statuses)
             conn.execute(
-                """
+                f"""
                 UPDATE jobs
-                SET status = 'failed',
+                SET status = ?,
                     finished_at = ?,
                     error_message = 'Interrupted by server restart'
-                WHERE status IN ('queued', 'running')
+                WHERE status IN ({active_placeholders})
                 """,
-                (_dt_to_text(timestamp),),
+                (JOB_STATUS_FAILED, _dt_to_text(timestamp), *active_statuses),
             )
             calculation_ids = [row["calculation_id"] for row in rows if row["calculation_id"] is not None]
             if calculation_ids:
@@ -154,11 +207,11 @@ class JobStore:
                 conn.execute(
                     f"""
                     UPDATE calculations
-                    SET status = 'failed',
+                    SET status = ?,
                         updated_at = ?
                     WHERE id IN ({placeholders})
                     """,
-                    [_dt_to_text(timestamp), *calculation_ids],
+                    [JOB_STATUS_FAILED, _dt_to_text(timestamp), *calculation_ids],
                 )
         return len(rows)
 
@@ -169,7 +222,7 @@ class JobStore:
             status=row["status"],
             command=json.loads(row["command_json"]),
             run_name=row["run_name"],
-            created_at=_text_to_dt(row["created_at"]) or datetime.utcnow(),
+            created_at=_text_to_dt(row["created_at"]) or _utcnow(),
             started_at=_text_to_dt(row["started_at"]),
             finished_at=_text_to_dt(row["finished_at"]),
             exit_code=row["exit_code"],
@@ -180,7 +233,7 @@ class JobStore:
         )
 
     def create_calculation(self, input_json: dict, *, now: datetime | None = None) -> Calculation:
-        timestamp = now or datetime.utcnow()
+        timestamp = now or _utcnow()
         with self._lock, self._connect() as conn:
             cursor = conn.execute(
                 """
@@ -195,7 +248,7 @@ class JobStore:
                     json.dumps(input_json, ensure_ascii=False),
                     None,
                     None,
-                    "draft",
+                    CALCULATION_STATUS_DRAFT,
                     None,
                 ),
             )
@@ -243,14 +296,14 @@ class JobStore:
                 SET run_name = ?, job_id = ?, result_dir = ?, status = ?, updated_at = ?
                 WHERE id = ?
                 """,
-                (run_name, job_id, result_dir, status, _dt_to_text(datetime.utcnow()), calculation_id),
+                (run_name, job_id, result_dir, status, _dt_to_text(_utcnow()), calculation_id),
             )
 
     def update_calculation_status(self, calculation_id: int, status: str) -> None:
         with self._lock, self._connect() as conn:
             conn.execute(
                 "UPDATE calculations SET status = ?, updated_at = ? WHERE id = ?",
-                (status, _dt_to_text(datetime.utcnow()), calculation_id),
+                (status, _dt_to_text(_utcnow()), calculation_id),
             )
 
     def delete_calculation(self, calculation_id: int) -> None:
@@ -262,8 +315,8 @@ class JobStore:
         return Calculation(
             id=row["id"],
             title=row["title"],
-            created_at=_text_to_dt(row["created_at"]) or datetime.utcnow(),
-            updated_at=_text_to_dt(row["updated_at"]) or datetime.utcnow(),
+            created_at=_text_to_dt(row["created_at"]) or _utcnow(),
+            updated_at=_text_to_dt(row["updated_at"]) or _utcnow(),
             input_json=json.loads(row["input_json"]),
             run_name=row["run_name"],
             job_id=row["job_id"],
