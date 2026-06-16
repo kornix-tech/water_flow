@@ -356,6 +356,96 @@ class JobStore:
             conn.execute("UPDATE jobs SET calculation_id = NULL WHERE calculation_id = ?", (calculation_id,))
             conn.execute("DELETE FROM calculations WHERE id = ?", (calculation_id,))
 
+    def create_soil_curve_table(
+        self,
+        calculation_id: int,
+        table: dict[str, object],
+        points: list[dict[str, object]],
+    ) -> dict[str, object]:
+        timestamp = _utcnow()
+        with self._lock, self._connect() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO soil_curve_tables (
+                    calculation_id, curve_name, curve_kind, retention_model, conductivity_model,
+                    pressure_unit, saturation_unit, conductivity_unit, created_at, updated_at, comment
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    calculation_id,
+                    table["curve_name"],
+                    table["curve_kind"],
+                    table.get("retention_model"),
+                    table.get("conductivity_model"),
+                    table.get("pressure_unit", "Pa"),
+                    table.get("saturation_unit", "m3/m3"),
+                    table.get("conductivity_unit"),
+                    _dt_to_text(timestamp),
+                    _dt_to_text(timestamp),
+                    table.get("comment"),
+                ),
+            )
+            table_id = int(cursor.lastrowid)
+            for point in points:
+                conn.execute(
+                    """
+                    INSERT INTO soil_curve_points (
+                        table_id, point_index, pressure_head_m, pressure_pa, water_content,
+                        saturation, relative_permeability, hydraulic_conductivity_m_s, comment
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        table_id,
+                        point["point_index"],
+                        point.get("pressure_head_m"),
+                        point.get("pressure_pa"),
+                        point.get("water_content"),
+                        point.get("saturation"),
+                        point.get("relative_permeability"),
+                        point.get("hydraulic_conductivity_m_s"),
+                        point.get("comment"),
+                    ),
+                )
+        created = self.get_soil_curve_table(table_id)
+        assert created is not None
+        return created
+
+    def list_soil_curve_tables(self, calculation_id: int) -> list[dict[str, object]]:
+        with self._lock, self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM soil_curve_tables WHERE calculation_id = ? ORDER BY id DESC",
+                (calculation_id,),
+            ).fetchall()
+        return [self._soil_curve_table_with_points(int(row["id"])) for row in rows]
+
+    def get_soil_curve_table(self, table_id: int) -> dict[str, object] | None:
+        with self._lock, self._connect() as conn:
+            row = conn.execute("SELECT * FROM soil_curve_tables WHERE id = ?", (table_id,)).fetchone()
+        if row is None:
+            return None
+        return self._soil_curve_table_with_points(table_id)
+
+    def delete_soil_curve_table(self, table_id: int) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute("DELETE FROM soil_curve_tables WHERE id = ?", (table_id,))
+
+    def _soil_curve_table_with_points(self, table_id: int) -> dict[str, object]:
+        with self._connect() as conn:
+            table_row = conn.execute("SELECT * FROM soil_curve_tables WHERE id = ?", (table_id,)).fetchone()
+            point_rows = conn.execute(
+                "SELECT * FROM soil_curve_points WHERE table_id = ? ORDER BY point_index",
+                (table_id,),
+            ).fetchall()
+        table = dict(table_row)
+        table["created_at"] = _text_to_dt(table["created_at"]) or _utcnow()
+        table["updated_at"] = _text_to_dt(table["updated_at"]) or _utcnow()
+        points = []
+        for row in point_rows:
+            point = dict(row)
+            points.append(point)
+        table["points"] = points
+        return table
+
     def _row_to_calculation(self, row: sqlite3.Row) -> Calculation:
         return Calculation(
             id=row["id"],

@@ -52,6 +52,11 @@ if not isinstance(workbook.get("tabs"), list):
 _, calculations = get_json("/api/calculations")
 if not isinstance(calculations, list):
     raise SystemExit("/api/calculations: response must be a list")
+if calculations:
+    calculation_id = calculations[0].get("id")
+    _, soil_curves = get_json(f"/api/soil-curves/calculations/{calculation_id}")
+    if not isinstance(soil_curves, list):
+        raise SystemExit("/api/soil-curves/calculations/{id}: response must be a list")
 
 _, runs = get_json("/api/results/runs")
 if not isinstance(runs, list):

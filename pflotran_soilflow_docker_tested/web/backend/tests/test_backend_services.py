@@ -158,6 +158,39 @@ class JobStoreTests(unittest.TestCase):
             self.assertEqual(tables_count, 0)
             self.assertEqual(points_count, 0)
 
+    def test_soil_curve_store_methods_create_list_get_and_delete_table(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = JobStore(Path(directory) / "jobs.sqlite")
+            calculation = store.create_calculation(_minimal_workbook_snapshot("demo"))
+
+            created = store.create_soil_curve_table(
+                calculation.id,
+                {
+                    "curve_name": "lab_retention",
+                    "curve_kind": "retention",
+                    "retention_model": "tabular",
+                    "pressure_unit": "кПа",
+                    "saturation_unit": "м3/м3",
+                    "comment": "Лабораторная водоудерживающая кривая",
+                },
+                [
+                    {"point_index": 0, "pressure_head_m": -0.1, "water_content": 0.41, "saturation": 0.93},
+                    {"point_index": 1, "pressure_head_m": -1.0, "water_content": 0.28, "saturation": 0.64},
+                ],
+            )
+
+            listed = store.list_soil_curve_tables(calculation.id)
+            loaded = store.get_soil_curve_table(int(created["id"]))
+
+            self.assertEqual(len(listed), 1)
+            self.assertEqual(loaded["curve_name"], "lab_retention")
+            self.assertEqual(len(loaded["points"]), 2)
+            self.assertEqual(loaded["points"][0]["point_index"], 0)
+
+            store.delete_soil_curve_table(int(created["id"]))
+
+            self.assertEqual(store.list_soil_curve_tables(calculation.id), [])
+
     def test_restart_marks_active_jobs_failed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = JobStore(Path(directory) / "jobs.sqlite")

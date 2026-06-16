@@ -215,3 +215,11 @@ boussinesq_groundwater_mound
 `theta_m3_m3`/`pressure_head_m`, который можно наложить на PFLOTRAN-график. Это уже
 устраняет отсутствие расчетных профилей, но не заменяет будущую строгую численную
 постановку соответствующей физики.
+
+`TEST_STATUS.txt` для расширенных profile-тестов дополнительно содержит:
+
+```text
+analytical_overlay_check=PASS|FAIL
+analytical_profile_source=analytical_profiles.csv
+analytical_profile_points=<число точек>
+```

@@ -15,7 +15,7 @@ from .config import ensure_workspace, load_settings
 from .file_manager import FileManager
 from .job_manager import JobManager
 from .job_store import JobStore
-from .routers import calculations, files, health, inputs, jobs, projects, results, system, visualization
+from .routers import calculations, files, health, inputs, jobs, projects, results, soil_curves, system, visualization
 
 
 FRONTEND_CSP = (
@@ -137,6 +137,7 @@ app.include_router(files.router, prefix="/api/files", tags=["files"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(results.router, prefix="/api/results", tags=["results"])
 app.include_router(visualization.router, prefix="/api/visualization", tags=["visualization"])
+app.include_router(soil_curves.router, prefix="/api/soil-curves", tags=["soil-curves"])
 
 frontend_dist = settings.soilflow_home / "web" / "frontend" / "dist"
 if frontend_dist.exists():

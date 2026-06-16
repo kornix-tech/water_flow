@@ -1,6 +1,8 @@
 ## [Unreleased]
 
 ### Added
+- Добавлен API `/api/soil-curves` для создания, чтения, списка и удаления табличных кривых почвы, привязанных к расчету.
+- Добавлен модуль `soilflow_pflotran_modules.extended_analytical` для расширенных аналитических эталонов и нормированных profile overlay.
 - Добавлена SQLite-миграция schema version 2 с таблицами `soil_curve_tables` и `soil_curve_points` для будущих табличных экспериментальных кривых водоудерживания/влагопроводности.
 - Добавлены модули `soilflow_pflotran_modules.input_contract` и `soilflow_pflotran_modules.physical_models`, а также unit-тесты перенесенных контрактов.
 - Добавлен endpoint `/api/health/ready` для проверки готовности расчетной среды: PFLOTRAN, workspace/tmp, frontend dist и SQLite schema version.
@@ -31,6 +33,9 @@
 - Добавлена панель прогресса задач в левом меню: общий индикатор по последним задачам и отдельный индикатор текущего запуска.
 
 ### Changed
+- Из `soilflow_pflotran.py` вынесен блок extended analytical helpers; основной скрипт стал ближе к CLI-фасаду.
+- Статус расширенных profile-тестов теперь включает `analytical_overlay_check`, источник и число точек аналитического профиля.
+- `scripts/api_smoke.sh` проверяет read-only контракт `/api/soil-curves/calculations/{id}`, если в базе уже есть расчеты.
 - Первый блок `soilflow_pflotran.py` вынесен из монолита в модули: парсинг входных значений, PFLOTRAN float-format и валидация пар моделей почвы.
 - Все расширенные аналитические benchmarks теперь генерируют PFLOTRAN `RICHARDS` profile carrier, `pflotran.in` и `analytical_profiles.csv`, чтобы после запуска были расчетные TECPLOT-профили для графиков.
 - Dry-run suite больше не считает статусы `GENERATED`/`GENERATED_ONLY` failed при `TEST_SUITE_STATUS=DRY_RUN`.
@@ -75,6 +80,7 @@
 - Восстановлено отображение интерактивных HTML-графиков на странице `Графики`: iframe теперь открывает backend HTML напрямую, чтобы CSP графиков разрешал встроенный Plotly.
 
 ### Removed
+- Удалён старый fallback расширенных тестов, который создавал только аналитический CSV/SVG со статусом `SKIP` без PFLOTRAN-профиля.
 - `output/runs` и вложенные расчетные артефакты удалены из git-индекса; локальные результаты остаются generated files и игнорируются.
 - Удалены старые frontend alias-маршруты `/inputs`, `/vvod`, `/jobs`, `/zadachi`, `/tests`, `/results`, `/rezultaty`, `/visualization`, `/system`.
 

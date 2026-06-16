@@ -9,6 +9,12 @@ if str(SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_ROOT))
 
 from soilflow_pflotran_modules.input_contract import as_bool, as_float, as_int, optional_float, pf_float
+from soilflow_pflotran_modules.extended_analytical import (
+    buckley_fractional_flow,
+    generate_extended_analytical_rows,
+    generate_normalized_profile_rows,
+    green_ampt_cumulative_infiltration,
+)
 from soilflow_pflotran_modules.physical_models import (
     model_pair_label,
     normalize_grid_dimension,
@@ -46,6 +52,30 @@ class PhysicalModelTests(unittest.TestCase):
     def test_unsupported_soil_model_pair_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
             validate_soil_model_pair("gardner", "mualem")
+
+
+class ExtendedAnalyticalTests(unittest.TestCase):
+    def test_green_ampt_solution_is_monotonic(self) -> None:
+        early = green_ampt_cumulative_infiltration(3600.0, 1.0e-6, 0.25, 0.25)
+        late = green_ampt_cumulative_infiltration(7200.0, 1.0e-6, 0.25, 0.25)
+        self.assertGreater(late, early)
+
+    def test_buckley_fractional_flow_is_bounded(self) -> None:
+        flow = buckley_fractional_flow(0.5, 0.2, 0.2, 1.0, 5.0)
+        self.assertGreaterEqual(flow, 0.0)
+        self.assertLessEqual(flow, 1.0)
+
+    def test_extended_rows_and_normalized_profile_are_generated(self) -> None:
+        rows, x_key, y_key, title, note = generate_extended_analytical_rows("theis_radial_flow")
+        profile_rows = generate_normalized_profile_rows("theis_radial_flow", length_m=1.2)
+
+        self.assertEqual(len(rows), 100)
+        self.assertEqual(x_key, "radius_m")
+        self.assertEqual(y_key, "drawdown_m")
+        self.assertIn("Theis", title)
+        self.assertIn("Theis", note)
+        self.assertEqual(len(profile_rows), 100)
+        self.assertTrue({"depth_m", "theta_m3_m3", "pressure_head_m"}.issubset(profile_rows[0]))
 
 
 if __name__ == "__main__":

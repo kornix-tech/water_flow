@@ -144,6 +144,45 @@ class CalculationRead(CalculationSummary):
     input: InputWorkbook
 
 
+class SoilCurvePointBase(BaseModel):
+    point_index: int = Field(ge=0)
+    pressure_head_m: float | None = None
+    pressure_pa: float | None = None
+    water_content: float | None = Field(default=None, ge=0.0)
+    saturation: float | None = Field(default=None, ge=0.0, le=1.0)
+    relative_permeability: float | None = Field(default=None, ge=0.0)
+    hydraulic_conductivity_m_s: float | None = Field(default=None, ge=0.0)
+    comment: str | None = Field(default=None, max_length=500)
+
+
+class SoilCurvePointRead(SoilCurvePointBase):
+    id: int
+    table_id: int
+
+
+class SoilCurveTableBase(BaseModel):
+    curve_name: str = Field(min_length=1, max_length=120)
+    curve_kind: str = Field(default="retention", min_length=1, max_length=80)
+    retention_model: str | None = Field(default=None, max_length=80)
+    conductivity_model: str | None = Field(default=None, max_length=80)
+    pressure_unit: str = Field(default="Pa", min_length=1, max_length=40)
+    saturation_unit: str = Field(default="m3/m3", min_length=1, max_length=40)
+    conductivity_unit: str | None = Field(default=None, max_length=40)
+    comment: str | None = Field(default=None, max_length=1000)
+
+
+class SoilCurveTableCreate(SoilCurveTableBase):
+    points: list[SoilCurvePointBase] = Field(default_factory=list)
+
+
+class SoilCurveTableRead(SoilCurveTableBase):
+    id: int
+    calculation_id: int
+    created_at: datetime
+    updated_at: datetime
+    points: list[SoilCurvePointRead] = Field(default_factory=list)
+
+
 class GenericMessage(BaseModel):
     status: str
     detail: str | None = None
