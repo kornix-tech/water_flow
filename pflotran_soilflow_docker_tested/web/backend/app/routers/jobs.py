@@ -53,7 +53,12 @@ def run_visualization(run_name: str, request: Request) -> JobCreated:
             _application_settings(request).tmp_dir / "calculations" / f"calculation_{calculation.id:06d}.json"
         )
         seed_workbook = read_seed_workbook(_application_settings(request).bundled_default_input_json)
-        write_workbook_json(calculation_to_workbook(calculation, seed_workbook), calculation_input_snapshot_path)
+        soil_curve_tables = request.app.state.job_store.list_soil_curve_tables(calculation.id)
+        write_workbook_json(
+            calculation_to_workbook(calculation, seed_workbook),
+            calculation_input_snapshot_path,
+            soil_curve_tables=soil_curve_tables,
+        )
         command.extend(["--input-json", str(calculation_input_snapshot_path)])
     job = _job_manager(request).submit("visualization", command, output_dir, normalized_run_name)
     return JobCreated(job_id=job.id, status=job.status, run_name=job.run_name)
@@ -75,7 +80,8 @@ def submit_calculation_run(request: Request, calculation_id: int, run_name: str 
     seed_workbook = read_seed_workbook(settings.bundled_default_input_json)
     workbook = calculation_to_workbook(calculation, seed_workbook)
     calculation_input_snapshot_path = settings.tmp_dir / "calculations" / f"calculation_{calculation.id:06d}.json"
-    write_workbook_json(workbook, calculation_input_snapshot_path)
+    soil_curve_tables = request.app.state.job_store.list_soil_curve_tables(calculation.id)
+    write_workbook_json(workbook, calculation_input_snapshot_path, soil_curve_tables=soil_curve_tables)
     normalized_run_name = run_name or f"calculation_{calculation.id:06d}"
     command, command_run_name, output_dir = soilflow_cli.calculation_command(
         settings,

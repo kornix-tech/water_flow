@@ -34,7 +34,7 @@ PFLOTRAN: /opt/pflotran/src/pflotran/pflotran
 5. Долгие операции запускаются как фоновые задания через `JobManager` и `ThreadPoolExecutor`; состояние заданий хранится в SQLite.
 6. Визуализация отделена от расчета: `soilflow_pflotran.py` генерирует и запускает расчет, `soilflow_visualize.py` читает TECPLOT/CSV и строит HTML/SVG/CSV графические артефакты.
 7. Для безопасности backend валидирует имена расчетов, job id, пути к файлам, размер API body и архивов; добавлены CSP/security headers, rate-limit и опциональный Bearer-token режим.
-8. SQLite schema version 2 содержит табличные экспериментальные кривые почвы: `soil_curve_tables` и `soil_curve_points`; backend API доступен через `/api/soil-curves`.
+8. SQLite schema version 2 содержит табличные экспериментальные кривые почвы: `soil_curve_tables` и `soil_curve_points`; backend API и frontend-редактор доступны на странице `Исходные данные`.
 
 ## 3. Карта каталогов
 
@@ -57,7 +57,7 @@ pflotran_soilflow_docker_tested/
     check_project.sh                 единая проверка: Python compile, backend unittest, frontend build, restart, API smoke
     api_smoke.sh                     read-only проверка базового API-контракта живого web-сервиса
     sync_to_running_container.sh     документированный hot-copy workflow для запущенного контейнера
-    soilflow_pflotran_modules/       вынесенные контракты парсинга/моделей/extended analytical и границы дальнейшей декомпозиции
+    soilflow_pflotran_modules/       вынесенные контракты парсинга/моделей/extended analytical/profile-carrier и границы дальнейшей декомпозиции
     *.sh                             вспомогательные Docker-команды
 
   web/backend/app/
@@ -613,7 +613,7 @@ scripts/__pycache__/
 4. Нет полноценной модели пользователей/ролей/проектов; `projects` пока фактически stub для default project.
 5. Дренажная задача использует эквивалентный sink вместо явной гидравлической сети труб, коллектора и колодца.
 6. Для многофакторного исследования дождя/импеданса нужны более легкие расчетные сетки или план эксперимента, иначе серия 3 x 3 работает долго.
-7. Табличные экспериментальные кривые водоудерживания предполагалось хранить в SQLite как часть расчета; формат передачи в PFLOTRAN еще требует отдельного проектного решения.
+7. Табличные экспериментальные кривые водоудерживания уже хранятся в SQLite, редактируются через frontend и попадают в временный JSON-снимок расчета как `soil_curve_tables`; генерация PFLOTRAN tabular `CHARACTERISTIC_CURVES` еще требует отдельного проектного решения.
 8. Пара `Голованов-Аверьянов` обозначена как предметная цель, но не доведена до проверенной PFLOTRAN-реализации.
 
 ## 15. Что важно сохранить в следующих итерациях
@@ -630,9 +630,9 @@ scripts/__pycache__/
 ## 16. Рекомендуемый следующий план разработки
 
 1. Для релизного состояния выполнить полную пересборку Docker image и сверить ее с hot-copy workflow.
-2. Продолжить перенос блоков `soilflow_pflotran.py` в `soilflow_pflotran_modules`: следующий безопасный кандидат - генератор PFLOTRAN profile carrier.
+2. Продолжить перенос блоков `soilflow_pflotran.py` в `soilflow_pflotran_modules`: следующий безопасный кандидат - writer основного PFLOTRAN deck'а и parser результатов.
 3. Довести расширенные profile carrier тесты до строгих физических deck'ов PFLOTRAN для transport/heat/two-phase/groundwater задач.
-4. Добавить frontend UI для `soil_curve_tables` и генерацию PFLOTRAN tabular characteristic curves из `soil_curve_points`.
+4. Добавить генерацию PFLOTRAN tabular characteristic curves из `soil_curve_points` и минимальный расчетный smoke-test для табличной кривой.
 5. Для дренажной задачи вынести исследовательские сценарии в отдельный воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`, `УГВ`, `C`, `G`, `Z`.
 6. Отдельно решить, остается ли регулируемый колодец эквивалентным sink или нужен явный модуль hydraulic network.
 

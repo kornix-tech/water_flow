@@ -21,6 +21,7 @@ from soilflow_pflotran_modules.physical_models import (
     normalize_model_token,
     validate_soil_model_pair,
 )
+from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
 
 
 class InputContractTests(unittest.TestCase):
@@ -76,6 +77,13 @@ class ExtendedAnalyticalTests(unittest.TestCase):
         self.assertIn("Theis", note)
         self.assertEqual(len(profile_rows), 100)
         self.assertTrue({"depth_m", "theta_m3_m3", "pressure_head_m"}.issubset(profile_rows[0]))
+
+    def test_profile_carrier_generates_richards_tecpot_deck(self) -> None:
+        deck = generate_richards_profile_input("theis_radial_flow")
+        self.assertIn("PROCESS_MODELS", deck)
+        self.assertIn("MODE RICHARDS", deck)
+        self.assertIn("FORMAT TECPLOT POINT", deck)
+        self.assertIn("CHARACTERISTIC_CURVES cc_vg", deck)
 
 
 if __name__ == "__main__":

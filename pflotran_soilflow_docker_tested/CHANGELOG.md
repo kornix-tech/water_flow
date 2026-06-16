@@ -1,6 +1,8 @@
 ## [Unreleased]
 
 ### Added
+- Добавлен интерфейс редактирования табличных кривых почвы на странице `Исходные данные`: паспорт кривой, точки `h/P/theta/S/kr/K`, сохранение, обновление и удаление через SQLite API.
+- Добавлен модуль `soilflow_pflotran_modules.profile_carrier` для генерации PFLOTRAN profile-carrier deck'ов расширенных аналитических тестов.
 - Добавлен API `/api/soil-curves` для создания, чтения, списка и удаления табличных кривых почвы, привязанных к расчету.
 - Добавлен модуль `soilflow_pflotran_modules.extended_analytical` для расширенных аналитических эталонов и нормированных profile overlay.
 - Добавлена SQLite-миграция schema version 2 с таблицами `soil_curve_tables` и `soil_curve_points` для будущих табличных экспериментальных кривых водоудерживания/влагопроводности.
@@ -33,6 +35,8 @@
 - Добавлена панель прогресса задач в левом меню: общий индикатор по последним задачам и отдельный индикатор текущего запуска.
 
 ### Changed
+- JSON-снимок расчета, передаваемый в CLI при запуске расчета или визуализации, теперь включает `soil_curve_tables` сохраненного расчета.
+- Генератор profile-carrier deck'ов вынесен из `soilflow_pflotran.py`, чтобы продолжить декомпозицию монолита без изменения CLI-контракта.
 - Из `soilflow_pflotran.py` вынесен блок extended analytical helpers; основной скрипт стал ближе к CLI-фасаду.
 - Статус расширенных profile-тестов теперь включает `analytical_overlay_check`, источник и число точек аналитического профиля.
 - `scripts/api_smoke.sh` проверяет read-only контракт `/api/soil-curves/calculations/{id}`, если в базе уже есть расчеты.
@@ -85,6 +89,7 @@
 - Удалены старые frontend alias-маршруты `/inputs`, `/vvod`, `/jobs`, `/zadachi`, `/tests`, `/results`, `/rezultaty`, `/visualization`, `/system`.
 
 ### Technical
+- При выборе табличной модели в расчетном CLI выводится явная русскоязычная ошибка: хранение таблиц уже поддержано, а генерация PFLOTRAN tabular `CHARACTERISTIC_CURVES` остается отдельным следующим шагом.
 - SQLite-хранилище переведено на явный журнал `schema_migrations`; текущая миграция сохраняет обратную совместимость с базами без `jobs.calculation_id`.
 - Строковые статусы заданий и расчетов вынесены в общий backend-модуль `job_lifecycle.py`.
 - `.gitignore` расширен для SQLite WAL/SHM, frontend dist, Vite temp, локальных архивов, uploads/tmp и generated visualization artifacts.

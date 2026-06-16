@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { getCalculation, getInputWorkbook, listCalculations, resetInputWorkbook, saveInputWorkbook } from "../api/client";
+import {
+  createSoilCurve,
+  deleteSoilCurve,
+  getCalculation,
+  getInputWorkbook,
+  listCalculations,
+  listSoilCurves,
+  resetInputWorkbook,
+  saveInputWorkbook
+} from "../api/client";
 import { ErrorNotice } from "../components/ErrorNotice";
-import type { CalculationSummary, InputField, InputTab, InputWorkbook, WeatherRow } from "../types";
+import type { CalculationSummary, InputField, InputTab, InputWorkbook, SoilCurvePoint, SoilCurveTable, SoilCurveTableCreate, WeatherRow } from "../types";
 
 const retentionOptions = [
   ["van_genuchten", "van Genuchten"],
@@ -85,6 +94,37 @@ function emptyWeatherRow(): WeatherRow {
   };
 }
 
+function emptyCurvePoint(pointIndex: number): SoilCurvePoint {
+  return {
+    point_index: pointIndex,
+    pressure_head_m: null,
+    pressure_pa: null,
+    water_content: null,
+    saturation: null,
+    relative_permeability: null,
+    hydraulic_conductivity_m_s: null,
+    comment: ""
+  };
+}
+
+function emptySoilCurveDraft(): SoilCurveTableCreate {
+  return {
+    curve_name: "lab_retention",
+    curve_kind: "retention",
+    retention_model: "tabular",
+    conductivity_model: null,
+    pressure_unit: "м",
+    saturation_unit: "м3/м3",
+    conductivity_unit: "м/с",
+    comment: "",
+    points: [emptyCurvePoint(0), emptyCurvePoint(1)]
+  };
+}
+
+function numericOrNull(value: string): number | null {
+  return value === "" ? null : Number(value);
+}
+
 function calculationIdFromLocation(): number | null {
   const rawValue = new URLSearchParams(window.location.search).get("calculation_id");
   if (!rawValue) {
@@ -112,6 +152,8 @@ export function InputsPage() {
   const [saving, setSaving] = useState(false);
   const [calculations, setCalculations] = useState<CalculationSummary[]>([]);
   const [search, setSearch] = useState("");
+  const [soilCurves, setSoilCurves] = useState<SoilCurveTable[]>([]);
+  const [soilCurveDraft, setSoilCurveDraft] = useState<SoilCurveTableCreate>(() => emptySoilCurveDraft());
 
   const activeTab = useMemo(() => workbook?.tabs.find((tab) => tab.id === activeTabId) ?? workbook?.tabs[0] ?? null, [workbook, activeTabId]);
   const soilModelError = useMemo(() => soilModelValidationMessage(workbook), [workbook]);
@@ -126,6 +168,7 @@ export function InputsPage() {
       setWorkbook(next);
       setCalculations(calculationList);
       setActiveTabId((current) => current || next.tabs[0]?.id || "");
+      await refreshSoilCurves(next.calculation_id);
       if (calculationId && next.calculation_title) {
         setMessage(`${next.calculation_title} загружен из базы без пересчета.`);
       }
@@ -148,6 +191,19 @@ export function InputsPage() {
     }
   }
 
+  async function refreshSoilCurves(calculationId = workbook?.calculation_id ?? null) {
+    if (!calculationId) {
+      setSoilCurves([]);
+      return;
+    }
+    try {
+      setSoilCurves(await listSoilCurves(calculationId));
+      setError("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось прочитать табличные кривые");
+    }
+  }
+
   function replaceTab(nextTab: InputTab) {
     setWorkbook((current) => (current ? { ...current, tabs: current.tabs.map((tab) => (tab.id === nextTab.id ? nextTab : tab)) } : current));
   }
@@ -167,6 +223,7 @@ export function InputsPage() {
       setWorkbook(saved);
       setCalculationIdInLocation(saved.calculation_id);
       await refreshCalculations();
+      await refreshSoilCurves(saved.calculation_id);
       setMessage(`${saved.calculation_title ?? "Расчет"} сохранен в базе данных проекта.`);
       setError("");
     } catch (caught) {
@@ -185,6 +242,7 @@ export function InputsPage() {
     try {
       const restored = await resetInputWorkbook();
       setWorkbook(restored);
+      setSoilCurves([]);
       setActiveTabId(restored.tabs[0]?.id || "");
       setCalculationIdInLocation(null);
       setMessage("Исходные данные восстановлены из JSON-шаблона. Для записи в базу нажмите «Сохранить». ");
@@ -204,12 +262,54 @@ export function InputsPage() {
       setWorkbook(calculation.input);
       setActiveTabId(calculation.input.tabs[0]?.id || "");
       setCalculationIdInLocation(calculationId);
+      await refreshSoilCurves(calculationId);
       setMessage(`${calculation.title} загружен из базы без пересчета.`);
       setError("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Не удалось загрузить расчет");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function updateCurveDraft(patch: Partial<SoilCurveTableCreate>) {
+    setSoilCurveDraft((current) => ({ ...current, ...patch }));
+  }
+
+  function updateCurvePoint(index: number, patch: Partial<SoilCurvePoint>) {
+    setSoilCurveDraft((current) => ({
+      ...current,
+      points: current.points.map((point, pointIndex) => (pointIndex === index ? { ...point, ...patch } : point))
+    }));
+  }
+
+  async function saveSoilCurve() {
+    if (!workbook?.calculation_id) {
+      setError("Сначала сохраните расчет в базу данных проекта.");
+      return;
+    }
+    try {
+      await createSoilCurve(workbook.calculation_id, soilCurveDraft);
+      setSoilCurveDraft(emptySoilCurveDraft());
+      await refreshSoilCurves(workbook.calculation_id);
+      setMessage("Табличная кривая сохранена в базе данных расчета.");
+      setError("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось сохранить табличную кривую");
+    }
+  }
+
+  async function removeSoilCurve(tableId: number) {
+    if (!window.confirm("Удалить табличную кривую из расчета?")) {
+      return;
+    }
+    try {
+      await deleteSoilCurve(tableId);
+      await refreshSoilCurves();
+      setMessage("Табличная кривая удалена.");
+      setError("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось удалить табличную кривую");
     }
   }
 
@@ -277,6 +377,99 @@ export function InputsPage() {
                 {tab.title}
               </button>
             ))}
+          </div>
+          <div className="panel soil-curves-panel">
+            <div className="panel-header">
+              <h2>Табличные кривые почвы</h2>
+              <div className="toolbar compact-toolbar">
+                <button type="button" onClick={() => refreshSoilCurves()} disabled={!workbook.calculation_id}>
+                  Обновить
+                </button>
+                <button type="button" onClick={saveSoilCurve} disabled={!workbook.calculation_id}>
+                  Сохранить кривую
+                </button>
+              </div>
+            </div>
+            {!workbook.calculation_id && <p className="muted">Сначала сохраните расчет. После этого табличные экспериментальные кривые будут записываться в SQLite как часть расчета.</p>}
+            {workbook.calculation_id && (
+              <>
+                <div className="curve-draft-grid">
+                  <label>
+                    <span>Имя кривой</span>
+                    <input value={soilCurveDraft.curve_name} onChange={(event) => updateCurveDraft({ curve_name: event.target.value })} />
+                  </label>
+                  <label>
+                    <span>Тип</span>
+                    <select value={soilCurveDraft.curve_kind} onChange={(event) => updateCurveDraft({ curve_kind: event.target.value })}>
+                      <option value="retention">Водоудерживание</option>
+                      <option value="conductivity">Влагопроводность</option>
+                      <option value="retention_conductivity">Водоудерживание + влагопроводность</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Модель</span>
+                    <input value={soilCurveDraft.retention_model ?? ""} onChange={(event) => updateCurveDraft({ retention_model: event.target.value || null })} />
+                  </label>
+                  <label>
+                    <span>Комментарий</span>
+                    <input value={soilCurveDraft.comment ?? ""} onChange={(event) => updateCurveDraft({ comment: event.target.value })} />
+                  </label>
+                </div>
+                <div className="weather-editor curve-editor">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>№</th>
+                        <th>h, м</th>
+                        <th>P, Па</th>
+                        <th>θ, м3/м3</th>
+                        <th>S</th>
+                        <th>kr</th>
+                        <th>K, м/с</th>
+                        <th>Комментарий</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {soilCurveDraft.points.map((point, index) => (
+                        <tr key={index}>
+                          <td>{index + 1}</td>
+                          <td><input type="number" step="any" value={point.pressure_head_m ?? ""} onChange={(event) => updateCurvePoint(index, { pressure_head_m: numericOrNull(event.target.value) })} /></td>
+                          <td><input type="number" step="any" value={point.pressure_pa ?? ""} onChange={(event) => updateCurvePoint(index, { pressure_pa: numericOrNull(event.target.value) })} /></td>
+                          <td><input type="number" step="any" value={point.water_content ?? ""} onChange={(event) => updateCurvePoint(index, { water_content: numericOrNull(event.target.value) })} /></td>
+                          <td><input type="number" step="any" value={point.saturation ?? ""} onChange={(event) => updateCurvePoint(index, { saturation: numericOrNull(event.target.value) })} /></td>
+                          <td><input type="number" step="any" value={point.relative_permeability ?? ""} onChange={(event) => updateCurvePoint(index, { relative_permeability: numericOrNull(event.target.value) })} /></td>
+                          <td><input type="number" step="any" value={point.hydraulic_conductivity_m_s ?? ""} onChange={(event) => updateCurvePoint(index, { hydraulic_conductivity_m_s: numericOrNull(event.target.value) })} /></td>
+                          <td><input value={point.comment ?? ""} onChange={(event) => updateCurvePoint(index, { comment: event.target.value })} /></td>
+                          <td>
+                            <button type="button" onClick={() => updateCurveDraft({ points: soilCurveDraft.points.filter((_, pointIndex) => pointIndex !== index).map((item, pointIndex) => ({ ...item, point_index: pointIndex })) })}>
+                              Удалить
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <button type="button" onClick={() => updateCurveDraft({ points: [...soilCurveDraft.points, emptyCurvePoint(soilCurveDraft.points.length)] })}>
+                    Добавить точку
+                  </button>
+                </div>
+                <div className="curve-list">
+                  {soilCurves.length === 0 && <p className="muted">Для этого расчета табличные кривые пока не сохранены.</p>}
+                  {soilCurves.map((curve) => (
+                    <div className="curve-card" key={curve.id}>
+                      <div>
+                        <strong>{curve.curve_name}</strong>
+                        <small>{curve.curve_kind}, точек: {curve.points.length}</small>
+                      </div>
+                      <button type="button" onClick={() => removeSoilCurve(curve.id)}>
+                        Удалить
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
           {activeTab?.description && <p className="muted source-description">{activeTab.description}</p>}
           {activeTab?.kind === "fields" && (

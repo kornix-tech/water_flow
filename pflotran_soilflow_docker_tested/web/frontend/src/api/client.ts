@@ -1,4 +1,15 @@
-import type { CalculationRead, CalculationSummary, HealthResponse, InputWorkbook, JobCreated, JobRead, RunInfo, SystemInfo } from "../types";
+import type {
+  CalculationRead,
+  CalculationSummary,
+  HealthResponse,
+  InputWorkbook,
+  JobCreated,
+  JobRead,
+  RunInfo,
+  SoilCurveTable,
+  SoilCurveTableCreate,
+  SystemInfo
+} from "../types";
 
 const API_BASE = "/api";
 const TOKEN_KEY = "soilflow_api_token";
@@ -128,6 +139,22 @@ export async function runCalculation(calculationId: number): Promise<JobCreated>
 
 export async function deleteCalculation(calculationId: number): Promise<void> {
   await request<{ status: string }>(`/calculations/${calculationId}`, { method: "DELETE" });
+}
+
+export async function listSoilCurves(calculationId: number): Promise<SoilCurveTable[]> {
+  return request<SoilCurveTable[]>(`/soil-curves/calculations/${calculationId}`);
+}
+
+export async function createSoilCurve(calculationId: number, payload: SoilCurveTableCreate): Promise<SoilCurveTable> {
+  return request<SoilCurveTable>(`/soil-curves/calculations/${calculationId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deleteSoilCurve(tableId: number): Promise<void> {
+  await request<{ status: string }>(`/soil-curves/${tableId}`, { method: "DELETE" });
 }
 
 export async function listJobs(): Promise<JobRead[]> {

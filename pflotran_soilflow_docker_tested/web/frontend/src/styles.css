@@ -747,6 +747,59 @@ tr.selected {
   text-align: left;
 }
 
+.soil-curves-panel {
+  margin: 0 0 14px;
+}
+
+.curve-draft-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 180px 180px minmax(220px, 2fr);
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.curve-draft-grid label {
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+  color: #465568;
+}
+
+.curve-draft-grid input,
+.curve-draft-grid select {
+  width: 100%;
+}
+
+.curve-editor table {
+  min-width: 1180px;
+}
+
+.curve-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.curve-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #d8e0e8;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f8fafc;
+}
+
+.curve-card div {
+  display: grid;
+  gap: 2px;
+}
+
+.curve-card small {
+  color: #64748b;
+}
+
 .auth-backdrop {
   position: fixed;
   inset: 0;

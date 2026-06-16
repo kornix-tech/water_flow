@@ -107,3 +107,44 @@ export interface CalculationSummary {
 export interface CalculationRead extends CalculationSummary {
   input: InputWorkbook;
 }
+
+export interface SoilCurvePoint {
+  id?: number;
+  table_id?: number;
+  point_index: number;
+  pressure_head_m: number | null;
+  pressure_pa: number | null;
+  water_content: number | null;
+  saturation: number | null;
+  relative_permeability: number | null;
+  hydraulic_conductivity_m_s: number | null;
+  comment: string | null;
+}
+
+export interface SoilCurveTable {
+  id: number;
+  calculation_id: number;
+  curve_name: string;
+  curve_kind: string;
+  retention_model: string | null;
+  conductivity_model: string | null;
+  pressure_unit: string;
+  saturation_unit: string;
+  conductivity_unit: string | null;
+  created_at: string;
+  updated_at: string;
+  comment: string | null;
+  points: SoilCurvePoint[];
+}
+
+export interface SoilCurveTableCreate {
+  curve_name: string;
+  curve_kind: string;
+  retention_model: string | null;
+  conductivity_model: string | null;
+  pressure_unit: string;
+  saturation_unit: string;
+  conductivity_unit: string | null;
+  comment: string | null;
+  points: SoilCurvePoint[];
+}
