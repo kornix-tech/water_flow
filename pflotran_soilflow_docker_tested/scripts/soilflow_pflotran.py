@@ -86,6 +86,12 @@ from soilflow_pflotran_modules.surface_balance import (
     write_weather_csv,
 )
 from soilflow_pflotran_modules.tabular_curves import build_tabular_characteristic_curve_assets, build_tabular_permeability_assets
+from soilflow_pflotran_modules.test_artifacts import (
+    analytical_profile_overlay_diagnostics,
+    write_curve_svg,
+    write_rows_csv,
+    write_xy_svg,
+)
 from soilflow_pflotran_modules.test_evaluation import (
     combined_test_status,
     direct_flux_output_file,
@@ -94,6 +100,17 @@ from soilflow_pflotran_modules.test_evaluation import (
     write_pflotran_error_status,
     write_suite_status_file,
     write_unknown_status,
+)
+from soilflow_pflotran_modules.test_registry import (
+    PFLOTRAN_PROFILE_TESTS,
+    PFLOTRAN_RICHARDS_TESTS,
+    TEST_OUTPUT_DIRS,
+    TEST_REGISTRY,
+    selected_test_names,
+    suite_workdir_for,
+    test_params_from_document,
+    test_workdir_for,
+    verification_level_for_test,
 )
 
 CONFIG_SHEETS = {
@@ -115,41 +132,6 @@ TEST_SHEETS = {
     "unit_gradient_unsat": "_test_unit_gradient_unsat",
     "transient_uniform_storage_vg": "_test_transient_uniform_storage_vg",
     "brooks_corey_burdine": "_test_brooks_corey_burdine",
-}
-TEST_OUTPUT_DIRS = {
-    "linear_darcy": "_test_linear_darcy",
-    "hydrostatic_vg_no_flow": "_test_hydrostatic_vg_no_flow",
-    "unit_gradient_unsat": "_test_unit_gradient_unsat",
-    "transient_uniform_storage_vg": "_test_transient_uniform_storage_vg",
-    "brooks_corey_burdine": "_test_brooks_corey_burdine",
-    "theis_radial_flow": "_test_theis_radial_flow",
-    "ogata_banks_1d_transport": "_test_ogata_banks_1d_transport",
-    "terzaghi_1d_consolidation": "_test_terzaghi_1d_consolidation",
-    "philip_infiltration": "_test_philip_infiltration",
-    "green_ampt_infiltration": "_test_green_ampt_infiltration",
-    "heat_conduction_1d": "_test_heat_conduction_1d",
-    "buckley_leverett": "_test_buckley_leverett",
-    "richards_mms": "_test_richards_mms",
-    "boussinesq_groundwater_mound": "_test_boussinesq_groundwater_mound",
-}
-TEST_REGISTRY = tuple(TEST_OUTPUT_DIRS)
-PFLOTRAN_RICHARDS_TESTS = {
-    "linear_darcy",
-    "hydrostatic_vg_no_flow",
-    "unit_gradient_unsat",
-    "transient_uniform_storage_vg",
-    "brooks_corey_burdine",
-}
-PFLOTRAN_PROFILE_TESTS = {
-    "theis_radial_flow",
-    "ogata_banks_1d_transport",
-    "terzaghi_1d_consolidation",
-    "philip_infiltration",
-    "green_ampt_infiltration",
-    "heat_conduction_1d",
-    "buckley_leverett",
-    "richards_mms",
-    "boussinesq_groundwater_mound",
 }
 PRESSURE_REPORT_ZERO_THRESHOLD_PA = 10.0
 ATM_PRESSURE_PA = 101325.0
@@ -198,11 +180,7 @@ def read_soil_curve_tables(input_json: Path) -> list[dict[str, Any]]:
 
 def read_test_params(input_json: Path, test_name: str = "linear_darcy") -> dict[str, Any]:
     data = read_input_document(input_json)
-    scenarios = data.get("test_scenarios", {})
-    params = scenarios.get(test_name, {}) if isinstance(scenarios, dict) else {}
-    if not params:
-        raise ValueError(f"В JSON отсутствует сценарий теста {test_name!r}")
-    return params
+    return test_params_from_document(data, test_name)
 
 
 def read_weather(input_json: Path) -> list[dict[str, Any]]:
@@ -1512,6 +1490,7 @@ def evaluate_test_after_run(test: LinearDarcyTest, workdir: Path) -> TestResult:
         pressure_info = pressure_reporting(max_abs, test.tolerance_abs_pressure_pa)
         reported_abs = pressure_info["reported_max_abs_pressure_error_pa"]
         diagnostics = {
+            "verification_level": verification_level_for_test("linear_darcy"),
             "pressure_reporting": pressure_info,
             "max_rel_pressure_error": max_rel,
             "saturation_min": saturation_min,
@@ -1531,6 +1510,8 @@ def evaluate_test_after_run(test: LinearDarcyTest, workdir: Path) -> TestResult:
             {
                 "TEST_STATUS": status,
                 "test_id": "_test_linear_darcy",
+                "verification_level": verification_level_for_test("linear_darcy"),
+                "verification_note": "Строгое сравнение PFLOTRAN с аналитическим стационарным решением Darcy/Richards.",
                 "pressure_check": pass_fail(pressure_check),
                 "saturation_check": pass_fail(saturation_check),
                 "flux_check": pass_fail(flux_check),
@@ -1677,6 +1658,7 @@ def evaluate_vg_test_after_run(test: VGRichardsTest, workdir: Path) -> TestResul
             kr_const = richards_relative_permeability(test, se_const)
             k_eff = test.ksat_m_s * kr_const
         metrics = {
+            "verification_level": verification_level_for_test(test.test_kind),
             "pressure_reporting": pressure_info,
             "max_abs_saturation_error": max_saturation,
             "saturation_min": saturation_min,
@@ -1724,6 +1706,8 @@ def evaluate_vg_test_after_run(test: VGRichardsTest, workdir: Path) -> TestResul
         status_fields: dict[str, Any] = {
             "TEST_STATUS": status,
             "test_id": test.test_id,
+            "verification_level": verification_level_for_test(test.test_kind),
+            "verification_note": "Строгое сравнение PFLOTRAN с аналитическим гидростатическим/unit-gradient профилем.",
             "retention_model": test.retention_model,
             "conductivity_model": test.conductivity_model,
             "soil_model_pair": model_pair_label(test.retention_model, test.conductivity_model),
@@ -1804,110 +1788,6 @@ def evaluate_vg_test_after_run(test: VGRichardsTest, workdir: Path) -> TestResul
         return TestResult(test.test_id, "UNKNOWN", workdir, {"reason": f"{type(exc).__name__}: {exc}"})
 
 
-def write_xy_svg(path: Path, title: str, x_label: str, y_label: str, rows: list[dict[str, float]], y_num: str, y_ana: str) -> None:
-    if not rows:
-        return
-    xs = [r["time_days"] for r in rows]
-    ys = [r[y_num] for r in rows] + [r[y_ana] for r in rows]
-    x_min, x_max = min(xs), max(xs)
-    y_min, y_max = min(ys), max(ys)
-    if math.isclose(x_min, x_max):
-        x_max = x_min + 1.0
-    if math.isclose(y_min, y_max):
-        y_min -= 1.0
-        y_max += 1.0
-    width, height = 900, 520
-    left, right, top, bottom = 90, 40, 42, 72
-    plot_w = width - left - right
-    plot_h = height - top - bottom
-
-    def sx(x: float) -> float:
-        return left + (x - x_min) / (x_max - x_min) * plot_w
-
-    def sy(y: float) -> float:
-        return top + (y_max - y) / (y_max - y_min) * plot_h
-
-    num_points = " ".join(f"{sx(r['time_days']):.2f},{sy(r[y_num]):.2f}" for r in rows)
-    ana_points = " ".join(f"{sx(r['time_days']):.2f},{sy(r[y_ana]):.2f}" for r in rows)
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
-  <rect width="100%" height="100%" fill="#ffffff"/>
-  <text x="{width/2:.0f}" y="26" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700">{title}</text>
-  <line x1="{left}" y1="{top}" x2="{left}" y2="{top+plot_h}" stroke="#222"/>
-  <line x1="{left}" y1="{top+plot_h}" x2="{left+plot_w}" y2="{top+plot_h}" stroke="#222"/>
-  <text x="{left+plot_w/2:.0f}" y="{height-22}" text-anchor="middle" font-family="Arial" font-size="13">{x_label}</text>
-  <text x="22" y="{top+plot_h/2:.0f}" transform="rotate(-90 22 {top+plot_h/2:.0f})" text-anchor="middle" font-family="Arial" font-size="13">{y_label}</text>
-  <polyline fill="none" stroke="#1f77b4" stroke-width="3" points="{ana_points}"/>
-  <polyline fill="none" stroke="#d62728" stroke-width="2" stroke-dasharray="7,5" points="{num_points}"/>
-  <text x="{left+plot_w-210}" y="{top+36}" font-family="Arial" font-size="12" fill="#1f77b4">аналитика</text>
-  <text x="{left+plot_w-210}" y="{top+58}" font-family="Arial" font-size="12" fill="#d62728">PFLOTRAN</text>
-</svg>'''
-    path.write_text(svg, encoding="utf-8")
-
-
-def write_curve_svg(path: Path, title: str, x_label: str, y_label: str, rows: list[dict[str, float]], x_key: str, y_key: str) -> None:
-    if not rows:
-        return
-    xs = [float(r[x_key]) for r in rows]
-    ys = [float(r[y_key]) for r in rows]
-    x_min, x_max = min(xs), max(xs)
-    y_min, y_max = min(ys), max(ys)
-    if math.isclose(x_min, x_max):
-        x_max = x_min + 1.0
-    if math.isclose(y_min, y_max):
-        y_min -= 1.0
-        y_max += 1.0
-    width, height = 900, 520
-    left, right, top, bottom = 90, 40, 42, 72
-    plot_w = width - left - right
-    plot_h = height - top - bottom
-
-    def sx(x: float) -> float:
-        return left + (x - x_min) / (x_max - x_min) * plot_w
-
-    def sy(y: float) -> float:
-        return top + (y_max - y) / (y_max - y_min) * plot_h
-
-    points = " ".join(f"{sx(float(r[x_key])):.2f},{sy(float(r[y_key])):.2f}" for r in rows)
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
-  <rect width="100%" height="100%" fill="#ffffff"/>
-  <text x="{width/2:.0f}" y="26" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700">{title}</text>
-  <line x1="{left}" y1="{top}" x2="{left}" y2="{top+plot_h}" stroke="#222"/>
-  <line x1="{left}" y1="{top+plot_h}" x2="{left+plot_w}" y2="{top+plot_h}" stroke="#222"/>
-  <text x="{left+plot_w/2:.0f}" y="{height-22}" text-anchor="middle" font-family="Arial" font-size="13">{x_label}</text>
-  <text x="22" y="{top+plot_h/2:.0f}" transform="rotate(-90 22 {top+plot_h/2:.0f})" text-anchor="middle" font-family="Arial" font-size="13">{y_label}</text>
-  <polyline fill="none" stroke="#1f77b4" stroke-width="3" points="{points}"/>
-</svg>'''
-    path.write_text(svg, encoding="utf-8")
-
-
-def write_rows_csv(path: Path, rows: list[dict[str, float]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not rows:
-        path.write_text("", encoding="utf-8")
-        return
-    with path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
-        writer.writeheader()
-        writer.writerows(rows)
-
-
-def analytical_profile_overlay_diagnostics(workdir: Path) -> dict[str, str | int]:
-    path = workdir / "analytical_profiles.csv"
-    if not path.exists():
-        return {"analytical_overlay_check": "FAIL", "analytical_profile_points": 0, "analytical_profile_source": "missing"}
-    with path.open("r", newline="", encoding="utf-8") as file_obj:
-        reader = csv.DictReader(file_obj)
-        required = {"depth_m", "theta_m3_m3", "pressure_head_m"}
-        if reader.fieldnames is None or not required.issubset(set(reader.fieldnames)):
-            return {"analytical_overlay_check": "FAIL", "analytical_profile_points": 0, "analytical_profile_source": path.name}
-        points = sum(1 for row in reader if any((row.get(key) or "").strip() for key in required))
-    return {
-        "analytical_overlay_check": "PASS" if points > 0 else "FAIL",
-        "analytical_profile_points": points,
-        "analytical_profile_source": path.name,
-    }
-
-
 def evaluate_profile_test_after_run(test_name: str, workdir: Path) -> TestResult:
     status_path = workdir / "TEST_STATUS.txt"
     try:
@@ -1921,6 +1801,8 @@ def evaluate_profile_test_after_run(test_name: str, workdir: Path) -> TestResult
         status_fields = {
             "TEST_STATUS": "PASS_WITH_WARNINGS",
             "test_id": f"_test_{test_name}",
+            "verification_level": verification_level_for_test(test_name),
+            "verification_note": "Profile smoke: PFLOTRAN строит расчетный Richards-профиль, но строгая физическая постановка и аналитическая метрика для этого benchmark еще не подключены.",
             "numerical_comparison": "PFLOTRAN_PROFILE_ONLY",
             "profile_status": "TECPLOT_READY",
             "tecplot_snapshot_count": len(tec_files),
@@ -2162,6 +2044,7 @@ def evaluate_transient_storage_after_run(test: TransientStorageTest, workdir: Pa
         pressure_info = pressure_reporting(max_p_err, test.pressure_abs_tolerance_pa)
         reported_abs = pressure_info["reported_max_abs_pressure_error_pa"]
         metrics = {
+            "verification_level": verification_level_for_test("transient_uniform_storage_vg"),
             "pressure": {
                 **pressure_info,
                 "pressure_check": pass_fail(pressure_check),
@@ -2198,6 +2081,8 @@ def evaluate_transient_storage_after_run(test: TransientStorageTest, workdir: Pa
             {
                 "TEST_STATUS": status,
                 "test_id": test.test_id,
+                "verification_level": verification_level_for_test("transient_uniform_storage_vg"),
+                "verification_note": "Частичная проверка баланса: сравниваются storage/source-sink/однородность, пространственный поток не проверяется.",
                 "pressure_check": "PASS" if pressure_check else "FAIL",
                 "saturation_check": pass_fail(saturation_check and uniformity_check),
                 "uniformity_check": pass_fail(uniformity_check),
@@ -2344,12 +2229,12 @@ From Linux/WSL:
 
 
 def test_workdir(args: argparse.Namespace, test_name: str) -> Path:
-    root = args.output_dir if args.output_dir is not None else None
-    if args.workdir is not None and args.test != "all":
-        return args.workdir
-    if root is None:
-        return Path("runs") / TEST_OUTPUT_DIRS[test_name]
-    return root / "runs" / TEST_OUTPUT_DIRS[test_name]
+    return test_workdir_for(
+        test_name=test_name,
+        output_dir=args.output_dir,
+        workdir=args.workdir,
+        selected_test=args.test,
+    )
 
 
 def write_suite_status(results: list[TestResult], suite_dir: Path, dry_run: bool = False) -> None:
@@ -2436,13 +2321,9 @@ def run_single_test(args: argparse.Namespace, test_name: str) -> TestResult:
 
 
 def run_test_mode(args: argparse.Namespace) -> int:
-    if args.test == "all":
-        test_names = list(TEST_REGISTRY)
-    else:
-        test_names = [args.test]
+    test_names = selected_test_names(args.test)
     results = [run_single_test(args, name) for name in test_names]
-    suite_root = args.output_dir if args.output_dir is not None else None
-    suite_dir = (suite_root / "runs" / "_test_suite") if suite_root is not None else Path("runs/_test_suite")
+    suite_dir = suite_workdir_for(args.output_dir)
     write_suite_status(results, suite_dir, dry_run=args.dry_run or not args.run)
     if args.dry_run or not args.run:
         return 0

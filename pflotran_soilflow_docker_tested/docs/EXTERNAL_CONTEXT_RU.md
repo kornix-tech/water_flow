@@ -628,6 +628,7 @@ scripts/__pycache__/
 - Любой новый расчет через интерфейс должен сохранять JSON-снимок в SQLite как новый `расчет №...`.
 - При выборе старого расчета поля формы должны заполняться значениями этого расчета.
 - Любые новые графики должны иметь расчетные и аналитические профили на одном графике, если для теста есть аналитика.
+- Любые новые тесты должны явно указывать `verification_level`: `strict_analytical`, `partial_balance` или `profile_smoke`; profile smoke нельзя показывать как строгую аналитическую верификацию.
 - Любые новые модели водоудерживания/влагопроводности должны проходить явную валидацию совместимости.
 - Для пользовательских путей и имен run обязательно использовать существующие safe helpers.
 - Новые комментарии и документация должны быть на русском языке.
@@ -635,7 +636,7 @@ scripts/__pycache__/
 ## 16. Рекомендуемый следующий план разработки
 
 1. Для релизного состояния выполнить полную пересборку Docker image и сверить ее с hot-copy workflow.
-2. Продолжить перенос тестового слоя `soilflow_pflotran.py` в `test_registry`: описание теста, generator, runner, evaluator и expected artifacts.
+2. Продолжить перенос тестового слоя `soilflow_pflotran.py` в `test_builders` и `test_evaluators`: dataclass-параметры, generator, evaluator и expected artifacts.
 3. Довести расширенные profile carrier тесты до строгих физических deck'ов PFLOTRAN для transport/heat/two-phase/groundwater задач.
 4. При замене solver-а подключать новый adapter рядом с `solver_runner.py` и parser-adapter рядом с `result_diagnostics.py`, возвращая `result_contract.py`; при замене испарения подключать новую реализацию через `surface_balance.py`/forcing contract.
 5. Для дренажной задачи вынести исследовательские сценарии в отдельный воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`, `УГВ`, `C`, `G`, `Z`.

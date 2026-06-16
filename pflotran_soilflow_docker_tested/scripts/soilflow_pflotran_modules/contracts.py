@@ -35,6 +35,8 @@ MODULE_BOUNDARIES = {
     "result_contract": "Solver-neutral профиль, diagnostics и статус для будущих parser-adapter реализаций.",
     "solver_runner": "Поиск и запуск внешнего solver-а без знания физической постановки.",
     "test_evaluation": "Единая сборка PASS/WARN/FAIL, UNKNOWN/PFLOTRAN_ERROR и suite status.",
+    "test_registry": "Реестр verification/profile тестов, выбор сценариев и рабочие пути suite.",
+    "test_artifacts": "Общие CSV/SVG artifacts и diagnostics аналитического overlay.",
     "analytical_tests": "Аналитические профили и метрики сравнения численных тестов.",
 }
 

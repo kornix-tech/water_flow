@@ -41,6 +41,11 @@ flowchart LR
   solver-а или parser-а.
 - `test_evaluation.py` - единая сборка `PASS/WARN/FAIL`, `UNKNOWN`,
   `PFLOTRAN_ERROR` и suite status.
+- `test_registry.py` - реестр тестов, выбор `all`, рабочие пути и чтение
+  сценариев из JSON, включая уровень проверки: `strict_analytical`,
+  `partial_balance`, `profile_smoke`.
+- `test_artifacts.py` - общие CSV/SVG artifacts и диагностика аналитического
+  overlay.
 
 ## Заменяемые границы
 
@@ -56,8 +61,11 @@ flowchart LR
 ## Текущие ограничения
 
 - Часть аналитических test deck/evaluator функций ещё остается в
-  `soilflow_pflotran.py`; следующий крупный рефакторинг должен выделить test
-  registry и runners.
+  `soilflow_pflotran.py`; следующий крупный рефакторинг должен выделить
+  `test_builders` и `test_evaluators`.
+- Profile smoke тесты не считаются строгой верификацией: они проверяют
+  генерацию PFLOTRAN-профиля и аналитического reference artifact, но не
+  физическое совпадение с Theis/Ogata/Terzaghi/heat/Buckley и другими моделями.
 - `result_contract.py` пока используется как явный контракт и покрыт тестом,
   но не является единственным runtime-путем визуализации.
 - `surface_balance.py` реализует простую среднюю верхнюю flux-модель; полноценные

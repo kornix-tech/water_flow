@@ -30,6 +30,11 @@ CLI и web-backend. Этот пакет задает безопасные гра
   для будущих parser-adapter реализаций.
 - `test_evaluation.py`: единая сборка `PASS/WARN/FAIL`, `UNKNOWN`,
   `PFLOTRAN_ERROR` и suite status.
+- `test_registry.py`: список verification/profile тестов, группировка, выбор
+  `all`, чтение параметров сценария, совместимые рабочие пути CLI и уровни
+  проверки `strict_analytical`/`partial_balance`/`profile_smoke`.
+- `test_artifacts.py`: общие CSV/SVG artifacts и проверка аналитического overlay
+  для profile-тестов.
 - `solver_runner.py`: поиск исполняемого PFLOTRAN, native/WSL запуск и запись
   логов без знания физической постановки. Это текущий solver adapter.
 - `surface_balance.py`: нормализация погодных строк, расчет `net_surface_input`,
@@ -47,9 +52,18 @@ CLI и web-backend. Этот пакет задает безопасные гра
   в тестовых deck'ах.
 - `analytical_tests`: строгие метрики сравнения профилей и физические PFLOTRAN
   deck'и для transport/heat/two-phase/groundwater задач.
-- `test_registry`: описание тестов, генераторы, runners и evaluators как
-  отдельный registry вместо роста CLI-фасада.
+- `test_builders`: dataclass-параметры тестов и генераторы PFLOTRAN deck'ов.
+- `test_evaluators`: физические сравнения numerical/analytical профилей.
 
 Правило дальнейшего рефакторинга: переносить по одному блоку, оставляя
 `soilflow_pflotran.py` тонким совместимым CLI-фасадом и добавляя тест на каждый
 перенесенный контракт.
+
+Уровни проверки:
+
+- `strict_analytical`: PFLOTRAN сравнивается с аналитическим или установившимся
+  решением по численным метрикам.
+- `partial_balance`: проверяется баланс/однородность/ODE, но не весь
+  пространственный поток.
+- `profile_smoke`: PFLOTRAN строит расчетный профиль, аналитика есть как
+  эталонный артефакт, но строгой физической постановки и метрики пока нет.

@@ -70,6 +70,12 @@ def suite_status_lines(results: list[TestResultLike], dry_run: bool = False) -> 
         f"tests_passed_with_warnings={sum(1 for result in results if result.status == 'PASS_WITH_WARNINGS')}",
         f"tests_skipped={len(skipped)}",
         f"tests_failed={len(failed)}",
+        f"strict_analytical_total={sum(1 for result in results if result.metrics.get('verification_level') == 'strict_analytical')}",
+        f"strict_analytical_passed={sum(1 for result in results if result.metrics.get('verification_level') == 'strict_analytical' and result.status in accepted)}",
+        f"partial_balance_total={sum(1 for result in results if result.metrics.get('verification_level') == 'partial_balance')}",
+        f"partial_balance_passed={sum(1 for result in results if result.metrics.get('verification_level') == 'partial_balance' and result.status in accepted)}",
+        f"profile_smoke_total={sum(1 for result in results if result.metrics.get('verification_level') == 'profile_smoke')}",
+        f"profile_smoke_ready={sum(1 for result in results if result.metrics.get('verification_level') == 'profile_smoke' and result.status in accepted)}",
         "",
     ]
     for result in results:

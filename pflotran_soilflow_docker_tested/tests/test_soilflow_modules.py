@@ -45,7 +45,20 @@ from soilflow_pflotran_modules.surface_balance import (
     write_weather_csv,
 )
 from soilflow_pflotran_modules.tabular_curves import build_tabular_characteristic_curve_assets, build_tabular_permeability_assets
+from soilflow_pflotran_modules.test_artifacts import (
+    analytical_profile_overlay_diagnostics,
+    write_curve_svg,
+    write_rows_csv,
+)
 from soilflow_pflotran_modules.test_evaluation import combined_test_status, suite_status_lines
+from soilflow_pflotran_modules.test_registry import (
+    TEST_REGISTRY,
+    selected_test_names,
+    suite_workdir_for,
+    test_params_from_document,
+    test_workdir_for,
+    verification_level_for_test,
+)
 from soilflow_pflotran import compute_derived, generate_pflotran_input, read_params, read_weather, run_demo_mode
 
 
@@ -302,12 +315,68 @@ class ResultContractTests(unittest.TestCase):
 
 class TestEvaluationTests(unittest.TestCase):
     def test_suite_status_accepts_generated_outputs_in_dry_run(self) -> None:
-        result = SimpleNamespace(test_id="_test_linear_darcy", status="GENERATED", metrics={})
+        result = SimpleNamespace(
+            test_id="_test_linear_darcy",
+            status="GENERATED",
+            metrics={"verification_level": "strict_analytical"},
+        )
 
         lines = suite_status_lines([result], dry_run=True)
 
         self.assertIn("TEST_SUITE_STATUS=DRY_RUN", lines)
         self.assertIn("tests_failed=0", lines)
+        self.assertIn("strict_analytical_total=1", lines)
+        self.assertIn("strict_analytical_passed=1", lines)
+
+
+class TestRegistryTests(unittest.TestCase):
+    def test_registry_selection_and_json_lookup(self) -> None:
+        self.assertIn("linear_darcy", TEST_REGISTRY)
+        self.assertEqual(selected_test_names("linear_darcy"), ["linear_darcy"])
+        self.assertGreater(len(selected_test_names("all")), 1)
+        params = test_params_from_document(
+            {"test_scenarios": {"linear_darcy": {"column_height_m": 2.0}}},
+            "linear_darcy",
+        )
+        self.assertEqual(params["column_height_m"], 2.0)
+
+    def test_registry_preserves_cli_workdir_contract(self) -> None:
+        explicit = Path("/tmp/explicit")
+
+        self.assertEqual(
+            test_workdir_for(
+                test_name="linear_darcy",
+                output_dir=None,
+                workdir=explicit,
+                selected_test="linear_darcy",
+            ),
+            explicit,
+        )
+        self.assertEqual(suite_workdir_for(Path("/tmp/out")), Path("/tmp/out/runs/_test_suite"))
+
+    def test_registry_declares_verification_levels(self) -> None:
+        self.assertEqual(verification_level_for_test("linear_darcy"), "strict_analytical")
+        self.assertEqual(verification_level_for_test("transient_uniform_storage_vg"), "partial_balance")
+        self.assertEqual(verification_level_for_test("theis_radial_flow"), "profile_smoke")
+
+
+class TestArtifactsTests(unittest.TestCase):
+    def test_csv_svg_and_overlay_diagnostics_are_written(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = Path(tmpdir)
+            rows = [{"time_days": 0.0, "value": 1.0}]
+
+            write_rows_csv(workdir / "rows.csv", rows)
+            write_curve_svg(workdir / "curve.svg", "Title", "t", "v", rows, "time_days", "value")
+            write_rows_csv(
+                workdir / "analytical_profiles.csv",
+                [{"depth_m": 0.1, "theta_m3_m3": 0.3, "pressure_head_m": -1.0}],
+            )
+            diagnostics = analytical_profile_overlay_diagnostics(workdir)
+
+            self.assertIn("time_days", (workdir / "rows.csv").read_text(encoding="utf-8"))
+            self.assertIn("<svg", (workdir / "curve.svg").read_text(encoding="utf-8"))
+            self.assertEqual(diagnostics["analytical_overlay_check"], "PASS")
 
 
 class ResultDiagnosticsTests(unittest.TestCase):

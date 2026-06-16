@@ -232,7 +232,15 @@ export function TestsPage({ onNavigate }: { onNavigate: (path: string) => void }
                         <h3>{test.title}</h3>
                         <p>{test.description}</p>
                         <p>
-                          <strong>Аналитическое сравнение:</strong> {test.analytical}
+                          <strong>Уровень проверки:</strong> {test.verificationLabel}
+                        </p>
+                        <p>
+                          <strong>
+                            {test.verificationLevel === "strict_analytical" || test.verificationLevel === "partial_balance"
+                              ? "Аналитическое сравнение:"
+                              : "Эталон и статус:"}
+                          </strong>{" "}
+                          {test.analytical}
                         </p>
                       </div>
                     </article>
