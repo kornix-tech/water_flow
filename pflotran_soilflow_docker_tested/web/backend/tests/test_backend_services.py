@@ -32,6 +32,7 @@ from app.job_lifecycle import CALCULATION_STATUS_DRAFT, JOB_STATUS_FAILED, JOB_S
 from app.job_store import JobStore
 from app.models import Job
 from app.services.result_status_artifacts import read_status_artifact_text
+from app.services.command_runner import CommandRunner
 from app.services.run_status_overview_service import read_run_status_overview
 from app.services.test_run_status_service import read_test_run_status
 from app.services.test_suite_summary_service import read_test_suite_status
@@ -266,6 +267,21 @@ class JobStoreTests(unittest.TestCase):
             self.assertEqual(marked_count, 1)
             self.assertEqual(store.get(job.id).status, JOB_STATUS_FAILED)
             self.assertEqual(store.get_calculation(calculation.id).status, JOB_STATUS_FAILED)
+
+
+class CommandRunnerTests(unittest.TestCase):
+    def test_run_returns_timeout_code_and_writes_log_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = root / "slow.sh"
+            script.write_text("#!/usr/bin/env sh\nsleep 2\n", encoding="utf-8")
+            script.chmod(0o755)
+            log_path = root / "job.log"
+
+            exit_code = CommandRunner().run([str(script)], cwd=root, log_path=log_path, timeout=0.1)
+
+            self.assertEqual(exit_code, 124)
+            self.assertIn("[TIMEOUT]", log_path.read_text(encoding="utf-8"))
 
 
 class TestSuiteSummaryServiceTests(unittest.TestCase):

@@ -16,6 +16,7 @@ class SolverExecutionResult:
     return_code: int
     log_path: Path
     command_label: str
+    timed_out: bool = False
 
 
 def find_pflotran_native(params: dict[str, Any], cli_exe: str | None) -> str | None:
@@ -73,11 +74,16 @@ def find_pflotran_wsl() -> str | None:
     return output if output else None
 
 
-def run_native(workdir: Path, pflotran_exe: str, mpi_processes: int) -> int:
-    return run_native_solver(workdir, pflotran_exe, mpi_processes).return_code
+def run_native(workdir: Path, pflotran_exe: str, mpi_processes: int, timeout_seconds: float | None = None) -> int:
+    return run_native_solver(workdir, pflotran_exe, mpi_processes, timeout_seconds=timeout_seconds).return_code
 
 
-def run_native_solver(workdir: Path, pflotran_exe: str, mpi_processes: int) -> SolverExecutionResult:
+def run_native_solver(
+    workdir: Path,
+    pflotran_exe: str,
+    mpi_processes: int,
+    timeout_seconds: float | None = None,
+) -> SolverExecutionResult:
     log_path = workdir / "run_pflotran.log"
     mpirun = shutil.which("mpirun") or shutil.which("mpiexec")
     if mpirun and mpi_processes >= 1:
@@ -87,15 +93,31 @@ def run_native_solver(workdir: Path, pflotran_exe: str, mpi_processes: int) -> S
 
     with log_path.open("w", encoding="utf-8", errors="replace") as log:
         log.write("COMMAND: " + " ".join(shlex.quote(part) for part in cmd) + "\n\n")
-        process = subprocess.run(cmd, cwd=workdir, stdout=log, stderr=subprocess.STDOUT, text=True)
-    return SolverExecutionResult(process.returncode, log_path, "native PFLOTRAN")
+        try:
+            process = subprocess.run(
+                cmd,
+                cwd=workdir,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=timeout_seconds,
+            )
+            return SolverExecutionResult(process.returncode, log_path, "native PFLOTRAN")
+        except subprocess.TimeoutExpired:
+            log.write(f"\n[TIMEOUT] PFLOTRAN exceeded solver timeout: {timeout_seconds} seconds\n")
+            return SolverExecutionResult(124, log_path, "native PFLOTRAN", timed_out=True)
 
 
-def run_wsl(workdir: Path, pflotran_wsl: str, mpi_processes: int) -> int:
-    return run_wsl_solver(workdir, pflotran_wsl, mpi_processes).return_code
+def run_wsl(workdir: Path, pflotran_wsl: str, mpi_processes: int, timeout_seconds: float | None = None) -> int:
+    return run_wsl_solver(workdir, pflotran_wsl, mpi_processes, timeout_seconds=timeout_seconds).return_code
 
 
-def run_wsl_solver(workdir: Path, pflotran_wsl: str, mpi_processes: int) -> SolverExecutionResult:
+def run_wsl_solver(
+    workdir: Path,
+    pflotran_wsl: str,
+    mpi_processes: int,
+    timeout_seconds: float | None = None,
+) -> SolverExecutionResult:
     log_path = workdir / "run_pflotran_wsl.log"
     workdir_wsl = wsl_path(workdir)
 
@@ -108,5 +130,15 @@ def run_wsl_solver(workdir: Path, pflotran_wsl: str, mpi_processes: int) -> Solv
 
     with log_path.open("w", encoding="utf-8", errors="replace") as log:
         log.write("WSL COMMAND: " + run_line + "\n\n")
-        process = subprocess.run(["wsl", "bash", "-lc", run_line], stdout=log, stderr=subprocess.STDOUT, text=True)
-    return SolverExecutionResult(process.returncode, log_path, "PFLOTRAN via WSL")
+        try:
+            process = subprocess.run(
+                ["wsl", "bash", "-lc", run_line],
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=timeout_seconds,
+            )
+            return SolverExecutionResult(process.returncode, log_path, "PFLOTRAN via WSL")
+        except subprocess.TimeoutExpired:
+            log.write(f"\n[TIMEOUT] PFLOTRAN via WSL exceeded solver timeout: {timeout_seconds} seconds\n")
+            return SolverExecutionResult(124, log_path, "PFLOTRAN via WSL", timed_out=True)

@@ -37,12 +37,17 @@ class CommandRunner:
             try:
                 return process.wait(timeout=timeout)
             except subprocess.TimeoutExpired:
+                log.write(f"\n[TIMEOUT] Command exceeded job timeout: {timeout} seconds\n")
+                log.flush()
                 process.terminate()
                 try:
-                    return process.wait(timeout=10)
+                    process.wait(timeout=10)
                 except subprocess.TimeoutExpired:
+                    log.write("[TIMEOUT] Command did not terminate gracefully; killing process\n")
+                    log.flush()
                     process.kill()
-                    return process.wait()
+                    process.wait()
+                return 124
 
     def _child_environment(self) -> dict[str, str]:
         env = dict(os.environ)

@@ -1,6 +1,6 @@
 IMAGE_NAME ?= soilflow-pflotran:local
 
-.PHONY: build run test test-strict test-linear test-hydrostatic test-unit-gradient test-transient dry-run dry-test dry-test-transient smoke-tabular-permeability api-tabular-workflow-smoke ui-smoke visualize visualize-demo visualize-test-linear visualize-test-hydrostatic visualize-test-unit-gradient visualize-test-transient visualize-selftest web-build web-up web-down web-logs web-open web-shell web-test-api web-sync api-smoke project-check check shell save clean
+.PHONY: build run test test-strict test-linear test-hydrostatic test-unit-gradient test-transient dry-run dry-test dry-test-transient smoke-tabular-permeability api-tabular-workflow-smoke ui-smoke visualize visualize-demo visualize-test-linear visualize-test-hydrostatic visualize-test-unit-gradient visualize-test-transient visualize-selftest web-build web-up web-down web-logs web-open web-shell web-test-api web-sync api-smoke project-check project-check-fast project-check-full check shell save clean
 
 build:
 	IMAGE_NAME=$(IMAGE_NAME) ./scripts/build_image.sh
@@ -95,6 +95,12 @@ api-smoke:
 
 project-check:
 	./scripts/check_project.sh
+
+project-check-fast:
+	CHECK_PROFILE=fast ./scripts/check_project.sh
+
+project-check-full:
+	CHECK_PROFILE=full ./scripts/check_project.sh
 
 check:
 	docker run --rm $(IMAGE_NAME) check

@@ -8,8 +8,8 @@ from typing import Any
 from soilflow_pflotran_modules.solver_runner import (
     find_pflotran_native,
     find_pflotran_wsl,
-    run_native,
-    run_wsl,
+    run_native_solver,
+    run_wsl_solver,
 )
 from soilflow_pflotran_modules.test_evaluation import write_pflotran_error_status
 
@@ -19,12 +19,26 @@ class TestSolverExecution:
     status: str
     executed: bool
     exit_code: int | None = None
+    timed_out: bool = False
 
     @property
     def metrics(self) -> dict[str, Any]:
         if self.exit_code is None:
             return {}
-        return {"exit_code": self.exit_code}
+        metrics = {"exit_code": self.exit_code}
+        if self.timed_out:
+            metrics["solver_timed_out"] = True
+        return metrics
+
+
+def solver_timeout_seconds(args: argparse.Namespace) -> float | None:
+    value = getattr(args, "solver_timeout_seconds", None)
+    if value in (None, "", 0):
+        return None
+    timeout = float(value)
+    if timeout <= 0:
+        return None
+    return timeout
 
 
 def execute_test_solver(
@@ -34,11 +48,16 @@ def execute_test_solver(
     mpi_processes: int,
 ) -> TestSolverExecution:
     native = find_pflotran_native({}, args.pflotran_exe)
+    timeout_seconds = solver_timeout_seconds(args)
     if native:
         print(f"[INFO] Running native PFLOTRAN for {test_name}: {native}")
-        exit_code = run_native(workdir, native, mpi_processes)
+        result = run_native_solver(workdir, native, mpi_processes, timeout_seconds=timeout_seconds)
+        exit_code = result.return_code
         print(f"[INFO] PFLOTRAN exit code: {exit_code}")
-        print(f"[INFO] Log: {workdir / 'run_pflotran.log'}")
+        print(f"[INFO] Log: {result.log_path}")
+        if result.timed_out:
+            write_pflotran_error_status(workdir / "TEST_STATUS.txt", exit_code, status="PFLOTRAN_TIMEOUT")
+            return TestSolverExecution("PFLOTRAN_TIMEOUT", True, exit_code, timed_out=True)
         if exit_code != 0:
             write_pflotran_error_status(workdir / "TEST_STATUS.txt", exit_code)
             return TestSolverExecution("PFLOTRAN_ERROR", True, exit_code)
@@ -48,9 +67,13 @@ def execute_test_solver(
         wsl_exe = find_pflotran_wsl()
         if wsl_exe:
             print(f"[INFO] Running PFLOTRAN via WSL for {test_name}: {wsl_exe}")
-            exit_code = run_wsl(workdir, wsl_exe, mpi_processes)
+            result = run_wsl_solver(workdir, wsl_exe, mpi_processes, timeout_seconds=timeout_seconds)
+            exit_code = result.return_code
             print(f"[INFO] PFLOTRAN WSL exit code: {exit_code}")
-            print(f"[INFO] Log: {workdir / 'run_pflotran_wsl.log'}")
+            print(f"[INFO] Log: {result.log_path}")
+            if result.timed_out:
+                write_pflotran_error_status(workdir / "TEST_STATUS.txt", exit_code, status="PFLOTRAN_TIMEOUT")
+                return TestSolverExecution("PFLOTRAN_TIMEOUT", True, exit_code, timed_out=True)
             if exit_code != 0:
                 write_pflotran_error_status(workdir / "TEST_STATUS.txt", exit_code)
                 return TestSolverExecution("PFLOTRAN_ERROR", True, exit_code)

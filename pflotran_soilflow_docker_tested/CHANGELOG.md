@@ -23,6 +23,7 @@
 - Добавлен `scripts/api_results_performance_smoke.sh`: живой performance/stability smoke для `/api/results/runs`, `/overview`, `/test-suite` и `/test-status` на временных run-папках с большим числом файлов.
 - `scripts/api_results_performance_smoke.sh` дополнительно проверяет HTML-график, `/plots` и отказ от выдачи symlink-файлов из run-директории.
 - Добавлен `scripts/api_restart_resilience_smoke.sh`: live smoke для проверки restart-поведения активных job'ов, SQLite schema version и базовых API после `docker compose restart soilflow-web`.
+- Добавлен быстрый профиль проверки `CHECK_PROFILE=fast ./scripts/check_project.sh` и Makefile-цель `project-check-fast` для compile/unit/modular/API/UI smoke без тяжелого full-gate.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_evaluators` для диагностической оценки `REFERENCE_OVERLAY` profile-smoke benchmark'ов и явной отметки pending strict evaluator.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_cases` с машинно-читаемой картой profile benchmark'ов, физическими семействами и blocker'ами будущих strict evaluator'ов.
 - Добавлен модуль `soilflow_pflotran_modules.profile_strict_evaluators` с первым strict-кандидатом для `richards_mms` по RMSE/max-error напора и влажности.
@@ -192,6 +193,8 @@
 - Табличное водоудерживание передается в PFLOTRAN через `LOOKUP_TABLE`-файл с колонками `time saturation Pc`; прежний кандидат `SATURATION_FUNCTION PCHIP` оставлен неиспользуемым, потому что текущая сборка PFLOTRAN отклоняет его на unsaturated extension check.
 - SQLite-хранилище переведено на явный журнал `schema_migrations`; текущая миграция сохраняет обратную совместимость с базами без `jobs.calculation_id`.
 - Строковые статусы заданий и расчетов вынесены в общий backend-модуль `job_lifecycle.py`.
+- CLI PFLOTRAN runner теперь поддерживает `--solver-timeout-seconds`/`SOILFLOW_SOLVER_TIMEOUT_SECONDS`; verification-suite пишет `PFLOTRAN_TIMEOUT` и timeout marker в log вместо зависания внешнего solver-а.
+- Backend `CommandRunner` возвращает exit code `124` и пишет timeout marker в job log при превышении `SOILFLOW_JOB_TIMEOUT_SECONDS`.
 - `.gitignore` расширен для SQLite WAL/SHM, frontend dist, Vite temp, локальных архивов, uploads/tmp и generated visualization artifacts.
 - Нумерация новых расчетов теперь опирается на SQLite AUTOINCREMENT и не переиспользует номер удаленного последнего расчета.
 - При старте backend незавершенные до перезапуска `queued/running` задачи помечаются как прерванные, чтобы прогресс и статус не зависали после рестарта контейнера.

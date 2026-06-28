@@ -41,8 +41,8 @@ def write_unknown_status(path: Path, exc: Exception) -> str:
     return reason
 
 
-def write_pflotran_error_status(path: Path, exit_code: int) -> None:
-    path.write_text(f"TEST_STATUS=PFLOTRAN_ERROR\nexit_code={exit_code}\n", encoding="utf-8")
+def write_pflotran_error_status(path: Path, exit_code: int, *, status: str = "PFLOTRAN_ERROR") -> None:
+    path.write_text(f"TEST_STATUS={status}\nexit_code={exit_code}\n", encoding="utf-8")
 
 
 def base_result_metrics(test_name: str, **extra_metrics: Any) -> dict[str, Any]:

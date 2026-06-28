@@ -42,6 +42,8 @@ PFLOTRAN: /opt/pflotran/src/pflotran/pflotran
 10. Полный API-контур табличной почвы закреплен в `scripts/api_tabular_workflow_smoke.sh` и включен в `scripts/check_project.sh`; smoke удаляет созданный расчет, если не задано `KEEP_TABULAR_API_SMOKE=1`.
 11. Performance/stability контур results API закреплен в `scripts/api_results_performance_smoke.sh`: smoke создает временные run-папки, делает restart web-сервиса, проверяет summary/detail/status/plots endpoints, HTML-график, лимиты времени ответа и размера payload, отказ прямого чтения symlink-файла, затем очищает временные данные.
 12. Restart-resilience контур закреплен в `scripts/api_restart_resilience_smoke.sh`: smoke создает временный queued job напрямую в SQLite, перезапускает web-сервис, проверяет перевод job в `failed`, readiness/schema version и базовые API, затем очищает временную запись.
+13. Verification/runtime timeout policy закреплена в коде: web jobs по `SOILFLOW_JOB_TIMEOUT_SECONDS` получают exit code `124` и `[TIMEOUT]` в log, CLI/PFLOTRAN runner поддерживает `--solver-timeout-seconds`/`SOILFLOW_SOLVER_TIMEOUT_SECONDS`, а verification-suite пишет `PFLOTRAN_TIMEOUT`.
+14. Для быстрых итераций добавлен профиль `CHECK_PROFILE=fast ./scripts/check_project.sh` и Makefile-цель `project-check-fast`; полный gate остается `CHECK_PROFILE=full ./scripts/check_project.sh` или обычный `project-check`.
 
 ## 3. Карта каталогов
 
@@ -61,7 +63,7 @@ pflotran_soilflow_docker_tested/
   scripts/
     soilflow_pflotran.py             совместимый CLI-фасад: чтение JSON, demo-mode, передача _test в verification_runner
     soilflow_visualize.py            HTML/SVG/CSV визуализация 1D/XY/XZ профилей
-    check_project.sh                 единая проверка: Python compile, backend unittest, frontend build, restart, API/performance/UI smoke
+    check_project.sh                 единая проверка с профилями fast/full: Python compile, unit, frontend build, restart, API/performance/UI smoke
     api_smoke.sh                     read-only проверка базового API-контракта живого web-сервиса
     ui_route_smoke.sh                read-only проверка коротких frontend URL и SPA/API fallback
     sync_to_running_container.sh     документированный hot-copy workflow для запущенного контейнера

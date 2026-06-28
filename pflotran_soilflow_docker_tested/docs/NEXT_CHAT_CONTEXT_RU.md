@@ -385,7 +385,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:115a1d0317a5a78f7ba12d9511fcd160af8f6902008623d3bb90462127ddf5dc
+sha256:50147172c4506ab71a74effb602ad595649998ca5f342852ee2930f2fa80032f
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -524,13 +524,21 @@ flowchart LR
 прогон, не заставляя каждый раз запускать самый тяжелый сценарий.
 
 1. Разделить проверки по профилям запуска:
-   - fast gate: compile, unit, modular smoke, API/UI route smoke;
-   - full gate: текущий `./scripts/check_project.sh` плюс Docker rebuild;
+   - fast gate реализован как `CHECK_PROFILE=fast ./scripts/check_project.sh`
+     и Makefile-цель `project-check-fast`: compile, unit, modular smoke,
+     restart, API smoke и UI route smoke;
+   - full gate остается `CHECK_PROFILE=full ./scripts/check_project.sh`
+     или обычный `./scripts/check_project.sh` плюс Docker rebuild;
    - research gate: долгие profile/DOE/solver-heavy сценарии отдельно.
 2. Добавить timeout/diagnostics policy:
-   - явные timeout'ы на внешние solver-запуски;
-   - сохранение last stdout/stderr/log tail в status;
-   - отчет, какой этап упал: generation, solver, parser, evaluator.
+   - CLI/PFLOTRAN runner поддерживает `--solver-timeout-seconds` и
+     `SOILFLOW_SOLVER_TIMEOUT_SECONDS`;
+   - verification-suite пишет `TEST_STATUS=PFLOTRAN_TIMEOUT`, `exit_code=124`,
+     `solver_timed_out=true` в metrics и `[TIMEOUT]` marker в log;
+   - backend `CommandRunner` при превышении `SOILFLOW_JOB_TIMEOUT_SECONDS`
+     возвращает exit code `124` и пишет timeout marker в job log;
+   - следующий шаг: расширить status diagnostics отдельным полем stage
+     `generation/solver/parser/evaluator`.
 3. Использовать `strict_readiness_stage` для выбора следующего блока:
    - сначала закрывать `DECK_ADAPTER_PENDING` для `richards_mms`;
    - затем `CASE_BUILDER_PENDING` для heat/transport/groundwater;

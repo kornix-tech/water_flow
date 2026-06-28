@@ -280,6 +280,7 @@ class VerificationRunnerModuleTests(unittest.TestCase):
                 run=False,
                 pflotran_exe=None,
                 prefer_wsl=False,
+                solver_timeout_seconds=None,
             )
 
             self.assertEqual(run_verification_test_mode(args), 0)
@@ -900,10 +901,21 @@ class SolverRunnerTests(unittest.TestCase):
             self.assertEqual(run_native(tmpdir_path, str(executable), 0), 7)
             self.assertIn("fake solver", (tmpdir_path / "run_pflotran.log").read_text(encoding="utf-8"))
 
+    def test_run_native_returns_timeout_code_and_log_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            executable = tmpdir_path / "slow_pflotran.sh"
+            executable.write_text("#!/usr/bin/env sh\nsleep 2\nexit 0\n", encoding="utf-8")
+            executable.chmod(0o755)
+            (tmpdir_path / "pflotran.in").write_text("# smoke\n", encoding="utf-8")
+
+            self.assertEqual(run_native(tmpdir_path, str(executable), 0, timeout_seconds=0.1), 124)
+            self.assertIn("[TIMEOUT]", (tmpdir_path / "run_pflotran.log").read_text(encoding="utf-8"))
+
     def test_test_solver_execution_reports_missing_and_nonzero_solver(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             workdir = Path(tmpdir)
-            args = SimpleNamespace(pflotran_exe=str(workdir / "missing"), prefer_wsl=False)
+            args = SimpleNamespace(pflotran_exe=str(workdir / "missing"), prefer_wsl=False, solver_timeout_seconds=None)
 
             missing = execute_test_solver(args, "linear_darcy", workdir, mpi_processes=1)
 
@@ -917,13 +929,30 @@ class SolverRunnerTests(unittest.TestCase):
             executable.write_text("#!/usr/bin/env sh\nexit 7\n", encoding="utf-8")
             executable.chmod(0o755)
             (workdir / "pflotran.in").write_text("# smoke\n", encoding="utf-8")
-            args = SimpleNamespace(pflotran_exe=str(executable), prefer_wsl=False)
+            args = SimpleNamespace(pflotran_exe=str(executable), prefer_wsl=False, solver_timeout_seconds=None)
 
             failed = execute_test_solver(args, "linear_darcy", workdir, mpi_processes=1)
 
             self.assertEqual(failed.status, "PFLOTRAN_ERROR")
             self.assertTrue(failed.executed)
             self.assertEqual(failed.exit_code, 7)
+
+    def test_test_solver_execution_reports_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = Path(tmpdir)
+            executable = workdir / "slow_pflotran.sh"
+            executable.write_text("#!/usr/bin/env sh\nsleep 2\nexit 0\n", encoding="utf-8")
+            executable.chmod(0o755)
+            (workdir / "pflotran.in").write_text("# smoke\n", encoding="utf-8")
+            args = SimpleNamespace(pflotran_exe=str(executable), prefer_wsl=False, solver_timeout_seconds=0.1)
+
+            timed_out = execute_test_solver(args, "linear_darcy", workdir, mpi_processes=1)
+
+            self.assertEqual(timed_out.status, "PFLOTRAN_TIMEOUT")
+            self.assertTrue(timed_out.executed)
+            self.assertEqual(timed_out.exit_code, 124)
+            self.assertTrue(timed_out.metrics["solver_timed_out"])
+            self.assertIn("PFLOTRAN_TIMEOUT", (workdir / "TEST_STATUS.txt").read_text(encoding="utf-8"))
 
 
 class CliContractTests(unittest.TestCase):
@@ -940,6 +969,7 @@ class CliContractTests(unittest.TestCase):
                 run=True,
                 pflotran_exe=fake_pflotran,
                 prefer_wsl=False,
+                solver_timeout_seconds=None,
             )
 
             self.assertEqual(run_demo_mode(args), 7)

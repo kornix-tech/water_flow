@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -251,7 +252,7 @@ def run_demo_mode(args: argparse.Namespace) -> int:
     native = find_pflotran_native(params, args.pflotran_exe)
     if native:
         print(f"[INFO] Running native PFLOTRAN: {native}")
-        rc = run_native(workdir, native, mpi_n)
+        rc = run_native(workdir, native, mpi_n, timeout_seconds=args.solver_timeout_seconds)
         print(f"[INFO] Native PFLOTRAN exit code: {rc}")
         print(f"[INFO] Log: {workdir / 'run_pflotran.log'}")
         return rc
@@ -261,7 +262,7 @@ def run_demo_mode(args: argparse.Namespace) -> int:
         wsl_exe = find_pflotran_wsl()
         if wsl_exe:
             print(f"[INFO] Running PFLOTRAN via WSL: {wsl_exe}")
-            rc = run_wsl(workdir, wsl_exe, mpi_n)
+            rc = run_wsl(workdir, wsl_exe, mpi_n, timeout_seconds=args.solver_timeout_seconds)
             print(f"[INFO] WSL PFLOTRAN exit code: {rc}")
             print(f"[INFO] Log: {workdir / 'run_pflotran_wsl.log'}")
             return rc
@@ -299,6 +300,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="Generate files only.")
     parser.add_argument("--pflotran-exe", default=None, help="Native Linux/Windows PFLOTRAN executable.")
     parser.add_argument("--prefer-wsl", action="store_true", help="Prefer WSL PFLOTRAN when native executable is absent.")
+    parser.add_argument(
+        "--solver-timeout-seconds",
+        type=float,
+        default=float(os.environ["SOILFLOW_SOLVER_TIMEOUT_SECONDS"])
+        if os.environ.get("SOILFLOW_SOLVER_TIMEOUT_SECONDS")
+        else None,
+        help="Maximum external PFLOTRAN runtime in seconds. Defaults to unlimited for CLI runs.",
+    )
     args = parser.parse_args(argv)
 
     if args.mode == "test":
