@@ -289,6 +289,26 @@ class TestSuiteSummaryServiceTests(unittest.TestCase):
             self.assertEqual(suite["results"][0]["verification_level"], "strict_analytical")
             self.assertIn("TEST_SUITE_RESULTS.csv", suite["files"])
 
+    def test_read_test_suite_status_falls_back_when_json_is_partial(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            (run_dir / "TEST_SUITE_STATUS.json").write_text('{"summary": ', encoding="utf-8")
+            (run_dir / "TEST_SUITE_STATUS.txt").write_text(
+                "TEST_SUITE_STATUS=PASS_WITH_WARNINGS\ntests_total=1\n_test_linear_darcy=PASS\n",
+                encoding="utf-8",
+            )
+            (run_dir / "TEST_SUITE_RESULTS.csv").write_text(
+                "test_id,status,verification_level\n_test_linear_darcy,PASS,strict_analytical\n",
+                encoding="utf-8",
+            )
+
+            suite = read_test_suite_status("_test_suite", run_dir)
+
+            self.assertEqual(suite["status"], "PASS_WITH_WARNINGS")
+            self.assertEqual(suite["source"], "TEST_SUITE_STATUS.txt")
+            self.assertEqual(suite["summary"]["artifact_readiness"], "PARTIAL")
+            self.assertEqual(suite["results"][0]["test_id"], "_test_linear_darcy")
+
     def test_read_test_suite_status_rejects_symlink_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             run_dir = Path(directory) / "run"
@@ -343,6 +363,17 @@ class TestRunStatusServiceTests(unittest.TestCase):
 
             self.assertEqual(status["status"], "GENERATED_ONLY")
             self.assertEqual(status["messages"], ["PFLOTRAN executable was not found"])
+
+    def test_read_test_run_status_keeps_status_when_diagnostics_json_is_partial(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            (run_dir / "TEST_STATUS.txt").write_text("TEST_STATUS=PASS\ntest_id=_test_linear_darcy\n", encoding="utf-8")
+            (run_dir / "test_diagnostics.json").write_text('{"max_error": ', encoding="utf-8")
+
+            status = read_test_run_status("_test_linear_darcy", run_dir)
+
+            self.assertEqual(status["status"], "PASS")
+            self.assertEqual(status["diagnostics"]["artifact_readiness"], "PARTIAL")
 
     def test_read_test_run_status_rejects_symlink_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

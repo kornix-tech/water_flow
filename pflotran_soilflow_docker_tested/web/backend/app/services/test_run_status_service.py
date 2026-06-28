@@ -38,11 +38,17 @@ def _coerce_fields(raw_fields: dict[str, str]) -> dict[str, str | int | float | 
 def _read_diagnostics(path: Path | None) -> dict[str, Any]:
     if path is None:
         return {}
-    with path.open(encoding="utf-8") as file_obj:
-        payload = json.load(file_obj)
-    if not isinstance(payload, dict):
-        raise ValueError("test_diagnostics.json must contain an object")
-    return payload
+    try:
+        with path.open(encoding="utf-8") as file_obj:
+            payload = json.load(file_obj)
+        if not isinstance(payload, dict):
+            raise ValueError("test_diagnostics.json must contain an object")
+        return payload
+    except (json.JSONDecodeError, ValueError) as exc:
+        # Diagnostics JSON пишется дополнительно к TEST_STATUS.txt и может быть
+        # пойман в частично записанном состоянии. Основной статус при этом
+        # остается полезным для UI/API, поэтому возвращаем явный partial marker.
+        return {"artifact_readiness": "PARTIAL", "diagnostics_error": str(exc)}
 
 
 def read_test_run_status(run_name: str, run_dir: Path) -> dict[str, Any]:

@@ -6,7 +6,7 @@
 **Git root:** `/home/zenbook/SF`  
 **Текущий сервис:** `http://localhost:18080/`  
 **Контейнер:** `pflotran_soilflow_docker_tested-soilflow-web-1`  
-**Базовый commit перед текущим smoke-этапом:** `c685e46 Add typed run status overviews`
+**Базовый commit перед текущим stability/performance этапом:** `d1c97dc Summarize strict readiness stages`
 **Статус этого handoff:** предназначен для открытия нового чата Codex без восстановления истории из текущего длинного чата.
 
 ## 1. Решение по переходу в новый чат
@@ -53,10 +53,10 @@ wsl -d Ubuntu --cd /home/zenbook/SF/pflotran_soilflow_docker_tested -- bash -lc 
 c685e46 Add typed run status overviews
 ```
 
-Текущий следующий этап: `scripts/api_smoke.sh` проверяет
-`GET /api/results/runs/{run_name}/overview` read-only способом без привязки к
-конкретному имени run. Связанные документы и этот handoff обновляются вместе со
-smoke-правкой.
+Текущий следующий этап: первый инкремент устойчивости и производительности
+results/status layer. `/api/results/runs` переведен в быстрый summary-режим без
+рекурсивного сканирования файлов каждой run-папки, а чтение suite/test status
+artifacts стало устойчивым к частично записанным JSON/CSV diagnostics.
 
 ## 4. Что было сделано после последнего commit
 
@@ -82,6 +82,9 @@ GET /api/results/runs/{run_name}/test-suite
 - не заставлять frontend парсить TXT;
 - безопасно читать только status-artifacts внутри run-директории;
 - отвергать symlink и слишком крупные artifacts.
+- при частично записанном `TEST_SUITE_STATUS.json` откатываться к
+  `TEST_SUITE_STATUS.txt`/`TEST_SUITE_RESULTS.csv` и помечать summary как
+  `artifact_readiness=PARTIAL`.
 
 ### 4.2 Typed test run status
 
@@ -105,6 +108,9 @@ GET /api/results/runs/{run_name}/test-status
 - нормализовать `true/false`, integer и float значения;
 - сохранять строки без `=` как `messages`;
 - подмешивать `test_diagnostics.json`, если он есть.
+- при частично записанном или поврежденном `test_diagnostics.json` сохранять
+  основной статус из `TEST_STATUS.txt`, а diagnostics помечать
+  `artifact_readiness=PARTIAL`.
 
 Пример проверенного live endpoint:
 
@@ -208,6 +214,11 @@ GET /api/results/runs/{run_name}/plots
 GET /api/results/runs/{run_name}/file/{file_path}
 ```
 
+Важно: `GET /api/results/runs` теперь является быстрым summary endpoint и не
+обязан возвращать список `files` для каждой run-папки. Детальный ограниченный
+список файлов остается в `GET /api/results/runs/{run_name}` для выбранного
+запуска.
+
 Новые/расширенные endpoints:
 
 ```text
@@ -262,9 +273,10 @@ RunStatusOverview
 .status-card-footer
 ```
 
-## 7. Проверки, выполненные после изменений
+## 7. Проверки, выполненные после stability/performance инкремента
 
-Последний полный gate прошел успешно:
+Последний полный gate после первого stability/performance инкремента прошел
+успешно:
 
 ```bash
 ./scripts/check_project.sh
@@ -273,23 +285,25 @@ RunStatusOverview
 Состав gate:
 
 ```text
-[1/7] Python compile
-[2/7] Backend unit tests
-[3/7] Modular scenario smoke
-[4/7] Frontend production build
-[5/7] Cleanup generated frontend build
-[6/7] Restart web service
-[7/7] API contract and workflow checks
+[1/8] Python compile
+[2/8] Backend unit tests
+[3/8] Core modular tests
+[4/8] Frontend production build
+[5/8] Cleanup generated frontend build
+[6/8] Restart web service
+[7/8] API contract and workflow checks
+[8/8] Frontend route smoke
 ```
 
 Итог последнего запуска:
 
 ```text
-Backend unit tests: 16 tests OK
-Core tests: 46 tests OK
+Backend unit tests: 18 tests OK
+Core tests: 51 tests OK
 Frontend production build: OK
 API smoke: OK
 tabular API workflow smoke: OK
+UI route smoke: OK
 project checks passed on http://localhost:18080
 ```
 
@@ -297,12 +311,14 @@ project checks passed on http://localhost:18080
 
 ```bash
 python3 -m compileall -q web/backend/app web/backend/tests scripts tests
-python3 -m unittest discover -s web/backend/tests -v
+python3 -m unittest web.backend.tests.test_backend_services -v
 python3 -m unittest discover -s tests -v
 docker run --rm -v /home/zenbook/SF/pflotran_soilflow_docker_tested:/app -w /app/web/frontend node:20 npm run build
 ./scripts/sync_to_running_container.sh
 curl -fsS http://localhost:18080/api/health/ready
 curl -fsS http://localhost:18080/api/results/runs/_test_linear_darcy/overview
+python3 -m compileall -q scripts tests web/backend/app
+git diff --check
 ```
 
 После `check_project.sh` generated local artifacts были очищены:
@@ -347,7 +363,8 @@ GET http://localhost:18080/api/health/ready
 }
 ```
 
-После hot-copy этапа была выполнена релизная сверка через полный Docker rebuild:
+После stability/performance этапа была выполнена релизная сверка через полный
+Docker rebuild:
 
 ```bash
 WEB_PORT=18080 BUILD_JOBS=12 docker compose build soilflow-web
@@ -355,10 +372,10 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 ./scripts/check_project.sh
 ```
 
-Последний подтвержденный image/container id после UI smoke-этапа:
+Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:c85a40633f540dac09eaeae383bb391b86ac257fd82f1980d5ba9af93a6f3666
+sha256:0c6fa227482a802ac0890cf7258837333ce124d1d30b3f9ece35a5d99244f212
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -368,6 +385,7 @@ CHANGELOG.md
 docs/API_CONTRACT_RU.md
 docs/EXTERNAL_CONTEXT_RU.md
 docs/WEB_INTERFACE_RU.md
+docs/NEXT_CHAT_CONTEXT_RU.md
 ```
 
 Смысл изменений:
@@ -376,6 +394,10 @@ docs/WEB_INTERFACE_RU.md
 - добавлен `scripts/ui_route_smoke.sh` и обязательный `[8/8] Frontend route smoke` в `scripts/check_project.sh`;
 - зафиксировано, что frontend больше не парсит status TXT напрямую;
 - описан общий reader status-сводок;
+- зафиксировано, что `/api/results/runs` является быстрым summary endpoint без
+  рекурсивного списка файлов каждой run-папки;
+- частично записанные suite/status artifacts больше не должны давать 500 при
+  наличии пригодного fallback;
 - web smoke examples дополнены curl-командами для новых endpoints.
 
 ## 10. Архитектурная карта текущего results/status слоя
@@ -401,8 +423,10 @@ flowchart LR
 
 ## 11. Текущие риски и ограничения
 
-1. Текущий smoke/doc diff нужно закоммитить после `check_project.sh`.
-2. Docker image может отставать от исходников, потому что использовался hot-copy workflow.
+1. Текущий stability/performance diff нужно закоммитить после финальной очистки
+   generated artifacts.
+2. Docker image пересобран после stability/performance инкремента; при
+   следующих значимых изменениях повторить rebuild gate.
 3. В `output/runs` и Docker volume есть много generated расчетных результатов; не добавлять их в git.
 4. `runs/_test_suite/TEST_SUITE_STATUS.txt` является tracked/generated baseline и может меняться после test dry-runs. После проверок его нужно восстанавливать, если он попал в `git status`.
 5. Endpoint `/overview` покрыт unit-тестами и добавлен в `scripts/api_smoke.sh`.
@@ -426,8 +450,9 @@ flowchart LR
      частично записанные run-директории;
    - не позволять frontend/API читать произвольные файлы вне run-директории.
 3. Сделать чтение status/artifacts устойчивым:
-   - добавить graceful fallback для поврежденных `TEST_STATUS.txt`,
-     `TEST_SUITE_STATUS.json`, `TEST_SUITE_RESULTS.csv`;
+   - уже добавлен graceful fallback для поврежденных `TEST_SUITE_STATUS.json`,
+     `TEST_SUITE_RESULTS.csv` и `test_diagnostics.json`;
+   - следующим шагом добавить явную политику для поврежденных `TEST_STATUS.txt`;
    - показывать `UNKNOWN/PARTIAL` вместо 500, если расчет еще пишет файлы;
    - разделить ошибки parser-а и ошибки внешнего solver-а в diagnostics.
 4. Проверить restart-resilience:
@@ -557,8 +582,9 @@ workflow_smoke
 Работай в проекте /home/zenbook/SF/pflotran_soilflow_docker_tested.
 Сначала прочитай docs/NEXT_CHAT_CONTEXT_RU.md и docs/EXTERNAL_CONTEXT_RU.md.
 Проверь git status и текущее состояние сервиса.
-Дальше продолжай с блока: если profile evaluator этап не закоммичен, проверить
-`git status`, запустить `./scripts/check_project.sh`, выполнить Docker rebuild
-gate, очистить generated artifacts `runs/_test_suite`, затем commit/push.
+Дальше продолжай с блока: если stability/performance этап не закоммичен,
+проверить `git status`, запустить `./scripts/check_project.sh`, выполнить Docker
+rebuild gate, очистить generated artifacts `runs/_test_suite`, затем
+commit/push.
 Работай через WSL bash, не через PowerShell heredoc/pipes.
 ```

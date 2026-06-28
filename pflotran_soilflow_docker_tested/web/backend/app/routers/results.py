@@ -15,8 +15,8 @@ from ..services.test_suite_summary_service import read_test_suite_status
 router = APIRouter()
 
 
-def _run_info(run_dir: Path, file_manager) -> RunInfo:
-    files = file_manager.list_relative_files(run_dir, max_files=500)
+def _run_info(run_dir: Path, file_manager, *, include_files: bool = True) -> RunInfo:
+    files = file_manager.list_relative_files(run_dir, max_files=500) if include_files else []
     return RunInfo(
         run_name=run_dir.name,
         path=str(run_dir),
@@ -32,7 +32,11 @@ def list_runs(request: Request) -> list[RunInfo]:
     runs_dir = request.app.state.settings.runs_dir
     if not runs_dir.exists():
         return []
-    return [_run_info(path, request.app.state.file_manager) for path in sorted(runs_dir.iterdir()) if path.is_dir() and not path.is_symlink()]
+    return [
+        _run_info(path, request.app.state.file_manager, include_files=False)
+        for path in sorted(runs_dir.iterdir())
+        if path.is_dir() and not path.is_symlink()
+    ]
 
 
 @router.get("/runs/{run_name}", response_model=RunInfo)

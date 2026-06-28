@@ -140,17 +140,32 @@ def read_test_suite_status(run_name: str, run_dir: Path) -> dict[str, Any]:
         raise FileNotFoundError("Test-suite status artifact was not found")
 
     if json_path is not None:
-        summary, results = _read_json_summary(json_path)
-        source = SUITE_STATUS_JSON
+        try:
+            summary, results = _read_json_summary(json_path)
+            source = SUITE_STATUS_JSON
+        except (json.JSONDecodeError, ValueError):
+            if text_path is None:
+                raise
+            # JSON может быть прочитан во время записи suite. В этом случае
+            # откатываемся к текстовой сводке и CSV-строкам, чтобы API не
+            # отвечал 500/422 для частично записанной run-директории.
+            summary, results = _read_text_summary(text_path)
+            summary["artifact_readiness"] = "PARTIAL"
+            summary["artifact_fallback"] = SUITE_STATUS_TEXT
+            source = SUITE_STATUS_TEXT
     else:
         assert text_path is not None
         summary, results = _read_text_summary(text_path)
         source = SUITE_STATUS_TEXT
 
     if csv_path is not None:
-        csv_results = _read_csv_results(csv_path)
-        if csv_results:
-            results = csv_results
+        try:
+            csv_results = _read_csv_results(csv_path)
+            if csv_results:
+                results = csv_results
+        except (csv.Error, ValueError):
+            summary["artifact_readiness"] = "PARTIAL"
+            summary["csv_fallback"] = "SKIPPED"
 
     return {
         "run_name": run_name,

@@ -126,8 +126,11 @@ Endpoints:
 
 ## Результаты и файлы
 
-- `GET /api/results/runs` - список папок результатов.
-- `GET /api/results/runs/{run_name}` - сведения о конкретном запуске.
+- `GET /api/results/runs` - быстрый summary-список: endpoint не обязан
+  возвращать полный список файлов внутри каждой run-папки, чтобы не делать
+  дорогое рекурсивное сканирование на больших архивах.
+- `GET /api/results/runs/{run_name}` - сведения о конкретном запуске, включая
+  ограниченный список файлов выбранной run-папки.
 - `GET /api/results/runs/{run_name}/status` - текстовый статус расчета/теста.
 - `GET /api/results/runs/{run_name}/test-suite` - типизированная JSON-сводка
   verification-suite из `TEST_SUITE_STATUS.json` с fallback на
@@ -135,6 +138,8 @@ Endpoints:
   `strict_readiness_stage` в счетчики `strict_gate_ready_total`,
   `strict_deck_adapter_pending_total`, `strict_case_builder_pending_total` и
   `strict_evaluator_pending_total`.
+  Если JSON suite artifact прочитан в частично записанном состоянии, backend
+  откатывается к TXT/CSV и помечает summary как `artifact_readiness=PARTIAL`.
 - `GET /api/results/runs/{run_name}/test-status` - типизированная JSON-сводка
   отдельного тестового запуска из `TEST_STATUS.txt` и, если есть,
   `test_diagnostics.json`.
@@ -163,6 +168,9 @@ Endpoints:
   source matrices. В `TEST_STATUS.txt` может приходить
   `richards_mms_adapter_artifact_check=PASS|FAIL` как проверка согласованности
   manifest и matrix shapes.
+  Если дополнительный `test_diagnostics.json` поврежден или еще пишется,
+  основной `TEST_STATUS.txt` остается источником статуса, а diagnostics получает
+  marker `artifact_readiness=PARTIAL`.
 - `GET /api/results/runs/{run_name}/overview` - единый обзор состояния запуска:
   verification-suite, отдельный тест, графики или fallback по файлам результата.
 - `GET /api/results/runs/{run_name}/plots` - список файлов графиков.
