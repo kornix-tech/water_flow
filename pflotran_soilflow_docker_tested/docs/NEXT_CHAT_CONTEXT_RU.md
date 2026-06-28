@@ -385,7 +385,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:358f22ab54c05ba2c3858d0721cc68f2f80e9cfc023ca88ae2fa238d9ff54b4b
+sha256:b2d27f7a8c84588030ac7562861af3ec221537e284fb73287f82bbb1aa299cbf
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -553,6 +553,9 @@ flowchart LR
      фильтрах suite results, если UI начнет показывать подробный список
      результатов suite.
 3. Использовать `strict_readiness_stage` для выбора следующего блока:
+   - suite writer теперь создает `STRICT_READINESS_PLAN.json` с `stage_order`,
+     `next_stage`, `next_targets` и списком candidates для машинного выбора
+     следующего strict-readiness блока;
    - сначала закрывать `DECK_ADAPTER_PENDING` для `richards_mms`;
    - затем `CASE_BUILDER_PENDING` для heat/transport/groundwater;
    - затем `STRICT_EVALUATOR_PENDING` для infiltration/profile carrier.

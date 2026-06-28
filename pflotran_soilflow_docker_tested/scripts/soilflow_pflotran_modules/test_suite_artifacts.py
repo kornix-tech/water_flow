@@ -41,6 +41,14 @@ SUITE_RESULT_CSV_FIELDS = [
     "strict_profile_evaluator",
 ]
 
+STRICT_READINESS_PLAN_JSON = "STRICT_READINESS_PLAN.json"
+STRICT_READINESS_STAGE_ORDER = [
+    "DECK_ADAPTER_PENDING",
+    "CASE_BUILDER_PENDING",
+    "STRICT_EVALUATOR_PENDING",
+    "STRICT_GATE_READY",
+]
+
 
 def accepted_suite_statuses(dry_run: bool = False) -> set[str]:
     accepted = {"PASS", "PASS_WITH_WARNINGS", "SKIP"}
@@ -61,6 +69,47 @@ def strict_readiness_stage_counts(results: list[TestResultLike]) -> dict[str, in
         if stage in stages:
             stages[stage] += 1
     return stages
+
+
+def strict_readiness_plan(results: list[TestResultLike]) -> dict[str, Any]:
+    rows = suite_result_rows(results)
+    candidates = [
+        {
+            "test_id": row["test_id"],
+            "status": row["status"],
+            "verification_level": row["verification_level"],
+            "output_dir": row["output_dir"],
+            "profile_physics_family": row.get("profile_physics_family", ""),
+            "profile_carrier_status": row.get("profile_carrier_status", ""),
+            "profile_deck_kind": row.get("profile_deck_kind", ""),
+            "strict_profile_evaluator": row.get("strict_profile_evaluator", ""),
+            "strict_readiness_stage": row.get("strict_readiness_stage", ""),
+            "strict_candidate_can_gate_suite": row.get("strict_candidate_can_gate_suite", ""),
+            "richards_mms_adapter_artifact_check": row.get("richards_mms_adapter_artifact_check", ""),
+            "richards_mms_strict_candidate_check": row.get("richards_mms_strict_candidate_check", ""),
+        }
+        for row in rows
+        if row.get("strict_readiness_stage")
+    ]
+    candidates.sort(
+        key=lambda row: (
+            STRICT_READINESS_STAGE_ORDER.index(str(row["strict_readiness_stage"]))
+            if row["strict_readiness_stage"] in STRICT_READINESS_STAGE_ORDER
+            else len(STRICT_READINESS_STAGE_ORDER),
+            str(row["test_id"]),
+        )
+    )
+    stage_counts = strict_readiness_stage_counts(results)
+    next_stage = next((stage for stage in STRICT_READINESS_STAGE_ORDER if stage_counts.get(stage, 0) > 0), "NONE")
+    next_targets = [row for row in candidates if row.get("strict_readiness_stage") == next_stage]
+    return {
+        "schema_version": 1,
+        "stage_order": STRICT_READINESS_STAGE_ORDER,
+        "stage_counts": stage_counts,
+        "next_stage": next_stage,
+        "next_targets": next_targets,
+        "candidates": candidates,
+    }
 
 
 def suite_status_summary(results: list[TestResultLike], dry_run: bool = False) -> dict[str, int | str | dict[str, int]]:
@@ -188,6 +237,10 @@ def write_suite_status_file(results: list[TestResultLike], suite_dir: Path, dry_
     )
     (suite_dir / "TEST_SUITE_STATUS.json").write_text(
         json.dumps({"summary": summary, "results": rows}, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (suite_dir / STRICT_READINESS_PLAN_JSON).write_text(
+        json.dumps(strict_readiness_plan(results), ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     with (suite_dir / "TEST_SUITE_RESULTS.csv").open("w", newline="", encoding="utf-8") as file_obj:

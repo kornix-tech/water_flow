@@ -25,6 +25,7 @@
 - Добавлен `scripts/api_restart_resilience_smoke.sh`: live smoke для проверки restart-поведения активных job'ов, SQLite schema version и базовых API после `docker compose restart soilflow-web`.
 - Добавлен быстрый профиль проверки `CHECK_PROFILE=fast ./scripts/check_project.sh` и Makefile-цель `project-check-fast` для compile/unit/modular/API/UI smoke без тяжелого full-gate.
 - Добавлен отдельный research-профиль `CHECK_PROFILE=research ./scripts/check_project.sh` и Makefile-цель `project-check-research` для verification-suite dry/run gate вне основного full-gate.
+- Verification-suite теперь пишет `STRICT_READINESS_PLAN.json` с priority order, `next_stage` и `next_targets` для следующего strict-readiness блока.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_evaluators` для диагностической оценки `REFERENCE_OVERLAY` profile-smoke benchmark'ов и явной отметки pending strict evaluator.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_cases` с машинно-читаемой картой profile benchmark'ов, физическими семействами и blocker'ами будущих strict evaluator'ов.
 - Добавлен модуль `soilflow_pflotran_modules.profile_strict_evaluators` с первым strict-кандидатом для `richards_mms` по RMSE/max-error напора и влажности.

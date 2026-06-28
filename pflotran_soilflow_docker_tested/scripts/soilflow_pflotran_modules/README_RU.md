@@ -32,7 +32,8 @@ CLI и web-backend. Этот пакет задает безопасные гра
 - `test_evaluation.py`: единая сборка `PASS/WARN/FAIL`, `UNKNOWN`,
   `PFLOTRAN_ERROR`/`PFLOTRAN_TIMEOUT`, `failure_stage` и suite status.
 - `test_suite_artifacts.py`: запись suite summary в `TEST_SUITE_STATUS.txt`,
-  `TEST_SUITE_STATUS.json` и `TEST_SUITE_RESULTS.csv` для машинного анализа.
+  `TEST_SUITE_STATUS.json`, `TEST_SUITE_RESULTS.csv` и
+  `STRICT_READINESS_PLAN.json` для машинного анализа.
 - `test_registry.py`: список verification/profile тестов, группировка, выбор
   `all`, чтение параметров сценария, совместимые рабочие пути CLI и уровни
   проверки `strict_analytical`/`partial_balance`/`profile_smoke`.

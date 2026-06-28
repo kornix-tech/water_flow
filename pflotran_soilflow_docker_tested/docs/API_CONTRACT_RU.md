@@ -153,6 +153,9 @@ Endpoints:
   `strict_readiness_stage` в счетчики `strict_gate_ready_total`,
   `strict_deck_adapter_pending_total`, `strict_case_builder_pending_total` и
   `strict_evaluator_pending_total`.
+  Дополнительно suite writer создает `STRICT_READINESS_PLAN.json` с
+  `stage_order`, `next_stage`, `next_targets` и полным списком strict-readiness
+  candidates; backend включает этот artifact в список `files` endpoint-а.
   Если JSON suite artifact прочитан в частично записанном состоянии, backend
   откатывается к TXT/CSV и помечает summary как `artifact_readiness=PARTIAL`.
 - `GET /api/results/runs/{run_name}/test-status` - типизированная JSON-сводка

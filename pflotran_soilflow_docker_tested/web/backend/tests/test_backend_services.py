@@ -340,12 +340,14 @@ class TestSuiteSummaryServiceTests(unittest.TestCase):
                 "_test_linear_darcy,PASS,strict_analytical,0\n",
                 encoding="utf-8",
             )
+            (run_dir / "STRICT_READINESS_PLAN.json").write_text('{"next_stage": "NONE"}\n', encoding="utf-8")
 
             suite = read_test_suite_status("_test_suite", run_dir)
 
             self.assertEqual(suite["summary"]["tests_failed"], 0)
             self.assertEqual(suite["results"][0]["verification_level"], "strict_analytical")
             self.assertIn("TEST_SUITE_RESULTS.csv", suite["files"])
+            self.assertIn("STRICT_READINESS_PLAN.json", suite["files"])
 
     def test_read_test_suite_status_falls_back_when_json_is_partial(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

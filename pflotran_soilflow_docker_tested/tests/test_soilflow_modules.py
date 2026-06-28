@@ -91,6 +91,7 @@ from soilflow_pflotran_modules.test_artifacts import (
     write_rows_csv,
 )
 from soilflow_pflotran_modules.test_evaluation import combined_test_status, suite_status_lines, write_suite_status_file
+from soilflow_pflotran_modules.test_suite_artifacts import strict_readiness_plan
 from soilflow_pflotran_modules.test_registry import (
     TEST_REGISTRY,
     selected_test_names,
@@ -574,6 +575,9 @@ class TestEvaluationTests(unittest.TestCase):
             self.assertIn("strict_deck_adapter_pending_total=1", status_text)
             self.assertIn('"profile_smoke_ready": 1', status_json)
             self.assertIn('"DECK_ADAPTER_PENDING": 1', status_json)
+            readiness_plan = json.loads((suite_dir / "STRICT_READINESS_PLAN.json").read_text(encoding="utf-8"))
+            self.assertEqual(readiness_plan["next_stage"], "DECK_ADAPTER_PENDING")
+            self.assertEqual(readiness_plan["next_targets"][0]["test_id"], "_test_richards_mms")
             csv_text = (suite_dir / "TEST_SUITE_RESULTS.csv").read_text(encoding="utf-8")
             self.assertIn("profile_overlay_comparison", csv_text)
             self.assertIn("profile_overlay_quality_check", csv_text)
@@ -586,6 +590,27 @@ class TestEvaluationTests(unittest.TestCase):
             self.assertIn("richards_mms_adapter_artifact_check", csv_text)
             self.assertIn("strict_profile_evaluator", csv_text)
             self.assertIn("REFERENCE_OVERLAY", csv_text)
+
+    def test_strict_readiness_plan_prioritizes_stage_order(self) -> None:
+        results = [
+            SimpleNamespace(
+                test_id="_test_heat_conduction_1d",
+                status="PASS_WITH_WARNINGS",
+                output_dir=Path("/tmp/heat"),
+                metrics={"verification_level": "profile_smoke", "strict_readiness_stage": "CASE_BUILDER_PENDING"},
+            ),
+            SimpleNamespace(
+                test_id="_test_richards_mms",
+                status="PASS_WITH_WARNINGS",
+                output_dir=Path("/tmp/mms"),
+                metrics={"verification_level": "profile_smoke", "strict_readiness_stage": "DECK_ADAPTER_PENDING"},
+            ),
+        ]
+
+        plan = strict_readiness_plan(results)
+
+        self.assertEqual(plan["next_stage"], "DECK_ADAPTER_PENDING")
+        self.assertEqual(plan["next_targets"][0]["test_id"], "_test_richards_mms")
 
 
 class TestRegistryTests(unittest.TestCase):
