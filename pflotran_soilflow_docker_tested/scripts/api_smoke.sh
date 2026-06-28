@@ -62,5 +62,36 @@ _, runs = get_json("/api/results/runs")
 if not isinstance(runs, list):
     raise SystemExit("/api/results/runs: response must be a list")
 
+overview_run = None
+for run in runs:
+    if not isinstance(run, dict):
+        raise SystemExit("/api/results/runs: each run must be an object")
+    run_name = run.get("run_name")
+    if not isinstance(run_name, str) or not run_name:
+        raise SystemExit("/api/results/runs: each run must have a run_name")
+    if run.get("has_test_status") or run.get("has_suite_status") or run.get("has_visualization"):
+        overview_run = run_name
+        break
+
+if overview_run is None and runs:
+    # Даже обычная папка результата должна отдавать fallback-карточку run-files.
+    overview_run = runs[0]["run_name"]
+
+if overview_run is not None:
+    _, overview = get_json(f"/api/results/runs/{overview_run}/overview")
+    if overview.get("run_name") != overview_run:
+        raise SystemExit("/api/results/runs/{run}/overview: unexpected run_name")
+    items = overview.get("items")
+    if not isinstance(items, list) or not items:
+        raise SystemExit("/api/results/runs/{run}/overview: items must be a non-empty list")
+    for item in items:
+        if not isinstance(item, dict):
+            raise SystemExit("/api/results/runs/{run}/overview: each item must be an object")
+        for key in ("kind", "title", "status"):
+            if not item.get(key):
+                raise SystemExit(f"/api/results/runs/{{run}}/overview: item is missing {key}")
+else:
+    print("/api/results/runs/{run}/overview: skipped because there are no runs")
+
 print(f"OK: API smoke passed for {base_url}")
 PY

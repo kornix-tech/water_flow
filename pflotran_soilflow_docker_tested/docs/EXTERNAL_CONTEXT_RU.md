@@ -684,6 +684,10 @@ curl -fsS "http://localhost:18080/api/calculations"
 WEB_PORT=18080 ./scripts/api_smoke.sh
 ```
 
+`api_smoke.sh` дополнительно проверяет типизированный `/api/results/runs/{run}/overview`
+для первого подходящего run и не зависит от заранее известного имени вроде
+`_test_linear_darcy`.
+
 Работа внутри контейнера:
 
 ```bash

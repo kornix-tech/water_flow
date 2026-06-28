@@ -64,6 +64,7 @@
 - Из `soilflow_pflotran.py` вынесен блок extended analytical helpers; основной скрипт стал ближе к CLI-фасаду.
 - Статус расширенных profile-тестов теперь включает `analytical_overlay_check`, источник и число точек аналитического профиля.
 - `scripts/api_smoke.sh` проверяет read-only контракт `/api/soil-curves/calculations/{id}`, если в базе уже есть расчеты.
+- `scripts/api_smoke.sh` проверяет read-only контракт `/api/results/runs/{run_name}/overview` для первого доступного run без жесткой привязки к имени теста.
 - `scripts/check_project.sh` теперь включает полный расчетный smoke для табличной почвы через публичный API.
 - Стандартный PFLOTRAN deck writer вынесен из `soilflow_pflotran.py`; основной скрипт оставлен совместимым CLI-фасадом и отдельно маршрутизирует `floodplain_controlled_drainage`.
 - Парсинг результатов PFLOTRAN, solver diagnostics и запись `TEST_STATUS.txt` вынесены из `soilflow_pflotran.py` в модуль с unit-тестами.

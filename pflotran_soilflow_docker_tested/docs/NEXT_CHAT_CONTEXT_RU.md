@@ -6,7 +6,7 @@
 **Git root:** `/home/zenbook/SF`  
 **Текущий сервис:** `http://localhost:18080/`  
 **Контейнер:** `pflotran_soilflow_docker_tested-soilflow-web-1`  
-**Последний commit в HEAD:** `fba8ebe Refactor verification suite modules`  
+**Базовый commit перед текущим smoke-этапом:** `c685e46 Add typed run status overviews`
 **Статус этого handoff:** предназначен для открытия нового чата Codex без восстановления истории из текущего длинного чата.
 
 ## 1. Решение по переходу в новый чат
@@ -17,7 +17,7 @@
 
 - текущий чат уже прошел через автоматическое сжатие контекста;
 - история разработки стала длинной и содержит несколько крупных этапов: verification-suite, API статусов, frontend карточки состояния, документация, проверки, hot-copy в контейнер;
-- в рабочем дереве есть крупный незакоммиченный diff, который важно не потерять и не смешать с новым этапом;
+- предыдущий крупный status-overview этап уже зафиксирован в `c685e46`;
 - инструмент не вернул точный остаток token budget, поэтому надежнее считать контекст рискованным для следующих крупных блоков;
 - следующий блок лучше начинать с этого файла, `git status`, `git diff --stat` и повторного smoke/check.
 
@@ -26,8 +26,8 @@
 1. В новом чате сначала прочитать этот файл.
 2. Проверить `git status --short`.
 3. Проверить, что сервис жив: `curl -fsS http://localhost:18080/api/health/ready`.
-4. Если пользователь хочет зафиксировать текущий этап, сделать commit/push.
-5. Потом продолжать следующий крупный блок.
+4. Продолжать с текущего незакоммиченного smoke/doc этапа, если он есть.
+5. После проверок зафиксировать новый малый этап отдельным commit.
 
 ## 2. Обязательные рабочие правила окружения
 
@@ -47,47 +47,16 @@ wsl -d Ubuntu --cd /home/zenbook/SF/pflotran_soilflow_docker_tested -- bash -lc 
 
 ## 3. Текущее состояние репозитория
 
-На момент фиксации контекста рабочее дерево не закоммичено. Последний известный `git status --short`:
+Крупный status-overview этап зафиксирован и отправлен в `main` commit'ом:
 
 ```text
- M CHANGELOG.md
- M docs/API_CONTRACT_RU.md
- M docs/EXTERNAL_CONTEXT_RU.md
- M docs/WEB_INTERFACE_RU.md
- M web/backend/app/routers/results.py
- M web/backend/app/schemas.py
- M web/backend/tests/test_backend_services.py
- M web/frontend/src/api/client.ts
- M web/frontend/src/pages/JobsPage.tsx
- M web/frontend/src/pages/ResultsPage.tsx
- M web/frontend/src/styles.css
- M web/frontend/src/types.ts
-?? web/backend/app/services/result_status_artifacts.py
-?? web/backend/app/services/run_status_overview_service.py
-?? web/backend/app/services/test_run_status_service.py
-?? web/backend/app/services/test_suite_summary_service.py
-?? web/frontend/src/components/StatusSummaryPanel.tsx
+c685e46 Add typed run status overviews
 ```
 
-Последний известный `git diff --stat`:
-
-```text
- pflotran_soilflow_docker_tested/CHANGELOG.md       |   2 +
- .../docs/API_CONTRACT_RU.md                        |   8 +
- .../docs/EXTERNAL_CONTEXT_RU.md                    |   4 +-
- .../docs/WEB_INTERFACE_RU.md                       |   3 +
- .../web/backend/app/routers/results.py             |  43 +++++-
- .../web/backend/app/schemas.py                     |  49 ++++++
- .../web/backend/tests/test_backend_services.py     | 165 ++++++++++++++++++++
- .../web/frontend/src/api/client.ts                 |  17 ++-
- .../web/frontend/src/pages/JobsPage.tsx            |  37 +++--
- .../web/frontend/src/pages/ResultsPage.tsx         | 105 +++++++++++--
- .../web/frontend/src/styles.css                    | 168 +++++++++++++++++++++
- .../web/frontend/src/types.ts                      |  49 ++++++
- 12 files changed, 624 insertions(+), 26 deletions(-)
-```
-
-В diff-stat не отображены untracked файлы как отдельные строки, но они входят в текущий незакоммиченный этап и должны быть добавлены при commit.
+Текущий следующий этап: `scripts/api_smoke.sh` проверяет
+`GET /api/results/runs/{run_name}/overview` read-only способом без привязки к
+конкретному имени run. Связанные документы и этот handoff обновляются вместе со
+smoke-правкой.
 
 ## 4. Что было сделано после последнего commit
 
@@ -425,56 +394,28 @@ flowchart LR
 
 ## 11. Текущие риски и ограничения
 
-1. Накопленный diff еще не закоммичен.
+1. Текущий smoke/doc diff нужно закоммитить после `check_project.sh`.
 2. Docker image может отставать от исходников, потому что использовался hot-copy workflow.
 3. В `output/runs` и Docker volume есть много generated расчетных результатов; не добавлять их в git.
 4. `runs/_test_suite/TEST_SUITE_STATUS.txt` является tracked/generated baseline и может меняться после test dry-runs. После проверок его нужно восстанавливать, если он попал в `git status`.
-5. Endpoint `/overview` уже покрыт unit-тестами, но `scripts/api_smoke.sh` еще не проверяет его явно. Это лучший следующий малый шаг.
+5. Endpoint `/overview` покрыт unit-тестами и добавлен в `scripts/api_smoke.sh`.
 6. Старые endpoints `/test-suite` и `/test-status` оставлены для совместимости и прямого анализа; не удалять их без отдельного решения.
 
 ## 12. Рекомендуемый следующий план
 
-### Блок A. Зафиксировать текущий этап
+### Блок A. API smoke для overview
 
-1. Проверить:
+Выполнено в текущем smoke-этапе:
 
-```bash
-wsl -d Ubuntu --cd /home/zenbook/SF/pflotran_soilflow_docker_tested -- git status --short
-wsl -d Ubuntu --cd /home/zenbook/SF/pflotran_soilflow_docker_tested -- git diff --check
-wsl -d Ubuntu --cd /home/zenbook/SF/pflotran_soilflow_docker_tested -- ./scripts/check_project.sh
-```
+- `scripts/api_smoke.sh` выбирает первый run с `has_test_status`,
+  `has_suite_status` или `has_visualization`;
+- если status/visualization run отсутствует, проверяет `/overview` для первой
+  обычной run-папки;
+- если run-папок нет, пропускает overview-проверку с явным сообщением;
+- проверяет базовую форму DTO: `run_name`, непустой `items`, обязательные поля
+  `kind/title/status` у каждой карточки.
 
-2. Очистить generated artifacts, если появились:
-
-```bash
-wsl -d Ubuntu --cd /home/zenbook/SF/pflotran_soilflow_docker_tested -- git restore -- runs/_test_suite/TEST_SUITE_STATUS.txt
-wsl -d Ubuntu --cd /home/zenbook/SF/pflotran_soilflow_docker_tested -- rm -f runs/_test_suite/TEST_SUITE_RESULTS.csv runs/_test_suite/TEST_SUITE_STATUS.json
-```
-
-3. Commit/push, если пользователь подтвердит:
-
-```bash
-git add CHANGELOG.md docs/API_CONTRACT_RU.md docs/EXTERNAL_CONTEXT_RU.md docs/WEB_INTERFACE_RU.md docs/NEXT_CHAT_CONTEXT_RU.md web/backend/app/routers/results.py web/backend/app/schemas.py web/backend/tests/test_backend_services.py web/backend/app/services/result_status_artifacts.py web/backend/app/services/run_status_overview_service.py web/backend/app/services/test_run_status_service.py web/backend/app/services/test_suite_summary_service.py web/frontend/src/api/client.ts web/frontend/src/components/StatusSummaryPanel.tsx web/frontend/src/pages/JobsPage.tsx web/frontend/src/pages/ResultsPage.tsx web/frontend/src/styles.css web/frontend/src/types.ts
-git commit -m "Add typed run status overviews"
-git push
-```
-
-### Блок B. Добавить smoke для overview
-
-Добавить в `scripts/api_smoke.sh` read-only проверки:
-
-```bash
-curl -fsS "$BASE_URL/api/results/runs" >/dev/null
-curl -fsS "$BASE_URL/api/results/runs/_test_linear_darcy/overview" >/dev/null || true
-```
-
-Лучше не завязываться жестко на `_test_linear_darcy`, если run отсутствует в свежем volume. Более устойчивый вариант:
-
-- получить первый run с `has_test_status` или `has_visualization`;
-- проверить `/overview` для него;
-- если runs пустой, пропустить с понятным сообщением.
-
-### Блок C. UI smoke
+### Блок B. UI smoke
 
 После API smoke можно добавить минимальный browser/API smoke для `/raschety`:
 
@@ -483,7 +424,7 @@ curl -fsS "$BASE_URL/api/results/runs/_test_linear_darcy/overview" >/dev/null ||
 - если есть `_test_suite` или `_test_linear_darcy`, выбрать run и проверить `Сводка состояния`;
 - не делать это обязательным в shell CI, если нет Playwright зависимости.
 
-### Блок D. Следующий архитектурный шаг
+### Блок C. Следующий архитектурный шаг
 
 После фиксации status overview можно продолжать:
 
@@ -526,7 +467,8 @@ workflow_smoke
 Работай в проекте /home/zenbook/SF/pflotran_soilflow_docker_tested.
 Сначала прочитай docs/NEXT_CHAT_CONTEXT_RU.md и docs/EXTERNAL_CONTEXT_RU.md.
 Проверь git status и текущее состояние сервиса.
-Дальше продолжай с блока: добавить API smoke для /overview, затем check_project.sh, затем подготовить commit/push.
+Дальше продолжай с блока: если smoke-этап не закоммичен, проверить `git status`,
+запустить `./scripts/check_project.sh`, очистить generated artifacts
+`runs/_test_suite`, затем commit/push.
 Работай через WSL bash, не через PowerShell heredoc/pipes.
 ```
-
