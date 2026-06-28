@@ -39,6 +39,7 @@ from soilflow_pflotran_modules.test_artifacts import write_xy_svg
 from soilflow_pflotran_modules.test_evaluation import (
     combined_test_status,
     direct_flux_output_file,
+    failure_metrics,
     pass_fail,
     solver_check_passed,
     write_unknown_status,
@@ -249,11 +250,11 @@ def evaluate_test_after_run(test: LinearDarcyTest, workdir: Path) -> TestResult:
         print(f"[TEST] {status}: max_abs={max_abs:.6g} Pa, max_rel={max_rel:.6g}, points={n}")
         return TestResult("_test_linear_darcy", status, workdir, diagnostics)
     except Exception as exc:
-        reason = write_unknown_status(status_path, exc)
+        reason = write_unknown_status(status_path, exc, stage="evaluator")
         with status_path.open("a", encoding="utf-8") as file_obj:
             file_obj.write("PFLOTRAN output was not parsed; generated analytical_solution.csv is still available.\n")
         print(f"[TEST] UNKNOWN: {exc}", file=sys.stderr)
-        return TestResult("_test_linear_darcy", "UNKNOWN", workdir, {"reason": reason})
+        return TestResult("_test_linear_darcy", "UNKNOWN", workdir, failure_metrics("linear_darcy", "evaluator", reason))
 
 
 def write_vg_comparison(test: VGRichardsTest, records: list[dict[str, float]], path: Path) -> tuple[float, float, int]:
@@ -482,9 +483,14 @@ def evaluate_vg_test_after_run(test: VGRichardsTest, workdir: Path) -> TestResul
         print(f"[TEST] {status}: {test.test_id} max_abs={max_pressure:.6g} Pa, max_sat={max_saturation:.6g}")
         return TestResult(test.test_id, status, workdir, metrics)
     except Exception as exc:
-        write_unknown_status(status_path, exc)
+        reason = write_unknown_status(status_path, exc, stage="evaluator")
         print(f"[TEST] UNKNOWN {test.test_id}: {exc}", file=sys.stderr)
-        return TestResult(test.test_id, "UNKNOWN", workdir, {"reason": f"{type(exc).__name__}: {exc}"})
+        return TestResult(
+            test.test_id,
+            "UNKNOWN",
+            workdir,
+            failure_metrics(test.test_id.removeprefix("_test_"), "evaluator", reason),
+        )
 
 def evaluate_transient_storage_after_run(test: TransientStorageTest, workdir: Path) -> TestResult:
     status_path = workdir / "TEST_STATUS.txt"
@@ -663,6 +669,11 @@ def evaluate_transient_storage_after_run(test: TransientStorageTest, workdir: Pa
         print(f"[TEST] {status}: {test.test_id} max_abs={max_p_err:.6g} Pa, max_sat={max_s_err:.6g}")
         return TestResult(test.test_id, status, workdir, metrics)
     except Exception as exc:
-        write_unknown_status(status_path, exc)
+        reason = write_unknown_status(status_path, exc, stage="evaluator")
         print(f"[TEST] UNKNOWN {test.test_id}: {exc}", file=sys.stderr)
-        return TestResult(test.test_id, "UNKNOWN", workdir, {"reason": f"{type(exc).__name__}: {exc}"})
+        return TestResult(
+            test.test_id,
+            "UNKNOWN",
+            workdir,
+            failure_metrics(test.test_id.removeprefix("_test_"), "evaluator", reason),
+        )

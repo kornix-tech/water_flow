@@ -30,7 +30,7 @@ CLI и web-backend. Этот пакет задает безопасные гра
 - `result_contract.py`: solver-neutral контракт профилей, diagnostics и статуса
   для будущих parser-adapter реализаций.
 - `test_evaluation.py`: единая сборка `PASS/WARN/FAIL`, `UNKNOWN`,
-  `PFLOTRAN_ERROR` и suite status.
+  `PFLOTRAN_ERROR`/`PFLOTRAN_TIMEOUT`, `failure_stage` и suite status.
 - `test_suite_artifacts.py`: запись suite summary в `TEST_SUITE_STATUS.txt`,
   `TEST_SUITE_STATUS.json` и `TEST_SUITE_RESULTS.csv` для машинного анализа.
 - `test_registry.py`: список verification/profile тестов, группировка, выбор
@@ -70,8 +70,8 @@ CLI и web-backend. Этот пакет задает безопасные гра
 - `profile_test_runner.py`: запуск profile-smoke benchmark'ов: reference
   artifacts, profile-carrier deck, solver и TECPLOT-ready status.
 - `test_solver_execution.py`: общий execution-helper для native/WSL PFLOTRAN
-  запуска в verification runners и единая обработка `PFLOTRAN_ERROR`/
-  `GENERATED_ONLY`.
+  запуска в verification runners и единая обработка `PFLOTRAN_ERROR`,
+  `PFLOTRAN_TIMEOUT` и `GENERATED_ONLY`.
 - `verification_runner.py`: suite-router режима `_test`: чтение JSON, выбор
   тестов, рабочие директории и запись suite status.
 - `solver_runner.py`: поиск исполняемого PFLOTRAN, native/WSL запуск и запись

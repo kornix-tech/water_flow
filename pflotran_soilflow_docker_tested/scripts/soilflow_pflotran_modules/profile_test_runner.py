@@ -23,7 +23,7 @@ from soilflow_pflotran_modules.richards_mms_case import (
 )
 from soilflow_pflotran_modules.richards_test_cases import TestResult
 from soilflow_pflotran_modules.test_artifacts import write_curve_svg, write_rows_csv
-from soilflow_pflotran_modules.test_evaluation import base_result_metrics, write_unknown_status
+from soilflow_pflotran_modules.test_evaluation import base_result_metrics, failure_metrics, write_unknown_status
 from soilflow_pflotran_modules.test_registry import PFLOTRAN_PROFILE_TESTS
 from soilflow_pflotran_modules.test_solver_execution import execute_test_solver
 
@@ -75,9 +75,9 @@ def evaluate_profile_benchmark_result(test_name: str, workdir: Path) -> TestResu
         print(f"[TEST] {result.status}: _test_{test_name} PFLOTRAN profile benchmark")
         return result
     except Exception as exc:
-        reason = write_unknown_status(workdir / "TEST_STATUS.txt", exc)
+        reason = write_unknown_status(workdir / "TEST_STATUS.txt", exc, stage="evaluator")
         print(f"[TEST] UNKNOWN _test_{test_name}: {exc}", file=sys.stderr)
-        return TestResult(f"_test_{test_name}", "UNKNOWN", workdir, {"reason": reason})
+        return TestResult(f"_test_{test_name}", "UNKNOWN", workdir, failure_metrics(test_name, "evaluator", reason))
 
 
 def run_profile_test(args: argparse.Namespace, test_name: str, workdir: Path) -> TestResult:

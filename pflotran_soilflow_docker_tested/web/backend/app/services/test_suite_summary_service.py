@@ -44,7 +44,7 @@ RESULT_INT_FIELDS = {
     "solver_cuts",
     "profile_overlay_points",
 }
-RESULT_BOOL_FIELDS = {"solver_diverged"}
+RESULT_BOOL_FIELDS = {"solver_diverged", "solver_timed_out"}
 RESULT_BASE_FIELDS = {"test_id", "status", "verification_level", "output_dir"}
 
 

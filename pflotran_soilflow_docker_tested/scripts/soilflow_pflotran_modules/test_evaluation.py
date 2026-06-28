@@ -35,18 +35,25 @@ def combined_test_status(physical_ok: bool, solver_ok: bool, warning_check: str)
     return "PASS"
 
 
-def write_unknown_status(path: Path, exc: Exception) -> str:
+def write_unknown_status(path: Path, exc: Exception, *, stage: str = "evaluator") -> str:
     reason = f"{type(exc).__name__}: {exc}"
-    path.write_text(f"TEST_STATUS=UNKNOWN\nreason={reason}\n", encoding="utf-8")
+    path.write_text(f"TEST_STATUS=UNKNOWN\nfailure_stage={stage}\nreason={reason}\n", encoding="utf-8")
     return reason
 
 
 def write_pflotran_error_status(path: Path, exit_code: int, *, status: str = "PFLOTRAN_ERROR") -> None:
-    path.write_text(f"TEST_STATUS={status}\nexit_code={exit_code}\n", encoding="utf-8")
+    path.write_text(f"TEST_STATUS={status}\nfailure_stage=solver\nexit_code={exit_code}\n", encoding="utf-8")
 
 
 def base_result_metrics(test_name: str, **extra_metrics: Any) -> dict[str, Any]:
     return {"verification_level": verification_level_for_test(test_name), **extra_metrics}
+
+
+def failure_metrics(test_name: str, stage: str, reason: str | None = None, **extra_metrics: Any) -> dict[str, Any]:
+    metrics = base_result_metrics(test_name, failure_stage=stage, **extra_metrics)
+    if reason is not None:
+        metrics["reason"] = reason
+    return metrics
 
 
 def direct_flux_output_file(direct_probe: dict[str, Any]) -> str:
@@ -63,6 +70,7 @@ __all__ = [
     "base_result_metrics",
     "combined_test_status",
     "direct_flux_output_file",
+    "failure_metrics",
     "pass_fail",
     "solver_check_passed",
     "suite_result_rows",

@@ -34,7 +34,7 @@ MODULE_BOUNDARIES = {
     "result_diagnostics": "Парсинг результатов, solver diagnostics и единая запись статуса.",
     "result_contract": "Solver-neutral профиль, diagnostics и статус для будущих parser-adapter реализаций.",
     "solver_runner": "Поиск и запуск внешнего solver-а без знания физической постановки.",
-    "test_evaluation": "Единая сборка PASS/WARN/FAIL, UNKNOWN/PFLOTRAN_ERROR и suite status.",
+    "test_evaluation": "Единая сборка PASS/WARN/FAIL, UNKNOWN/PFLOTRAN_ERROR/PFLOTRAN_TIMEOUT, failure_stage и suite status.",
     "test_suite_artifacts": "Запись suite summary в TXT/JSON/CSV для машинного анализа verification-suite.",
     "test_registry": "Реестр verification/profile тестов, выбор сценариев и рабочие пути suite.",
     "test_artifacts": "Общие CSV/SVG artifacts и diagnostics аналитического overlay.",

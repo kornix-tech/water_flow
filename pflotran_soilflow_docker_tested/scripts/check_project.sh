@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEB_PORT="${WEB_PORT:-18080}"
 FRONTEND_NODE_IMAGE="${FRONTEND_NODE_IMAGE:-node:20}"
 CHECK_PROFILE="${CHECK_PROFILE:-full}"
+RESEARCH_TEST_NAME="${RESEARCH_TEST_NAME:-all}"
+RESEARCH_DRY_RUN="${RESEARCH_DRY_RUN:-1}"
 
 cd "$ROOT_DIR"
 
@@ -46,8 +48,26 @@ if [[ "$CHECK_PROFILE" == "fast" ]]; then
   exit 0
 fi
 
+if [[ "$CHECK_PROFILE" == "research" ]]; then
+  echo "[research 1/3] Python compile"
+  python3 -m compileall -q web/backend/app scripts tests
+
+  echo "[research 2/3] Unit tests"
+  python3 -m unittest discover -s tests
+
+  echo "[research 3/3] Verification research gate"
+  if [[ "$RESEARCH_DRY_RUN" == "1" ]]; then
+    docker/run_test.sh "$RESEARCH_TEST_NAME" --dry-run
+  else
+    docker/run_test.sh "$RESEARCH_TEST_NAME"
+  fi
+
+  echo "OK: research project checks passed for test=${RESEARCH_TEST_NAME} dry_run=${RESEARCH_DRY_RUN}"
+  exit 0
+fi
+
 if [[ "$CHECK_PROFILE" != "full" ]]; then
-  echo "Unknown CHECK_PROFILE=${CHECK_PROFILE}; supported: fast, full" >&2
+  echo "Unknown CHECK_PROFILE=${CHECK_PROFILE}; supported: fast, full, research" >&2
   exit 2
 fi
 

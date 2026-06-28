@@ -25,7 +25,9 @@ class TestSolverExecution:
     def metrics(self) -> dict[str, Any]:
         if self.exit_code is None:
             return {}
-        metrics = {"exit_code": self.exit_code}
+        metrics: dict[str, Any] = {"exit_code": self.exit_code}
+        if self.status in {"PFLOTRAN_ERROR", "PFLOTRAN_TIMEOUT"}:
+            metrics["failure_stage"] = "solver"
         if self.timed_out:
             metrics["solver_timed_out"] = True
         return metrics

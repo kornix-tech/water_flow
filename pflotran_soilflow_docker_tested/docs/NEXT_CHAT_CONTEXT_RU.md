@@ -385,7 +385,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:50147172c4506ab71a74effb602ad595649998ca5f342852ee2930f2fa80032f
+sha256:77713fec429d744c0e51b1570be7c2028239c69a8ea62e8a7764388a7d016c0a
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -529,7 +529,10 @@ flowchart LR
      restart, API smoke и UI route smoke;
    - full gate остается `CHECK_PROFILE=full ./scripts/check_project.sh`
      или обычный `./scripts/check_project.sh` плюс Docker rebuild;
-   - research gate: долгие profile/DOE/solver-heavy сценарии отдельно.
+   - research gate реализован как `CHECK_PROFILE=research
+     ./scripts/check_project.sh` и Makefile-цель `project-check-research`;
+     по умолчанию это verification-suite dry-run, solver-heavy режим включается
+     через `RESEARCH_DRY_RUN=0` и `RESEARCH_TEST_NAME=<test|all>`.
 2. Добавить timeout/diagnostics policy:
    - CLI/PFLOTRAN runner поддерживает `--solver-timeout-seconds` и
      `SOILFLOW_SOLVER_TIMEOUT_SECONDS`;
@@ -537,8 +540,15 @@ flowchart LR
      `solver_timed_out=true` в metrics и `[TIMEOUT]` marker в log;
    - backend `CommandRunner` при превышении `SOILFLOW_JOB_TIMEOUT_SECONDS`
      возвращает exit code `124` и пишет timeout marker в job log;
-   - следующий шаг: расширить status diagnostics отдельным полем stage
-     `generation/solver/parser/evaluator`.
+   - status diagnostics расширены полем `failure_stage` в `TEST_STATUS.txt`,
+     JSON/CSV suite artifacts и API-сводке;
+   - generation exceptions больше не обрывают весь suite: отдельный тест
+     получает `UNKNOWN` и `failure_stage=generation`, после чего suite summary
+     все равно записывается;
+   - evaluator/parser exceptions получают `failure_stage=evaluator`; solver
+     timeout/error получает `failure_stage=solver`;
+   - следующий шаг: при необходимости отделить parser в отдельный
+     `failure_stage=parser` там, где evaluator сейчас ловит parse errors.
 3. Использовать `strict_readiness_stage` для выбора следующего блока:
    - сначала закрывать `DECK_ADAPTER_PENDING` для `richards_mms`;
    - затем `CASE_BUILDER_PENDING` для heat/transport/groundwater;

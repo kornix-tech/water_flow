@@ -15,6 +15,7 @@ class TestResultLike(Protocol):
 SUITE_RESULT_CSV_FIELDS = [
     "test_id",
     "status",
+    "failure_stage",
     "verification_level",
     "output_dir",
     "warning_count",
@@ -22,6 +23,7 @@ SUITE_RESULT_CSV_FIELDS = [
     "solver_error_count",
     "solver_diverged",
     "solver_cuts",
+    "solver_timed_out",
     "profile_overlay_comparison",
     "profile_overlay_points",
     "profile_overlay_quality_check",

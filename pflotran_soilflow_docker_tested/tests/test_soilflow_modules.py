@@ -291,6 +291,37 @@ class VerificationRunnerModuleTests(unittest.TestCase):
             self.assertIn("_test_linear_darcy=GENERATED", status_text)
             self.assertIn("strict_analytical_total=1", status_text)
 
+    def test_generation_failure_is_recorded_in_suite_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            input_json = root / "input.json"
+            output_dir = root / "out"
+            input_json.write_text('{"test_scenarios": {}}', encoding="utf-8")
+            args = SimpleNamespace(
+                input_json=input_json,
+                output_dir=output_dir,
+                workdir=None,
+                test="linear_darcy",
+                dry_run=True,
+                run=False,
+                pflotran_exe=None,
+                prefer_wsl=False,
+                solver_timeout_seconds=None,
+            )
+
+            self.assertEqual(run_verification_test_mode(args), 0)
+
+            status_text = (output_dir / "runs" / "_test_linear_darcy" / "TEST_STATUS.txt").read_text(
+                encoding="utf-8"
+            )
+            suite_csv = (output_dir / "runs" / "_test_suite" / "TEST_SUITE_RESULTS.csv").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("TEST_STATUS=UNKNOWN", status_text)
+            self.assertIn("failure_stage=generation", status_text)
+            self.assertIn("failure_stage", suite_csv)
+            self.assertIn("generation", suite_csv)
+
 
 class ExtendedAnalyticalTests(unittest.TestCase):
     def test_green_ampt_solution_is_monotonic(self) -> None:
@@ -528,6 +559,7 @@ class TestEvaluationTests(unittest.TestCase):
                 "strict_readiness_stage": "DECK_ADAPTER_PENDING",
                 "richards_mms_adapter_artifact_check": "PASS",
                 "strict_profile_evaluator": "EVALUATOR_READY_DECK_PENDING",
+                "failure_stage": "",
             },
         )
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -549,6 +581,7 @@ class TestEvaluationTests(unittest.TestCase):
             self.assertIn("profile_deck_kind", csv_text)
             self.assertIn("strict_candidate_can_gate_suite", csv_text)
             self.assertIn("strict_readiness_stage", csv_text)
+            self.assertIn("failure_stage", csv_text)
             self.assertIn("richards_mms_adapter_artifact_check", csv_text)
             self.assertIn("strict_profile_evaluator", csv_text)
             self.assertIn("REFERENCE_OVERLAY", csv_text)

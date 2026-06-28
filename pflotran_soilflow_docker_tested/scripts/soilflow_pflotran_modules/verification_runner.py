@@ -17,7 +17,7 @@ from typing import Any
 from soilflow_pflotran_modules.profile_test_runner import run_profile_test
 from soilflow_pflotran_modules.richards_test_cases import TestResult
 from soilflow_pflotran_modules.richards_test_runner import run_richards_test
-from soilflow_pflotran_modules.test_evaluation import write_suite_status_file
+from soilflow_pflotran_modules.test_evaluation import failure_metrics, write_suite_status_file, write_unknown_status
 from soilflow_pflotran_modules.test_registry import (
     PFLOTRAN_PROFILE_TESTS,
     PFLOTRAN_RICHARDS_TESTS,
@@ -69,9 +69,24 @@ def run_single_test(args: argparse.Namespace, test_name: str) -> TestResult:
     return run_richards_test(args, test_name, params, workdir)
 
 
+def run_single_test_safely(args: argparse.Namespace, test_name: str) -> TestResult:
+    try:
+        return run_single_test(args, test_name)
+    except Exception as exc:
+        workdir = resolve_test_workdir(args, test_name)
+        workdir.mkdir(parents=True, exist_ok=True)
+        reason = write_unknown_status(workdir / "TEST_STATUS.txt", exc, stage="generation")
+        return TestResult(
+            f"_test_{test_name}",
+            "UNKNOWN",
+            workdir,
+            failure_metrics(test_name, "generation", reason),
+        )
+
+
 def run_test_mode(args: argparse.Namespace) -> int:
     test_names = selected_test_names(args.test)
-    results = [run_single_test(args, name) for name in test_names]
+    results = [run_single_test_safely(args, name) for name in test_names]
     suite_dir = suite_workdir_for(args.output_dir)
     write_suite_status(results, suite_dir, dry_run=args.dry_run or not args.run)
     if args.dry_run or not args.run:

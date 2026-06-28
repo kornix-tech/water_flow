@@ -301,7 +301,9 @@ class TestSuiteSummaryServiceTests(unittest.TestCase):
                       "test_id": "_test_linear_darcy",
                       "status": "PASS",
                       "verification_level": "strict_analytical",
-                      "warning_count": "0"
+                      "warning_count": "0",
+                      "failure_stage": "",
+                      "solver_timed_out": "false"
                     }
                   ]
                 }
@@ -314,6 +316,7 @@ class TestSuiteSummaryServiceTests(unittest.TestCase):
             self.assertEqual(suite["status"], "PASS_WITH_WARNINGS")
             self.assertEqual(suite["summary"]["tests_total"], 2)
             self.assertEqual(suite["results"][0]["metrics"]["warning_count"], 0)
+            self.assertFalse(suite["results"][0]["metrics"]["solver_timed_out"])
             self.assertEqual(suite["source"], "TEST_SUITE_STATUS.json")
 
     def test_read_test_suite_status_uses_csv_rows_with_text_fallback(self) -> None:
