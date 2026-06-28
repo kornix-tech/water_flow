@@ -18,6 +18,7 @@ from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_
 from soilflow_pflotran_modules.richards_mms_case import (
     RichardsMmsCase,
     generate_richards_mms_source_term_input,
+    generate_richards_mms_spatial_adapter_input,
     richards_mms_adapter_summary,
     write_richards_mms_case_artifacts,
 )
@@ -41,7 +42,11 @@ def generate_profile_test_files(test_name: str, workdir: Path) -> None:
     if test_name == "richards_mms":
         mms_case = RichardsMmsCase()
         write_richards_mms_case_artifacts(mms_case, workdir)
-        (workdir / "pflotran.in").write_text(generate_richards_mms_source_term_input(mms_case), encoding="utf-8")
+        (workdir / "pflotran_uniform_source_candidate.in").write_text(
+            generate_richards_mms_source_term_input(mms_case),
+            encoding="utf-8",
+        )
+        (workdir / "pflotran.in").write_text(generate_richards_mms_spatial_adapter_input(mms_case), encoding="utf-8")
         adapter_summary = richards_mms_adapter_summary(mms_case)
     else:
         (workdir / "pflotran.in").write_text(generate_richards_profile_input(test_name), encoding="utf-8")

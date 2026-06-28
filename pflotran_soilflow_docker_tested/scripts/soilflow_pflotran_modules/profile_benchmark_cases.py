@@ -21,12 +21,12 @@ PROFILE_BENCHMARK_CASES: dict[str, ProfileBenchmarkCase] = {
     "richards_mms": ProfileBenchmarkCase(
         name="richards_mms",
         physics_family="richards",
-        carrier_status="MMS_SOURCE_TERM_CANDIDATE",
-        strict_evaluator_status="EVALUATOR_READY_DECK_PENDING",
-        deck_kind="richards_mms_uniform_source_candidate",
-        strict_candidate_can_gate_suite=False,
-        strict_blocker="Есть spatial MMS source-term matrix artifacts, но PFLOTRAN deck пока применяет uniform storage source и не читает cell-wise source/initial profile.",
-        next_step="Подключить cell-wise MMS source и nonuniform initial profile к PFLOTRAN deck, затем включить strict pressure/theta evaluator как PASS/FAIL критерий.",
+        carrier_status="MMS_SPATIAL_ADAPTER_READY",
+        strict_evaluator_status="STRICT_CANDIDATE_READY",
+        deck_kind="richards_mms_spatial_source_candidate",
+        strict_candidate_can_gate_suite=True,
+        strict_blocker="Spatial MMS adapter deck подключен; следующий риск - подтвердить устойчивость на расширенных сетках и tolerances.",
+        next_step="Расширить solver validation Richards MMS на несколько сеток/шагов и затем перевести его из profile_smoke в strict_analytical уровень.",
     ),
     "philip_infiltration": ProfileBenchmarkCase(
         name="philip_infiltration",

@@ -173,25 +173,29 @@ Endpoints:
   `profile_evaluator=reference_overlay`, `profile_overlay_quality_check` и
   `strict_profile_evaluator`, а также `profile_physics_family`,
   `profile_carrier_status`, `strict_readiness_stage` и blocker будущего strict
-  evaluator. Значение может быть `PENDING` или
-  `EVALUATOR_READY_DECK_PENDING`; эти поля не повышают тест до strict
-  analytical verification.
+  evaluator. Значение может быть `PENDING`, `EVALUATOR_READY_DECK_PENDING` или
+  `STRICT_CANDIDATE_READY`; profile-smoke остается отдельным уровнем до
+  расширенной solver validation.
   Run-директория profile benchmark'а также содержит `profile_case_manifest.json`
   и `profile_strict_plan.json` с `profile_deck_kind`,
   `strict_candidate_can_gate_suite`, readiness stage, blocker'ом и следующим
   шагом; эти artifacts являются guard-контрактом, чтобы strict-кандидат не стал
-  suite-gate до готовности физического deck'а.
+  suite-gate до готовности физического deck'а и evaluator-а.
   Для `richards_mms` дополнительно может приходить
   `richards_mms_strict_candidate_check`: это готовый strict-кандидат по
   RMSE/max-error напора и влажности. Сейчас `richards_mms` использует
-  `richards_mms_uniform_source_candidate`: PFLOTRAN deck уже содержит
-  `SOURCE_SINK`/`RATE LIST` по среднему хранению, но до spatial MMS source-term
-  он остается диагностикой, а не suite PASS/FAIL критерием. Дополнительно
-  пишется `richards_mms_spatial_source_profile.csv` с cell-wise residual, но
-  текущий deck еще не применяет этот artifact как PFLOTRAN source. Для будущего
-  adapter-а также пишутся `richards_mms_spatial_source_matrix.json` и
-  `richards_mms_spatial_source_manifest.json` с initial pressure profile и
-  source matrices. В `TEST_STATUS.txt` может приходить
+  `richards_mms_spatial_source_candidate`: PFLOTRAN deck применяет cell-wise
+  source и nonuniform initial pressure как per-cell source/initial regions.
+  Дополнительно пишется `richards_mms_spatial_source_profile.csv` с cell-wise residual, и
+  основной `pflotran.in` применяет spatial adapter deck с per-cell PFLOTRAN
+  regions/source sinks. Для adapter-а также пишутся
+  `richards_mms_spatial_source_matrix.json`,
+  `richards_mms_spatial_source_manifest.json`,
+  `pflotran_spatial_mms_candidate.in` и
+  `richards_mms_spatial_adapter_manifest.json` с initial pressure profile,
+  source matrices и per-cell PFLOTRAN regions/source sinks. Прежний uniform
+  storage deck сохраняется как `pflotran_uniform_source_candidate.in`. В
+  `TEST_STATUS.txt` может приходить
   `richards_mms_adapter_artifact_check=PASS|FAIL` как проверка согласованности
   manifest и matrix shapes.
   Если дополнительный `test_diagnostics.json` поврежден или еще пишется,

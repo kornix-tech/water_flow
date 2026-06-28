@@ -385,7 +385,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:b1e0e151f91739f24525e82357e966cc41c4c723a1503e03f0afab95574727a5
+sha256:fcc553d369f3213198673437731599c4be0daceedbbddf745423ec06251c1a73
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -557,8 +557,10 @@ flowchart LR
      машинного выбора следующего strict-readiness блока;
    - backend `/test-suite` отдает `strict_readiness_plan`, а `/overview`
      показывает следующий strict-блок, первый target и blocker в карточке suite;
-   - сначала закрывать `DECK_ADAPTER_PENDING` для `richards_mms`;
-   - затем `CASE_BUILDER_PENDING` для heat/transport/groundwater;
+   - `DECK_ADAPTER_PENDING` для `richards_mms` закрыт через spatial adapter
+     deck и solver validation `RESEARCH_DRY_RUN=0`;
+   - следующий крупный блок: `CASE_BUILDER_PENDING` для
+     heat/transport/groundwater;
    - затем `STRICT_EVALUATOR_PENDING` для infiltration/profile carrier.
 4. Не повышать `profile_smoke` до strict gate без физического deck/evaluator и
    явного `strict_candidate_can_gate_suite=true`.
@@ -583,27 +585,31 @@ flowchart LR
   `richards_mms_initial_profile.csv`, `richards_mms_source_rate.csv`,
   `richards_mms_spatial_source_profile.csv`,
   `richards_mms_spatial_source_matrix.json`,
-  `richards_mms_spatial_source_manifest.json`;
+  `richards_mms_spatial_source_manifest.json`,
+  `pflotran_spatial_mms_candidate.in` и
+  `richards_mms_spatial_adapter_manifest.json`;
 - `TEST_STATUS.txt` profile benchmark'ов теперь может содержать
   `profile_evaluator=reference_overlay`, `strict_profile_evaluator` и
   `profile_overlay_quality_check`, `profile_physics_family`,
   `profile_carrier_status`;
-- для `richards_mms` значение strict evaluator readiness остается
-  `EVALUATOR_READY_DECK_PENDING`: evaluator готов, uniform source-term candidate
-  и cell-wise matrix/manifest artifacts есть, но strict gate ждет PFLOTRAN adapter
-  для spatial MMS source-term и nonuniform initial profile;
+- для `richards_mms` spatial adapter deck подключен как основной `pflotran.in`:
+  evaluator готов, cell-wise matrix/manifest artifacts есть, source/initial
+  profile разворачиваются в per-cell PFLOTRAN regions/source sinks, а
+  `strict_readiness_stage=STRICT_GATE_READY`;
 - profile status для `richards_mms` уже публикует
   `richards_mms_adapter_artifact_check`, а `analytical_test_summary.txt`
   содержит readiness matrix/manifest artifacts и pending deck adapter status;
-- `strict_candidate_can_gate_suite=false` сохраняет strict-кандидат
-  диагностическим до замены carrier deck'а физической MMS постановкой;
+- `strict_candidate_can_gate_suite=true` для `richards_mms`; следующий риск -
+  расширить solver validation на несколько сеток/шагов и затем перевести тест
+  из `profile_smoke` в `strict_analytical`;
 - suite CSV расширен колонками качества overlay, blocker-полями и pending
   strict evaluator;
 - suite summary агрегирует strict-readiness stages в счетчики
   `strict_gate_ready_total`, `strict_deck_adapter_pending_total`,
   `strict_case_builder_pending_total`, `strict_evaluator_pending_total`;
 - физические strict-evaluator'ы для Theis/Ogata/Terzaghi/heat/Buckley/
-  Boussinesq/Richards MMS еще не подключены;
+  Boussinesq еще не подключены; Richards MMS имеет strict-кандидат и spatial
+  adapter, но пока остается в profile_smoke группе до расширенной validation;
 - полный Docker rebuild gate выполнен после strict-readiness/API инкремента;
 - затем переходить к следующей физической/исследовательской модели.
 

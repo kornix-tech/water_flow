@@ -252,17 +252,26 @@ class VerificationRunnerModuleTests(unittest.TestCase):
             self.assertTrue((workdir / "richards_mms_spatial_source_profile.csv").exists())
             self.assertTrue((workdir / "richards_mms_spatial_source_matrix.json").exists())
             self.assertTrue((workdir / "richards_mms_spatial_source_manifest.json").exists())
+            self.assertTrue((workdir / "richards_mms_spatial_adapter_manifest.json").exists())
+            self.assertTrue((workdir / "pflotran_spatial_mms_candidate.in").exists())
+            self.assertTrue((workdir / "pflotran_uniform_source_candidate.in").exists())
             manifest = json.loads((workdir / "profile_case_manifest.json").read_text(encoding="utf-8"))
             deck = (workdir / "pflotran.in").read_text(encoding="utf-8")
+            spatial_deck = (workdir / "pflotran_spatial_mms_candidate.in").read_text(encoding="utf-8")
+            uniform_deck = (workdir / "pflotran_uniform_source_candidate.in").read_text(encoding="utf-8")
             summary = (workdir / "analytical_test_summary.txt").read_text(encoding="utf-8")
-            self.assertEqual(manifest["profile_deck_kind"], "richards_mms_uniform_source_candidate")
-            self.assertEqual(manifest["strict_readiness_stage"], "DECK_ADAPTER_PENDING")
-            self.assertFalse(manifest["strict_candidate_can_gate_suite"])
-            self.assertIn("SOURCE_SINK mms_uniform_storage", deck)
-            self.assertIn("strict_readiness_stage=DECK_ADAPTER_PENDING", summary)
-            self.assertIn("strict_candidate_can_gate_suite=false", summary)
-            self.assertIn("richards_mms_adapter_artifact_status=MATRIX_ARTIFACT_READY_DECK_PENDING", summary)
-            self.assertIn("richards_mms_adapter_deck_status=PFLOTRAN_DECK_ADAPTER_PENDING", summary)
+            self.assertEqual(manifest["profile_deck_kind"], "richards_mms_spatial_source_candidate")
+            self.assertEqual(manifest["strict_readiness_stage"], "STRICT_GATE_READY")
+            self.assertTrue(manifest["strict_candidate_can_gate_suite"])
+            self.assertIn("SOURCE_SINK mms_uniform_storage", uniform_deck)
+            self.assertIn("SOURCE_SINK source_mms_cell_001", spatial_deck)
+            self.assertIn("FLOW_CONDITION initial_mms_cell_001", spatial_deck)
+            self.assertIn("SOURCE_SINK source_mms_cell_001", deck)
+            self.assertIn("strict_readiness_stage=STRICT_GATE_READY", summary)
+            self.assertIn("strict_candidate_can_gate_suite=true", summary)
+            self.assertIn("richards_mms_adapter_artifact_status=MATRIX_ARTIFACT_READY_DECK_ACTIVE", summary)
+            self.assertIn("richards_mms_adapter_deck_status=PFLOTRAN_SPATIAL_ADAPTER_ACTIVE", summary)
+            self.assertIn("richards_mms_spatial_adapter_deck_status=SPATIAL_DECK_DEFAULT_ACTIVE", summary)
 
     def test_dry_run_mode_writes_suite_status_without_solver(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -546,21 +555,22 @@ class TestEvaluationTests(unittest.TestCase):
     def test_suite_status_writer_emits_text_json_and_csv_artifacts(self) -> None:
         result = SimpleNamespace(
             test_id="_test_richards_mms",
-            status="PASS_WITH_WARNINGS",
+            status="PASS",
             output_dir=Path("/tmp/_test_richards_mms"),
             metrics={
                 "verification_level": "profile_smoke",
-                "warning_count": 1,
+                "warning_count": 0,
                 "profile_overlay_comparison": "REFERENCE_OVERLAY",
                 "profile_overlay_points": 96,
                 "profile_overlay_quality_check": "PASS",
                 "profile_physics_family": "richards",
-                "profile_carrier_status": "MMS_SOURCE_TERM_CANDIDATE",
-                "profile_deck_kind": "richards_mms_uniform_source_candidate",
-                "strict_candidate_can_gate_suite": False,
-                "strict_readiness_stage": "DECK_ADAPTER_PENDING",
+                "profile_carrier_status": "MMS_SPATIAL_ADAPTER_READY",
+                "profile_deck_kind": "richards_mms_spatial_source_candidate",
+                "strict_candidate_can_gate_suite": True,
+                "strict_readiness_stage": "STRICT_GATE_READY",
                 "richards_mms_adapter_artifact_check": "PASS",
-                "strict_profile_evaluator": "EVALUATOR_READY_DECK_PENDING",
+                "richards_mms_spatial_adapter_check": "PASS",
+                "strict_profile_evaluator": "STRICT_CANDIDATE_READY",
                 "failure_stage": "",
             },
         )
@@ -571,12 +581,12 @@ class TestEvaluationTests(unittest.TestCase):
 
             status_text = (suite_dir / "TEST_SUITE_STATUS.txt").read_text(encoding="utf-8")
             status_json = (suite_dir / "TEST_SUITE_STATUS.json").read_text(encoding="utf-8")
-            self.assertIn("TEST_SUITE_STATUS=PASS_WITH_WARNINGS", status_text)
-            self.assertIn("strict_deck_adapter_pending_total=1", status_text)
+            self.assertIn("TEST_SUITE_STATUS=PASS", status_text)
+            self.assertIn("strict_gate_ready_total=1", status_text)
             self.assertIn('"profile_smoke_ready": 1', status_json)
-            self.assertIn('"DECK_ADAPTER_PENDING": 1', status_json)
+            self.assertIn('"STRICT_GATE_READY": 1', status_json)
             readiness_plan = json.loads((suite_dir / "STRICT_READINESS_PLAN.json").read_text(encoding="utf-8"))
-            self.assertEqual(readiness_plan["next_stage"], "DECK_ADAPTER_PENDING")
+            self.assertEqual(readiness_plan["next_stage"], "STRICT_GATE_READY")
             self.assertEqual(readiness_plan["next_targets"][0]["test_id"], "_test_richards_mms")
             csv_text = (suite_dir / "TEST_SUITE_RESULTS.csv").read_text(encoding="utf-8")
             self.assertIn("profile_overlay_comparison", csv_text)
@@ -588,6 +598,8 @@ class TestEvaluationTests(unittest.TestCase):
             self.assertIn("strict_readiness_stage", csv_text)
             self.assertIn("strict_profile_evaluator_blocker", csv_text)
             self.assertIn("deck_adapter_blocker", csv_text)
+            self.assertIn("richards_mms_spatial_adapter_check", csv_text)
+            self.assertIn("richards_mms_spatial_adapter_deck_status", csv_text)
             self.assertIn("failure_stage", csv_text)
             self.assertIn("richards_mms_adapter_artifact_check", csv_text)
             self.assertIn("strict_profile_evaluator", csv_text)
@@ -694,7 +706,7 @@ class ProfileBenchmarkTests(unittest.TestCase):
             adapter_manifest = json.loads(
                 (workdir / "richards_mms_spatial_source_manifest.json").read_text(encoding="utf-8")
             )
-            self.assertEqual(adapter_manifest["artifact_status"], "MATRIX_ARTIFACT_READY_DECK_PENDING")
+            self.assertEqual(adapter_manifest["artifact_status"], "MATRIX_ARTIFACT_READY_DECK_ACTIVE")
             matrix_artifact = json.loads((workdir / "richards_mms_spatial_source_matrix.json").read_text(encoding="utf-8"))
             self.assertEqual(len(matrix_artifact["source"]["source_rate_per_volume_1_day"]), len(rows))
             self.assertEqual(len(matrix_artifact["source"]["source_rate_per_volume_1_day"][0]), case.nz)
@@ -704,6 +716,8 @@ class ProfileBenchmarkTests(unittest.TestCase):
             self.assertEqual(adapter_check["richards_mms_adapter_artifact_check"], "PASS")
             self.assertEqual(adapter_summary["richards_mms_adapter_cell_count"], case.nz)
             self.assertIn("cell-wise source", str(adapter_summary["deck_adapter_blocker"]))
+            self.assertEqual(adapter_check["richards_mms_spatial_adapter_check"], "PASS")
+            self.assertEqual(adapter_check["richards_mms_spatial_adapter_deck_file"], "pflotran_spatial_mms_candidate.in")
 
     def test_richards_profile_overlay_rows_are_written_for_mms(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -746,15 +760,17 @@ class ProfileBenchmarkTests(unittest.TestCase):
             self.assertEqual(fields["profile_overlay_points"], 2)
             self.assertEqual(fields["profile_overlay_source"], "profile_overlay_comparison.csv")
             self.assertEqual(fields["profile_evaluator"], "reference_overlay")
-            self.assertEqual(fields["strict_profile_evaluator"], "EVALUATOR_READY_DECK_PENDING")
-            self.assertEqual(fields["strict_readiness_stage"], "DECK_ADAPTER_PENDING")
+            self.assertEqual(fields["strict_profile_evaluator"], "STRICT_CANDIDATE_READY")
+            self.assertEqual(fields["strict_readiness_stage"], "STRICT_GATE_READY")
             self.assertEqual(fields["profile_physics_family"], "richards")
-            self.assertEqual(fields["profile_carrier_status"], "MMS_SOURCE_TERM_CANDIDATE")
-            self.assertEqual(fields["profile_deck_kind"], "richards_mms_uniform_source_candidate")
-            self.assertFalse(fields["strict_candidate_can_gate_suite"])
-            self.assertIn("MMS source-term", str(fields["strict_profile_evaluator_blocker"]))
+            self.assertEqual(fields["profile_carrier_status"], "MMS_SPATIAL_ADAPTER_READY")
+            self.assertEqual(fields["profile_deck_kind"], "richards_mms_spatial_source_candidate")
+            self.assertTrue(fields["strict_candidate_can_gate_suite"])
+            self.assertIn("расширенных сетках", str(fields["strict_profile_evaluator_blocker"]))
             self.assertEqual(fields["profile_overlay_quality_check"], "PASS")
             self.assertEqual(fields["richards_mms_adapter_artifact_check"], "PASS")
+            self.assertEqual(fields["richards_mms_spatial_adapter_check"], "PASS")
+            self.assertEqual(fields["richards_mms_spatial_adapter_deck_status"], "SPATIAL_DECK_DEFAULT_ACTIVE")
             self.assertEqual(fields["richards_mms_strict_evaluator"], "READY_DECK_PENDING")
             self.assertEqual(fields["richards_mms_strict_candidate_check"], "FAIL")
             self.assertTrue((workdir / "profile_overlay_comparison.csv").exists())
@@ -845,11 +861,11 @@ class ProfileBenchmarkTests(unittest.TestCase):
         heat = profile_benchmark_case_status_fields("heat_conduction_1d")
 
         self.assertEqual(richards["profile_physics_family"], "richards")
-        self.assertEqual(richards["profile_carrier_status"], "MMS_SOURCE_TERM_CANDIDATE")
-        self.assertEqual(richards["profile_deck_kind"], "richards_mms_uniform_source_candidate")
-        self.assertFalse(richards["strict_candidate_can_gate_suite"])
-        self.assertEqual(richards["strict_readiness_stage"], "DECK_ADAPTER_PENDING")
-        self.assertEqual(richards["strict_profile_evaluator"], "EVALUATOR_READY_DECK_PENDING")
+        self.assertEqual(richards["profile_carrier_status"], "MMS_SPATIAL_ADAPTER_READY")
+        self.assertEqual(richards["profile_deck_kind"], "richards_mms_spatial_source_candidate")
+        self.assertTrue(richards["strict_candidate_can_gate_suite"])
+        self.assertEqual(richards["strict_readiness_stage"], "STRICT_GATE_READY")
+        self.assertEqual(richards["strict_profile_evaluator"], "STRICT_CANDIDATE_READY")
         self.assertEqual(heat["profile_carrier_status"], "REFERENCE_ONLY")
         self.assertEqual(heat["strict_readiness_stage"], "CASE_BUILDER_PENDING")
 
@@ -859,9 +875,9 @@ class ProfileBenchmarkTests(unittest.TestCase):
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
             self.assertEqual(manifest["schema_version"], 1)
-            self.assertEqual(manifest["profile_deck_kind"], "richards_mms_uniform_source_candidate")
-            self.assertEqual(manifest["strict_readiness_stage"], "DECK_ADAPTER_PENDING")
-            self.assertFalse(manifest["strict_candidate_can_gate_suite"])
+            self.assertEqual(manifest["profile_deck_kind"], "richards_mms_spatial_source_candidate")
+            self.assertEqual(manifest["strict_readiness_stage"], "STRICT_GATE_READY")
+            self.assertTrue(manifest["strict_candidate_can_gate_suite"])
             strict_plan_path = write_profile_benchmark_strict_plan("heat_conduction_1d", Path(tmpdir))
             strict_plan = json.loads(strict_plan_path.read_text(encoding="utf-8"))
             self.assertEqual(strict_plan["strict_readiness_stage"], "CASE_BUILDER_PENDING")

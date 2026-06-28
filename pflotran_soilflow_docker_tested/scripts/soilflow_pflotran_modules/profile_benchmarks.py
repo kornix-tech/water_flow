@@ -276,5 +276,17 @@ def profile_status_fields_after_run(test_name: str, workdir: Path) -> dict[str, 
 def evaluate_profile_test_after_run(test_name: str, workdir: Path, result_factory: ProfileTestResultFactory) -> Any:
     status_path = workdir / "TEST_STATUS.txt"
     status_fields = profile_status_fields_after_run(test_name, workdir)
+    result_status = "PASS_WITH_WARNINGS"
+    if status_fields.get("strict_candidate_can_gate_suite") is True:
+        strict_checks = [
+            value
+            for key, value in status_fields.items()
+            if key.endswith("_strict_candidate_check") or key == "profile_strict_candidate_check"
+        ]
+        if strict_checks and all(value == "PASS" for value in strict_checks):
+            result_status = "PASS"
+        elif any(value == "FAIL" for value in strict_checks):
+            result_status = "FAIL"
+        status_fields["TEST_STATUS"] = result_status
     write_unified_status(status_path, status_fields)
-    return result_factory(f"_test_{test_name}", "PASS_WITH_WARNINGS", workdir, status_fields)
+    return result_factory(f"_test_{test_name}", result_status, workdir, status_fields)

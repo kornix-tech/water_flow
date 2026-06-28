@@ -28,6 +28,7 @@
 - Verification-suite теперь пишет `STRICT_READINESS_PLAN.json` с priority order, `next_stage` и `next_targets` для следующего strict-readiness блока.
 - Backend `/test-suite` теперь отдает `strict_readiness_plan` как структурированное поле, suite plan сохраняет blocker-поля, а `/overview` добавляет в карточку suite следующий strict-блок, первый target и blocker.
 - На странице `Расчеты` добавлена таблица результатов verification-suite с фильтрами по статусу, `failure_stage` и `strict_readiness_stage`.
+- Для `richards_mms` подключен spatial MMS adapter deck: основной `pflotran.in` теперь использует per-cell PFLOTRAN regions/source sinks для nonuniform initial pressure и cell-wise source, а uniform-source deck сохранен как отдельный candidate artifact.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_evaluators` для диагностической оценки `REFERENCE_OVERLAY` profile-smoke benchmark'ов и явной отметки pending strict evaluator.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_cases` с машинно-читаемой картой profile benchmark'ов, физическими семействами и blocker'ами будущих strict evaluator'ов.
 - Добавлен модуль `soilflow_pflotran_modules.profile_strict_evaluators` с первым strict-кандидатом для `richards_mms` по RMSE/max-error напора и влажности.
@@ -123,12 +124,11 @@
 - `scripts/check_project.sh` теперь включает UI route smoke после API/workflow проверок живого сервиса.
 - Profile-smoke suite CSV теперь включает качество reference overlay и статус strict evaluator readiness.
 - Profile-smoke TEST_STATUS и suite CSV теперь включают физическое семейство benchmark'а и готовность carrier deck'а.
-- `richards_mms` помечен как `EVALUATOR_READY_DECK_PENDING`: strict-кандидат готов, но остается диагностическим до замены carrier deck на MMS source-term постановку.
+- `richards_mms` помечен как `STRICT_GATE_READY`: strict-кандидат и spatial MMS adapter deck готовы, но тест остается в profile-smoke группе до расширенной solver validation.
 - Profile-smoke TEST_STATUS и suite CSV теперь явно различают `profile_deck_kind` и `strict_candidate_can_gate_suite`, чтобы strict-кандидат нельзя было случайно сделать обязательным до готовности физического deck'а.
-- `richards_mms` переведен с generic profile-carrier на `richards_mms_uniform_source_candidate`; strict-кандидат остается диагностическим, пока не добавлен spatial MMS source-term.
-- Blocker `richards_mms` уточнен: spatial residual table уже пишется, но PFLOTRAN deck еще не применяет cell-wise source и nonuniform initial profile.
-- Blocker `richards_mms` уточнен до уровня deck adapter: matrix/manifest artifacts готовы, но текущий PFLOTRAN input еще остается uniform-source candidate.
-- `analytical_test_summary.txt` для `richards_mms` теперь явно публикует readiness MMS adapter artifacts и pending-статус PFLOTRAN deck adapter-а.
+- `richards_mms` переведен с generic profile-carrier на `richards_mms_spatial_source_candidate`; прежний uniform-source deck сохранен как отдельный artifact.
+- Blocker `richards_mms` закрыт на уровне deck adapter: PFLOTRAN input применяет cell-wise source и nonuniform initial profile через per-cell regions/source sinks.
+- `analytical_test_summary.txt` для `richards_mms` теперь явно публикует readiness MMS adapter artifacts и active-статус PFLOTRAN spatial adapter-а.
 - Profile status, suite CSV и `profile_case_manifest.json` теперь публикуют `strict_readiness_stage`.
 - `TEST_SUITE_STATUS.txt`/JSON теперь показывают stage counts, чтобы следующий инженерный блок выбирать по текущим blocker'ам, а не вручную по отдельным run-папкам.
 - `scripts/check_project.sh` теперь включает полный расчетный smoke для табличной почвы через публичный API.
