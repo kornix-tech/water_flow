@@ -243,6 +243,8 @@ class VerificationRunnerModuleTests(unittest.TestCase):
             self.assertTrue((workdir / "richards_mms_initial_profile.csv").exists())
             self.assertTrue((workdir / "richards_mms_source_rate.csv").exists())
             self.assertTrue((workdir / "richards_mms_spatial_source_profile.csv").exists())
+            self.assertTrue((workdir / "richards_mms_spatial_source_matrix.json").exists())
+            self.assertTrue((workdir / "richards_mms_spatial_source_manifest.json").exists())
             manifest = json.loads((workdir / "profile_case_manifest.json").read_text(encoding="utf-8"))
             deck = (workdir / "pflotran.in").read_text(encoding="utf-8")
             summary = (workdir / "analytical_test_summary.txt").read_text(encoding="utf-8")
@@ -605,6 +607,14 @@ class ProfileBenchmarkTests(unittest.TestCase):
             self.assertIn("richards_mms_source_rate.csv", "\n".join(path.name for path in workdir.iterdir()))
             self.assertIn("source_rate_per_volume_1_day", (workdir / "richards_mms_spatial_source_profile.csv").read_text(encoding="utf-8"))
             self.assertIn("pressure_head_m", (workdir / "richards_mms_initial_profile.csv").read_text(encoding="utf-8"))
+            adapter_manifest = json.loads(
+                (workdir / "richards_mms_spatial_source_manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(adapter_manifest["artifact_status"], "MATRIX_ARTIFACT_READY_DECK_PENDING")
+            matrix_artifact = json.loads((workdir / "richards_mms_spatial_source_matrix.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(matrix_artifact["source"]["source_rate_per_volume_1_day"]), len(rows))
+            self.assertEqual(len(matrix_artifact["source"]["source_rate_per_volume_1_day"][0]), case.nz)
+            self.assertEqual(len(matrix_artifact["initial"]["liquid_pressure_pa"]), case.nz)
 
     def test_richards_profile_overlay_rows_are_written_for_mms(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -152,7 +152,10 @@ Endpoints:
   `SOURCE_SINK`/`RATE LIST` по среднему хранению, но до spatial MMS source-term
   он остается диагностикой, а не suite PASS/FAIL критерием. Дополнительно
   пишется `richards_mms_spatial_source_profile.csv` с cell-wise residual, но
-  текущий deck еще не применяет этот artifact как PFLOTRAN source.
+  текущий deck еще не применяет этот artifact как PFLOTRAN source. Для будущего
+  adapter-а также пишутся `richards_mms_spatial_source_matrix.json` и
+  `richards_mms_spatial_source_manifest.json` с initial pressure profile и
+  source matrices.
 - `GET /api/results/runs/{run_name}/overview` - единый обзор состояния запуска:
   verification-suite, отдельный тест, графики или fallback по файлам результата.
 - `GET /api/results/runs/{run_name}/plots` - список файлов графиков.
