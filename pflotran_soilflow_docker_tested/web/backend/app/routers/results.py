@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 
-from ..file_manager import safe_resolve_under, safe_run_name
+from ..file_manager import safe_child_file, safe_run_name
 from ..schemas import RunInfo, RunStatusOverview, TestRunStatus, TestSuiteStatus
 from ..services.result_status_artifacts import has_status_artifact
 from ..services.run_status_overview_service import read_run_status_overview
@@ -14,6 +14,9 @@ from ..services.test_run_status_service import read_test_run_status
 from ..services.test_suite_summary_service import SUITE_STATUS_ARTIFACTS, read_test_suite_status
 
 router = APIRouter()
+
+MAX_INLINE_STATUS_BYTES = 2 * 1024 * 1024
+MAX_DIRECT_RESULT_FILE_BYTES = 512 * 1024 * 1024
 
 
 def _run_info(run_dir: Path, file_manager, *, include_files: bool = True) -> RunInfo:
@@ -52,9 +55,13 @@ def get_run(run_name: str, request: Request) -> RunInfo:
 def get_run_status(run_name: str, request: Request):
     run_dir = request.app.state.file_manager.run_dir(run_name)
     for filename in ("TEST_STATUS.txt", "TEST_SUITE_STATUS.txt", "VISUALIZATION_STATUS.txt"):
-        path = safe_resolve_under(run_dir, filename)
-        if path.exists():
-            return FileResponse(path, media_type="text/plain")
+        try:
+            path = safe_child_file(run_dir, filename, max_bytes=MAX_INLINE_STATUS_BYTES)
+        except HTTPException as exc:
+            if exc.status_code == 404:
+                continue
+            raise
+        return FileResponse(path, media_type="text/plain")
     raise HTTPException(status_code=404, detail="Status file was not found")
 
 
@@ -107,7 +114,5 @@ def get_run_plots(run_name: str, request: Request):
 def get_run_file(run_name: str, file_path: str, request: Request):
     safe_run_name(run_name)
     run_dir = request.app.state.file_manager.run_dir(run_name)
-    target = safe_resolve_under(run_dir, file_path)
-    if not target.exists() or not target.is_file():
-        raise HTTPException(status_code=404, detail="File was not found")
+    target = safe_child_file(run_dir, file_path, max_bytes=MAX_DIRECT_RESULT_FILE_BYTES)
     return FileResponse(target, filename=target.name)

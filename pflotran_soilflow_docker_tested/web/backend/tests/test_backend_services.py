@@ -27,7 +27,7 @@ class HTTPException(Exception):
 fastapi_stub.HTTPException = HTTPException
 sys.modules.setdefault("fastapi", fastapi_stub)
 
-from app.file_manager import safe_resolve_under, safe_run_name
+from app.file_manager import safe_child_file, safe_resolve_under, safe_run_name
 from app.job_lifecycle import CALCULATION_STATUS_DRAFT, JOB_STATUS_FAILED, JOB_STATUS_QUEUED
 from app.job_store import JobStore
 from app.models import Job
@@ -83,6 +83,33 @@ class PathSafetyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(HTTPException):
                 safe_resolve_under(Path(directory), "../outside.txt")
+
+    def test_safe_child_file_rejects_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            target = base / "target.txt"
+            target.write_text("secret\n", encoding="utf-8")
+            link = base / "link.txt"
+            try:
+                link.symlink_to(target)
+            except (NotImplementedError, OSError):
+                self.skipTest("symlink is not supported by this filesystem")
+
+            with self.assertRaises(HTTPException) as context:
+                safe_child_file(base, "link.txt")
+
+            self.assertEqual(context.exception.status_code, 404)
+
+    def test_safe_child_file_rejects_oversized_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            path = base / "payload.txt"
+            path.write_text("123456", encoding="utf-8")
+
+            with self.assertRaises(HTTPException) as context:
+                safe_child_file(base, "payload.txt", max_bytes=5)
+
+            self.assertEqual(context.exception.status_code, 413)
 
     def test_status_artifact_text_cache_invalidates_on_file_change(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

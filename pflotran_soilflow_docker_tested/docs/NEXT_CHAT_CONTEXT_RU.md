@@ -385,7 +385,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:3333a31ecf79fcdd29e2efe425272778f3b512ad4effae09b6596ca59a02399c
+sha256:115a1d0317a5a78f7ba12d9511fcd160af8f6902008623d3bb90462127ddf5dc
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -418,6 +418,11 @@ docs/NEXT_CHAT_CONTEXT_RU.md
 - `scripts/api_results_performance_smoke.sh` проверяет лимиты времени ответа и
   размера JSON payload для results endpoints;
 - results performance smoke проверяет контракт после restart web-сервиса;
+- results performance smoke дополнительно проверяет `/plots`, HTML-график и
+  отказ прямой выдачи symlink-файла из run-директории;
+- прямые file responses для status/results/visualization централизованы на
+  safe-file helper с отказом для symlink, директорий, path escape и слишком
+  крупных inline payload;
 - restart resilience smoke проверяет перевод active job в `failed`, readiness и
   SQLite schema version после restart;
 - `TEST_STATUS.txt` без ключа `TEST_STATUS` получает явный partial marker;
@@ -471,10 +476,11 @@ flowchart LR
    - лимиты времени ответа и размера JSON уже проверяются smoke-скриптом;
    - фиксировать деградации отдельным скриптом, не смешивая с физикой PFLOTRAN.
 2. Ужесточить filesystem-контракты result endpoints:
-   - централизовать safe path helpers для всех чтений artifacts;
-   - добавить unit-тесты на traversal, отсутствующие файлы, битые JSON/CSV и
-     частично записанные run-директории;
-   - не позволять frontend/API читать произвольные файлы вне run-директории.
+   - safe-file helper централизован для прямых status/results/visualization
+     responses;
+   - unit-тесты покрывают traversal, symlink и oversized direct file;
+   - symlink, директории, выход за пределы run-директории и слишком крупные
+     inline files не отдаются через API.
 3. Сделать чтение status/artifacts устойчивым:
    - уже добавлен graceful fallback для поврежденных `TEST_SUITE_STATUS.json`,
      `TEST_SUITE_RESULTS.csv`, `test_diagnostics.json` и частично записанного

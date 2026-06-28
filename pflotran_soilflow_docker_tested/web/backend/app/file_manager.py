@@ -30,12 +30,32 @@ def safe_run_name(run_name: str) -> str:
     return run_name
 
 
-def _is_safe_child_file(base_dir: Path, path: Path) -> bool:
+def is_safe_child_file(base_dir: Path, path: Path) -> bool:
     if path.is_symlink() or not path.is_file():
         return False
     resolved_base = base_dir.resolve()
     resolved_path = path.resolve()
     return resolved_path == resolved_base or resolved_base in resolved_path.parents
+
+
+def safe_child_file(base_dir: Path, user_path: str, *, max_bytes: int | None = None) -> Path:
+    candidate = Path(user_path)
+    if candidate.is_absolute():
+        raise HTTPException(status_code=400, detail="Absolute paths are not allowed")
+    cursor = base_dir.resolve()
+    for part in candidate.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            raise HTTPException(status_code=404, detail="File was not found")
+    path = safe_resolve_under(base_dir, user_path)
+    if not is_safe_child_file(base_dir, path):
+        raise HTTPException(status_code=404, detail="File was not found")
+    if max_bytes is not None and path.stat().st_size > max_bytes:
+        raise HTTPException(status_code=413, detail="File is too large")
+    return path
+
+
+_is_safe_child_file = is_safe_child_file
 
 
 class FileManager:

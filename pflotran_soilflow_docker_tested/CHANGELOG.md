@@ -21,6 +21,7 @@
 - Добавлен API `/api/results/runs/{run_name}/overview` и общий frontend-компонент карточек состояния для страниц `Статус` и `Расчеты`.
 - Добавлен UI route smoke `scripts/ui_route_smoke.sh` и Makefile-цель `ui-smoke` для проверки коротких frontend URL и SPA/API fallback-контракта живого сервиса.
 - Добавлен `scripts/api_results_performance_smoke.sh`: живой performance/stability smoke для `/api/results/runs`, `/overview`, `/test-suite` и `/test-status` на временных run-папках с большим числом файлов.
+- `scripts/api_results_performance_smoke.sh` дополнительно проверяет HTML-график, `/plots` и отказ от выдачи symlink-файлов из run-директории.
 - Добавлен `scripts/api_restart_resilience_smoke.sh`: live smoke для проверки restart-поведения активных job'ов, SQLite schema version и базовых API после `docker compose restart soilflow-web`.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_evaluators` для диагностической оценки `REFERENCE_OVERLAY` profile-smoke benchmark'ов и явной отметки pending strict evaluator.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_cases` с машинно-читаемой картой profile benchmark'ов, физическими семействами и blocker'ами будущих strict evaluator'ов.
@@ -204,6 +205,7 @@
 - Backend читает и сохраняет редактируемые исходные данные через JSON/SQLite API, сохраняя структуру многовкладочной формы.
 - Удалён frontend-компонент загрузки XLSX и API endpoint `/api/files/upload-xlsx`, так как исходные данные теперь редактируются через web-формы.
 - ZIP-архивы и списки результатов теперь пропускают symlink-файлы и ограничивают объём/количество файлов, чтобы не читать данные вне run-директории.
+- Прямые file responses для status/results/visualization теперь проходят через общий safe-file helper: symlink, директории, path escape и слишком крупные inline-файлы не отдаются клиенту.
 - SPA fallback больше не отдаёт `index.html` для неизвестных `/api/...` и `HEAD /api/...` запросов.
 - Docker Compose теперь принимает web security/time-limit параметры через переменные окружения.
 - Suite-статус теперь различает `PASS`, `PASS_WITH_WARNINGS` и `FAIL`; ожидаемое предупреждение Mualem-VG без `SMOOTH` для ненасыщенных VG-тестов учитывается как warning, а не как падение.

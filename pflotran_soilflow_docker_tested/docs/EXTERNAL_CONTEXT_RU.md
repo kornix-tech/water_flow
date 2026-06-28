@@ -36,11 +36,11 @@ PFLOTRAN: /opt/pflotran/src/pflotran/pflotran
 4. Web-интерфейс работает как SPA на React/Vite, а backend на FastAPI обслуживает API, static frontend, файлы результатов и HTML-графики.
 5. Долгие операции запускаются как фоновые задания через `JobManager` и `ThreadPoolExecutor`; состояние заданий хранится в SQLite.
 6. Визуализация отделена от расчета: `soilflow_pflotran.py` генерирует и запускает расчет, `soilflow_visualize.py` читает TECPLOT/CSV и строит HTML/SVG/CSV графические артефакты.
-7. Для безопасности backend валидирует имена расчетов, job id, пути к файлам, размер API body и архивов; добавлены CSP/security headers, rate-limit и опциональный Bearer-token режим.
+7. Для безопасности backend валидирует имена расчетов, job id, пути к файлам, размер API body, прямые file responses и архивы; добавлены CSP/security headers, rate-limit и опциональный Bearer-token режим.
 8. SQLite schema version 2 содержит табличные экспериментальные кривые почвы: `soil_curve_tables` и `soil_curve_points`; backend API и frontend-редактор доступны на странице `Исходные данные`.
 9. Страница `Тесты` содержит workflow `Табличная почва`: он создает расчет в SQLite, сохраняет демо-кривые Pc(S)/kr(S), запускает PFLOTRAN и затем строит графики.
 10. Полный API-контур табличной почвы закреплен в `scripts/api_tabular_workflow_smoke.sh` и включен в `scripts/check_project.sh`; smoke удаляет созданный расчет, если не задано `KEEP_TABULAR_API_SMOKE=1`.
-11. Performance/stability контур results API закреплен в `scripts/api_results_performance_smoke.sh`: smoke создает временные run-папки, делает restart web-сервиса, проверяет summary/detail/status endpoints, лимиты времени ответа и размера JSON payload, затем очищает временные данные.
+11. Performance/stability контур results API закреплен в `scripts/api_results_performance_smoke.sh`: smoke создает временные run-папки, делает restart web-сервиса, проверяет summary/detail/status/plots endpoints, HTML-график, лимиты времени ответа и размера payload, отказ прямого чтения symlink-файла, затем очищает временные данные.
 12. Restart-resilience контур закреплен в `scripts/api_restart_resilience_smoke.sh`: smoke создает временный queued job напрямую в SQLite, перезапускает web-сервис, проверяет перевод job в `failed`, readiness/schema version и базовые API, затем очищает временную запись.
 
 ## 3. Карта каталогов

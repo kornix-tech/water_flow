@@ -11,6 +11,8 @@ OVERVIEW_MAX_SECONDS="${OVERVIEW_MAX_SECONDS:-1.5}"
 LIST_MAX_BYTES="${LIST_MAX_BYTES:-524288}"
 DETAIL_MAX_BYTES="${DETAIL_MAX_BYTES:-262144}"
 OVERVIEW_MAX_BYTES="${OVERVIEW_MAX_BYTES:-262144}"
+PLOTS_MAX_BYTES="${PLOTS_MAX_BYTES:-262144}"
+VISUALIZATION_HTML_MAX_BYTES="${VISUALIZATION_HTML_MAX_BYTES:-262144}"
 RESTART_CHECK="${RESTART_CHECK:-1}"
 
 cleanup() {
@@ -57,6 +59,20 @@ for index in range(run_count):
         '{"summary": {"TEST_SUITE_STATUS": "PASS", "tests_total": 1, "tests_passed": 1}, "results": []}\n',
         encoding="utf-8",
     )
+    if index == 0:
+        plots_dir = run_dir / "plots"
+        plots_dir.mkdir(parents=True, exist_ok=True)
+        (plots_dir / "profiles_animation.html").write_text(
+            "<!doctype html><html><body>performance smoke</body></html>\n",
+            encoding="utf-8",
+        )
+        (plots_dir / "VISUALIZATION_STATUS.txt").write_text(
+            "VISUALIZATION_STATUS=PASS\nhtml_file=profiles_animation.html\n",
+            encoding="utf-8",
+        )
+        unsafe_link = nested_dir / "unsafe_link.txt"
+        if not unsafe_link.exists():
+            unsafe_link.symlink_to("/etc/passwd")
     for file_index in range(files_per_run):
         (nested_dir / f"payload_{file_index:03d}.txt").write_text("x" * 128, encoding="utf-8")
 PY
@@ -75,12 +91,13 @@ if [[ "$RESTART_CHECK" == "1" ]]; then
   done
 fi
 
-python3 - "$BASE_URL" "$LIST_MAX_SECONDS" "$DETAIL_MAX_SECONDS" "$OVERVIEW_MAX_SECONDS" "$LIST_MAX_BYTES" "$DETAIL_MAX_BYTES" "$OVERVIEW_MAX_BYTES" <<'PY'
+python3 - "$BASE_URL" "$LIST_MAX_SECONDS" "$DETAIL_MAX_SECONDS" "$OVERVIEW_MAX_SECONDS" "$LIST_MAX_BYTES" "$DETAIL_MAX_BYTES" "$OVERVIEW_MAX_BYTES" "$PLOTS_MAX_BYTES" "$VISUALIZATION_HTML_MAX_BYTES" <<'PY'
 from __future__ import annotations
 
 import json
 import sys
 import time
+import urllib.error
 import urllib.request
 
 base_url = sys.argv[1].rstrip("/")
@@ -90,6 +107,8 @@ overview_max_seconds = float(sys.argv[4])
 list_max_bytes = int(sys.argv[5])
 detail_max_bytes = int(sys.argv[6])
 overview_max_bytes = int(sys.argv[7])
+plots_max_bytes = int(sys.argv[8])
+visualization_html_max_bytes = int(sys.argv[9])
 target_run = "_perf_smoke_000"
 
 
@@ -104,6 +123,28 @@ def get_json(path: str, max_seconds: float, max_bytes: int) -> object:
         raise SystemExit(f"{path}: payload {len(raw_payload)} bytes exceeds {max_bytes} bytes")
     payload = raw_payload.decode("utf-8")
     return json.loads(payload)
+
+
+def get_raw(path: str, max_seconds: float, max_bytes: int) -> bytes:
+    start = time.perf_counter()
+    with urllib.request.urlopen(f"{base_url}{path}", timeout=max(10.0, max_seconds + 5.0)) as response:
+        raw_payload = response.read()
+    elapsed = time.perf_counter() - start
+    if elapsed > max_seconds:
+        raise SystemExit(f"{path}: {elapsed:.3f}s exceeds {max_seconds:.3f}s")
+    if len(raw_payload) > max_bytes:
+        raise SystemExit(f"{path}: payload {len(raw_payload)} bytes exceeds {max_bytes} bytes")
+    return raw_payload
+
+
+def expect_http_error(path: str, expected_statuses: set[int]) -> None:
+    try:
+        get_raw(path, detail_max_seconds, detail_max_bytes)
+    except urllib.error.HTTPError as exc:
+        if exc.code in expected_statuses:
+            return
+        raise SystemExit(f"{path}: expected {sorted(expected_statuses)}, got {exc.code}") from exc
+    raise SystemExit(f"{path}: expected HTTP error, got success")
 
 
 runs = get_json("/api/results/runs", list_max_seconds, list_max_bytes)
@@ -133,6 +174,16 @@ if test_status.get("status") != "PASS":
 suite_status = get_json(f"/api/results/runs/{target_run}/test-suite", detail_max_seconds, detail_max_bytes)
 if suite_status.get("status") != "PASS":
     raise SystemExit("/api/results/runs/{run}/test-suite: unexpected status")
+
+plots = get_json(f"/api/results/runs/{target_run}/plots", detail_max_seconds, plots_max_bytes)
+if "profiles_animation.html" not in plots:
+    raise SystemExit("/api/results/runs/{run}/plots: missing visualization HTML")
+
+html = get_raw(f"/api/visualization/{target_run}/html", detail_max_seconds, visualization_html_max_bytes)
+if b"performance smoke" not in html:
+    raise SystemExit("/api/visualization/{run}/html: unexpected HTML payload")
+
+expect_http_error(f"/api/results/runs/{target_run}/file/nested/unsafe_link.txt", {404})
 
 print(f"OK: results performance smoke passed for {base_url}")
 PY
