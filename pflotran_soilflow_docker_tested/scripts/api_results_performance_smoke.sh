@@ -8,6 +8,9 @@ PERF_FILES_PER_RUN="${PERF_FILES_PER_RUN:-30}"
 LIST_MAX_SECONDS="${LIST_MAX_SECONDS:-2.5}"
 DETAIL_MAX_SECONDS="${DETAIL_MAX_SECONDS:-1.5}"
 OVERVIEW_MAX_SECONDS="${OVERVIEW_MAX_SECONDS:-1.5}"
+LIST_MAX_BYTES="${LIST_MAX_BYTES:-524288}"
+DETAIL_MAX_BYTES="${DETAIL_MAX_BYTES:-262144}"
+OVERVIEW_MAX_BYTES="${OVERVIEW_MAX_BYTES:-262144}"
 RESTART_CHECK="${RESTART_CHECK:-1}"
 
 cleanup() {
@@ -72,7 +75,7 @@ if [[ "$RESTART_CHECK" == "1" ]]; then
   done
 fi
 
-python3 - "$BASE_URL" "$LIST_MAX_SECONDS" "$DETAIL_MAX_SECONDS" "$OVERVIEW_MAX_SECONDS" <<'PY'
+python3 - "$BASE_URL" "$LIST_MAX_SECONDS" "$DETAIL_MAX_SECONDS" "$OVERVIEW_MAX_SECONDS" "$LIST_MAX_BYTES" "$DETAIL_MAX_BYTES" "$OVERVIEW_MAX_BYTES" <<'PY'
 from __future__ import annotations
 
 import json
@@ -84,20 +87,26 @@ base_url = sys.argv[1].rstrip("/")
 list_max_seconds = float(sys.argv[2])
 detail_max_seconds = float(sys.argv[3])
 overview_max_seconds = float(sys.argv[4])
+list_max_bytes = int(sys.argv[5])
+detail_max_bytes = int(sys.argv[6])
+overview_max_bytes = int(sys.argv[7])
 target_run = "_perf_smoke_000"
 
 
-def get_json(path: str, max_seconds: float) -> object:
+def get_json(path: str, max_seconds: float, max_bytes: int) -> object:
     start = time.perf_counter()
     with urllib.request.urlopen(f"{base_url}{path}", timeout=max(10.0, max_seconds + 5.0)) as response:
-        payload = response.read().decode("utf-8")
+        raw_payload = response.read()
     elapsed = time.perf_counter() - start
     if elapsed > max_seconds:
         raise SystemExit(f"{path}: {elapsed:.3f}s exceeds {max_seconds:.3f}s")
+    if len(raw_payload) > max_bytes:
+        raise SystemExit(f"{path}: payload {len(raw_payload)} bytes exceeds {max_bytes} bytes")
+    payload = raw_payload.decode("utf-8")
     return json.loads(payload)
 
 
-runs = get_json("/api/results/runs", list_max_seconds)
+runs = get_json("/api/results/runs", list_max_seconds, list_max_bytes)
 if not isinstance(runs, list):
     raise SystemExit("/api/results/runs: response must be a list")
 run = next((item for item in runs if isinstance(item, dict) and item.get("run_name") == target_run), None)
@@ -108,20 +117,20 @@ if run.get("files") != []:
 if not run.get("has_test_status") or not run.get("has_suite_status"):
     raise SystemExit("/api/results/runs: status flags are missing for performance smoke run")
 
-detail = get_json(f"/api/results/runs/{target_run}", detail_max_seconds)
+detail = get_json(f"/api/results/runs/{target_run}", detail_max_seconds, detail_max_bytes)
 if not detail.get("files"):
     raise SystemExit("/api/results/runs/{run}: detailed endpoint must include selected run files")
 
-overview = get_json(f"/api/results/runs/{target_run}/overview", overview_max_seconds)
+overview = get_json(f"/api/results/runs/{target_run}/overview", overview_max_seconds, overview_max_bytes)
 kinds = {item.get("kind") for item in overview.get("items", []) if isinstance(item, dict)}
 if "test-suite" not in kinds or "test-run" not in kinds:
     raise SystemExit("/api/results/runs/{run}/overview: missing status items")
 
-test_status = get_json(f"/api/results/runs/{target_run}/test-status", detail_max_seconds)
+test_status = get_json(f"/api/results/runs/{target_run}/test-status", detail_max_seconds, detail_max_bytes)
 if test_status.get("status") != "PASS":
     raise SystemExit("/api/results/runs/{run}/test-status: unexpected status")
 
-suite_status = get_json(f"/api/results/runs/{target_run}/test-suite", detail_max_seconds)
+suite_status = get_json(f"/api/results/runs/{target_run}/test-suite", detail_max_seconds, detail_max_bytes)
 if suite_status.get("status") != "PASS":
     raise SystemExit("/api/results/runs/{run}/test-suite: unexpected status")
 

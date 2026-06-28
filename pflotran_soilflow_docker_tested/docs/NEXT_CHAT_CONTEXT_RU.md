@@ -385,7 +385,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:3dae62aea89f2a5959a15c56df51dc421125b6c6c32cbe7181d8553888013ec1
+sha256:3333a31ecf79fcdd29e2efe425272778f3b512ad4effae09b6596ca59a02399c
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -413,6 +413,10 @@ docs/NEXT_CHAT_CONTEXT_RU.md
 - JSON-only suite artifacts теперь видны в summary/overview как suite status;
 - чтение status artifacts кэшируется по `path + size + mtime_ns`, поэтому
   повторные overview/status запросы на неизменных файлах уменьшают disk I/O;
+- overview кэшируется по сигнатуре status artifacts и инвалидируется при
+  изменении TXT/JSON/CSV/status-файлов;
+- `scripts/api_results_performance_smoke.sh` проверяет лимиты времени ответа и
+  размера JSON payload для results endpoints;
 - results performance smoke проверяет контракт после restart web-сервиса;
 - restart resilience smoke проверяет перевод active job в `failed`, readiness и
   SQLite schema version после restart;
@@ -464,7 +468,7 @@ flowchart LR
    - уже добавлен `scripts/api_results_performance_smoke.sh`, который измеряет
      `/api/results/runs`, `/overview`, `/test-suite`, `/test-status` на наборе
      временных run-папок и проверяет restart-resilience;
-   - проверять лимиты времени ответа и размер JSON;
+   - лимиты времени ответа и размера JSON уже проверяются smoke-скриптом;
    - фиксировать деградации отдельным скриптом, не смешивая с физикой PFLOTRAN.
 2. Ужесточить filesystem-контракты result endpoints:
    - централизовать safe path helpers для всех чтений artifacts;
@@ -490,7 +494,7 @@ flowchart LR
 1. Оптимизировать список run'ов и overview:
    - профилировать количество `stat/open/read` при `/api/results/runs`;
    - кэш чтения status artifacts по `mtime`/размеру уже добавлен;
-   - следующим шагом профилировать необходимость кэша агрегированных overview;
+   - кэш агрегированных overview по сигнатуре status artifacts уже добавлен;
    - читать тяжелые artifacts лениво, только для выбранного run.
 2. Ограничить размер payload'ов:
    - для списков отдавать summary, а не содержимое больших CSV/TEC;
@@ -503,7 +507,8 @@ flowchart LR
    - добавить regression-тесты на shape/содержимое, чтобы оптимизация не
      изменила физический контракт.
 4. Frontend:
-   - не запрашивать тяжелые данные до выбора конкретного run;
+   - страница `Графики` уже не запрашивает файлы графиков для run без готовой
+     визуализации и обновляется реже;
    - показывать skeleton/partial state вместо блокировки страницы;
    - сохранить русские короткие URL и текущий визуальный язык.
 

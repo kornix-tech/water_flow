@@ -83,6 +83,9 @@
 - Results performance smoke теперь делает restart web-сервиса после создания
   временных run-папок и проверяет, что summary/detail/status endpoints
   сохраняют контракт после restart.
+- Results performance smoke теперь проверяет не только время ответа, но и
+  верхний лимит размера JSON payload для summary/detail/overview/status
+  endpoints.
 - `scripts/check_project.sh` теперь включает restart resilience smoke как
   отдельный gate после results performance smoke.
 - JSON-only suite status теперь определяется в summary/overview так же, как
@@ -91,12 +94,17 @@
 - Чтение TXT/JSON/CSV status artifacts теперь использует общий кэш по
   `path + size + mtime_ns`, чтобы повторные overview/status запросы не
   перечитывали неизменные artifacts с диска.
+- `GET /api/results/runs/{run_name}/overview` теперь кэширует собранную сводку
+  по сигнатуре status artifacts (`size + mtime_ns`) и инвалидируется при
+  изменении TXT/JSON/CSV/status-файлов.
 - Чтение test-suite/test-status стало устойчивее к частично записанным
   artifacts: битый `TEST_SUITE_STATUS.json` откатывается к TXT/CSV, а битый
   `test_diagnostics.json` помечается как `PARTIAL` без потери основного статуса.
 - `TEST_STATUS.txt` без ключа `TEST_STATUS` теперь возвращает
   `status=UNKNOWN` и `artifact_readiness=PARTIAL`, а не неявно выглядит как
   полноценный статус.
+- Страница `Графики` перестала опрашивать список файлов графиков для run без
+  готовой визуализации и снижает частоту фонового обновления до 5 секунд.
 - В интерфейсе `Исходные данные` табличная кривая стала разрешенной моделью водоудерживания и влагопроводности для проверенных пар `van_genuchten + tabular`, `brooks_corey + tabular` и `tabular + tabular`.
 - Сообщение об ошибке failed-задания теперь извлекает предметную строку `ERROR`/`Traceback` из job log, если она есть.
 - JSON-снимок расчета, передаваемый в CLI при запуске расчета или визуализации, теперь включает `soil_curve_tables` сохраненного расчета.

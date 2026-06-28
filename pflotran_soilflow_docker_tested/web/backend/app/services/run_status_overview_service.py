@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from .result_status_artifacts import existing_status_artifact, has_status_artifact, parse_key_value_status
-from .test_run_status_service import TEST_STATUS_TEXT, read_test_run_status
-from .test_suite_summary_service import SUITE_STATUS_ARTIFACTS, read_test_suite_status
+from .test_run_status_service import TEST_ARTIFACTS, TEST_STATUS_TEXT, read_test_run_status
+from .test_suite_summary_service import SUITE_ARTIFACTS, SUITE_STATUS_ARTIFACTS, read_test_suite_status
 
 VISUALIZATION_STATUS_TEXT = "VISUALIZATION_STATUS.txt"
+OVERVIEW_SIGNATURE_FILES = tuple(dict.fromkeys((*SUITE_ARTIFACTS, *TEST_ARTIFACTS, f"plots/{VISUALIZATION_STATUS_TEXT}")))
+ArtifactSignature = tuple[tuple[str, int, int], ...]
 
 
 def _metric(label: str, value: Any) -> dict[str, str]:
@@ -97,7 +100,23 @@ def _visualization_item(run_dir: Path) -> dict[str, Any] | None:
     }
 
 
-def read_run_status_overview(run_name: str, run_dir: Path) -> dict[str, Any]:
+def _artifact_signature(run_dir: Path) -> ArtifactSignature:
+    signature: list[tuple[str, int, int]] = []
+    for filename in OVERVIEW_SIGNATURE_FILES:
+        artifact_path = existing_status_artifact(run_dir, filename)
+        if artifact_path is None:
+            continue
+        stat_result = artifact_path.stat()
+        signature.append((filename, stat_result.st_size, stat_result.st_mtime_ns))
+    return tuple(signature)
+
+
+@lru_cache(maxsize=512)
+def _read_run_status_overview_cached(run_name: str, run_dir_value: str, signature: ArtifactSignature) -> dict[str, Any]:
+    # Signature передается только как cache key. Если status artifact изменился,
+    # вызов получит новый key и перечитает сводку без ручной инвалидации.
+    del signature
+    run_dir = Path(run_dir_value)
     items = [
         item
         for item in (
@@ -120,3 +139,8 @@ def read_run_status_overview(run_name: str, run_dir: Path) -> dict[str, Any]:
             }
         )
     return {"run_name": run_name, "items": items}
+
+
+def read_run_status_overview(run_name: str, run_dir: Path) -> dict[str, Any]:
+    resolved_run_dir = run_dir.resolve()
+    return _read_run_status_overview_cached(run_name, str(resolved_run_dir), _artifact_signature(resolved_run_dir))

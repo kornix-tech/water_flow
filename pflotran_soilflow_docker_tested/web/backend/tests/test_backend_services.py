@@ -460,6 +460,19 @@ class RunStatusOverviewServiceTests(unittest.TestCase):
             self.assertEqual(overview["items"][0]["kind"], "test-suite")
             self.assertEqual(overview["items"][0]["source"], "TEST_SUITE_STATUS.json")
 
+    def test_read_run_status_overview_cache_invalidates_on_status_change(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            status_path = run_dir / "TEST_STATUS.txt"
+            status_path.write_text("TEST_STATUS=PASS\ntest_id=_test_cached\n", encoding="utf-8")
+
+            first = read_run_status_overview("_test_cached", run_dir)
+            status_path.write_text("TEST_STATUS=FAIL\ntest_id=_test_cached\nextra=1\n", encoding="utf-8")
+            second = read_run_status_overview("_test_cached", run_dir)
+
+            self.assertEqual(first["items"][0]["status"], "PASS")
+            self.assertEqual(second["items"][0]["status"], "FAIL")
+
 
 if __name__ == "__main__":
     unittest.main()

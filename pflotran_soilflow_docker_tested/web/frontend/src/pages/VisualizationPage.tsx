@@ -4,6 +4,9 @@ import { ErrorNotice } from "../components/ErrorNotice";
 import { PlotFrame } from "../components/PlotFrame";
 import type { RunInfo } from "../types";
 
+const RUNS_REFRESH_MS = 5000;
+const PLOT_FILES_REFRESH_MS = 5000;
+
 function runNameFromLocation(): string {
   return new URLSearchParams(window.location.search).get("run")?.trim() ?? "";
 }
@@ -22,6 +25,7 @@ export function VisualizationPage() {
   const [runs, setRuns] = useState<RunInfo[]>([]);
   const [runName, setRunNameState] = useState(runNameFromLocation);
   const [plotFiles, setPlotFiles] = useState<string[]>([]);
+  const [plotFilesLoading, setPlotFilesLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -49,17 +53,22 @@ export function VisualizationPage() {
 
   useEffect(() => {
     refreshRuns();
-    const timer = window.setInterval(refreshRuns, 2000);
+    const timer = window.setInterval(refreshRuns, RUNS_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, [runName]);
 
+  const selectedRun = runs.find((run) => run.run_name === runName) ?? null;
+
   useEffect(() => {
-    if (!runName) {
+    if (!runName || !selectedRun?.has_visualization) {
+      setPlotFiles([]);
+      setPlotFilesLoading(false);
       return;
     }
     let cancelled = false;
     async function refreshPlotFiles() {
       try {
+        setPlotFilesLoading(true);
         const files = await getRunFiles(runName);
         if (!cancelled) {
           setPlotFiles(files);
@@ -70,15 +79,19 @@ export function VisualizationPage() {
           setPlotFiles([]);
           setError(caught instanceof Error ? caught.message : "Не удалось прочитать файлы графиков");
         }
+      } finally {
+        if (!cancelled) {
+          setPlotFilesLoading(false);
+        }
       }
     }
     refreshPlotFiles();
-    const timer = window.setInterval(refreshPlotFiles, 2000);
+    const timer = window.setInterval(refreshPlotFiles, PLOT_FILES_REFRESH_MS);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [runName]);
+  }, [runName, selectedRun?.has_visualization]);
 
   async function generate() {
     setError("");
@@ -89,8 +102,6 @@ export function VisualizationPage() {
       setError(caught instanceof Error ? caught.message : "Не удалось поставить визуализацию в очередь");
     }
   }
-
-  const selectedRun = runs.find((run) => run.run_name === runName) ?? null;
 
   return (
     <section>
@@ -122,11 +133,15 @@ export function VisualizationPage() {
         )}
         <div className="panel">
           <h2>Файлы графиков</h2>
-          <ul className="file-list dense">
-            {plotFiles.map((file) => (
-              <li key={file}>{file}</li>
-            ))}
-          </ul>
+          {plotFilesLoading && !plotFiles.length ? (
+            <p className="muted">Файлы графиков загружаются.</p>
+          ) : (
+            <ul className="file-list dense">
+              {plotFiles.map((file) => (
+                <li key={file}>{file}</li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </section>
