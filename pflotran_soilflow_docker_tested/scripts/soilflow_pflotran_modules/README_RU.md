@@ -31,13 +31,30 @@ CLI и web-backend. Этот пакет задает безопасные гра
   для будущих parser-adapter реализаций.
 - `test_evaluation.py`: единая сборка `PASS/WARN/FAIL`, `UNKNOWN`,
   `PFLOTRAN_ERROR` и suite status.
+- `test_suite_artifacts.py`: запись suite summary в `TEST_SUITE_STATUS.txt`,
+  `TEST_SUITE_STATUS.json` и `TEST_SUITE_RESULTS.csv` для машинного анализа.
 - `test_registry.py`: список verification/profile тестов, группировка, выбор
   `all`, чтение параметров сценария, совместимые рабочие пути CLI и уровни
   проверки `strict_analytical`/`partial_balance`/`profile_smoke`.
 - `test_artifacts.py`: общие CSV/SVG artifacts и проверка аналитического overlay
   для profile-тестов.
 - `profile_benchmarks.py`: генерация `analytical_profiles.csv` для расширенных
-  profile benchmark'ов и сборка TECPLOT-ready статуса после PFLOTRAN запуска.
+  profile benchmark'ов, сборка TECPLOT-ready статуса и diagnostic
+  `REFERENCE_OVERLAY` ошибок после PFLOTRAN запуска.
+- `richards_test_cases.py`: dataclass-параметры, PFLOTRAN deck'и,
+  аналитические CSV/summary и builders для strict/partial Richards verification.
+- `richards_test_evaluators.py`: сравнение PFLOTRAN TECPLOT-профилей с
+  аналитическими решениями Darcy/VG/Brooks-Corey/transient storage и запись
+  `TEST_STATUS.txt`.
+- `richards_test_runner.py`: запуск strict/partial Richards verification:
+  генерация artifacts, запуск solver-а и выбор evaluator-а.
+- `profile_test_runner.py`: запуск profile-smoke benchmark'ов: reference
+  artifacts, profile-carrier deck, solver и TECPLOT-ready status.
+- `test_solver_execution.py`: общий execution-helper для native/WSL PFLOTRAN
+  запуска в verification runners и единая обработка `PFLOTRAN_ERROR`/
+  `GENERATED_ONLY`.
+- `verification_runner.py`: suite-router режима `_test`: чтение JSON, выбор
+  тестов, рабочие директории и запись suite status.
 - `solver_runner.py`: поиск исполняемого PFLOTRAN, native/WSL запуск и запись
   логов без знания физической постановки. Это текущий solver adapter.
 - `surface_balance.py`: нормализация погодных строк, расчет `net_surface_input`,
@@ -55,8 +72,13 @@ CLI и web-backend. Этот пакет задает безопасные гра
   в тестовых deck'ах.
 - `analytical_tests`: строгие метрики сравнения профилей и физические PFLOTRAN
   deck'и для transport/heat/two-phase/groundwater задач.
-- `test_builders`: dataclass-параметры тестов и генераторы PFLOTRAN deck'ов.
-- `test_evaluators`: физические сравнения numerical/analytical профилей.
+- `test_builders`: расширение вынесенных Richards builders на будущие
+  transport/heat/two-phase/groundwater постановки.
+- `test_evaluators`: строгие физические сравнения для profile-smoke benchmark'ов.
+- `verification_runner`: сохранять только orchestration и не возвращать в него
+  физические формулы, которые должны жить в case/evaluator модулях.
+- `test_runner`: новые семейства тестов подключать отдельными runner-модулями,
+  чтобы центральный suite-router не зависел от физики конкретной постановки.
 
 Правило дальнейшего рефакторинга: переносить по одному блоку, оставляя
 `soilflow_pflotran.py` тонким совместимым CLI-фасадом и добавляя тест на каждый

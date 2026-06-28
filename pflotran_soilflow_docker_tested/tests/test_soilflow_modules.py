@@ -30,10 +30,13 @@ from soilflow_pflotran_modules.physical_models import (
     vg_mualem_relative_permeability,
 )
 from soilflow_pflotran_modules.profile_benchmarks import (
+    profile_overlay_error_metrics,
     profile_status_fields_after_run,
+    write_profile_overlay_comparison,
     write_richards_profile_analytical_profiles,
 )
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
+from soilflow_pflotran_modules.profile_test_runner import generate_profile_test_files
 from soilflow_pflotran_modules.result_contract import profile_rows_to_contract
 from soilflow_pflotran_modules.result_diagnostics import (
     classify_pflotran_warnings,
@@ -45,6 +48,16 @@ from soilflow_pflotran_modules.result_diagnostics import (
     records_to_z_pressure_saturation,
     write_unified_status,
 )
+from soilflow_pflotran_modules.richards_test_cases import (
+    TEST_BUILDERS,
+    build_linear_darcy_test,
+    build_transient_uniform_storage_vg_test,
+    generate_pflotran_test_input,
+    transient_rate_m3_day,
+    write_analytical_solution,
+)
+from soilflow_pflotran_modules.richards_test_evaluators import write_test_comparison, write_test_svg
+from soilflow_pflotran_modules.richards_test_runner import generate_richards_test_files
 from soilflow_pflotran_modules.solver_runner import find_pflotran_native, run_native
 from soilflow_pflotran_modules.surface_balance import (
     SimpleSurfaceFluxModel,
@@ -58,7 +71,7 @@ from soilflow_pflotran_modules.test_artifacts import (
     write_curve_svg,
     write_rows_csv,
 )
-from soilflow_pflotran_modules.test_evaluation import combined_test_status, suite_status_lines
+from soilflow_pflotran_modules.test_evaluation import combined_test_status, suite_status_lines, write_suite_status_file
 from soilflow_pflotran_modules.test_registry import (
     TEST_REGISTRY,
     selected_test_names,
@@ -66,6 +79,11 @@ from soilflow_pflotran_modules.test_registry import (
     test_params_from_document,
     test_workdir_for,
     verification_level_for_test,
+)
+from soilflow_pflotran_modules.test_solver_execution import execute_test_solver
+from soilflow_pflotran_modules.verification_runner import (
+    resolve_test_workdir,
+    run_test_mode as run_verification_test_mode,
 )
 from soilflow_pflotran import compute_derived, generate_pflotran_input, read_params, read_weather, run_demo_mode
 
@@ -96,7 +114,14 @@ class ArchitectureContractTests(unittest.TestCase):
         self.assertIn("result_diagnostics", MODULE_BOUNDARIES)
         self.assertIn("result_contract", MODULE_BOUNDARIES)
         self.assertIn("test_evaluation", MODULE_BOUNDARIES)
+        self.assertIn("test_suite_artifacts", MODULE_BOUNDARIES)
         self.assertIn("profile_benchmarks", MODULE_BOUNDARIES)
+        self.assertIn("richards_test_cases", MODULE_BOUNDARIES)
+        self.assertIn("richards_test_evaluators", MODULE_BOUNDARIES)
+        self.assertIn("richards_test_runner", MODULE_BOUNDARIES)
+        self.assertIn("profile_test_runner", MODULE_BOUNDARIES)
+        self.assertIn("test_solver_execution", MODULE_BOUNDARIES)
+        self.assertIn("verification_runner", MODULE_BOUNDARIES)
 
 
 class PhysicalModelTests(unittest.TestCase):
@@ -134,6 +159,98 @@ class PhysicalModelTests(unittest.TestCase):
         self.assertAlmostEqual(pressure_head, -0.8, places=9)
         self.assertGreaterEqual(relative_permeability, 0.0)
         self.assertLessEqual(relative_permeability, 1.0)
+
+
+class RichardsTestCaseModuleTests(unittest.TestCase):
+    def test_strict_test_builders_and_darcy_artifacts_are_independent_module_contract(self) -> None:
+        self.assertIn("linear_darcy", TEST_BUILDERS)
+        test = build_linear_darcy_test({"column_height_m": 2.0, "bottom_pressure_pa": 125000.0})
+        deck = generate_pflotran_test_input(test)
+
+        self.assertIn("MODE RICHARDS", deck)
+        self.assertIn("LIQUID_FLUX", deck)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = Path(tmpdir)
+            analytical_path = workdir / "analytical_solution.csv"
+            comparison_path = workdir / "test_comparison.csv"
+            svg_path = workdir / "test_comparison.svg"
+
+            write_analytical_solution(test, analytical_path)
+            max_abs, max_rel, points = write_test_comparison(
+                test,
+                [(0.5, test.bottom_pressure_pa - test.rho_water_kg_m3 * test.gravity_m_s2 * (1.0 + test.imposed_flux_z_m_s / test.ksat_m_s) * 0.5)],
+                comparison_path,
+            )
+            write_test_svg(test, comparison_path, svg_path)
+
+            self.assertEqual(points, 1)
+            self.assertEqual(max_abs, 0.0)
+            self.assertEqual(max_rel, 0.0)
+            self.assertIn("pressure_analytical_pa", analytical_path.read_text(encoding="utf-8"))
+            self.assertIn("<svg", svg_path.read_text(encoding="utf-8"))
+
+    def test_transient_storage_builder_exposes_partial_balance_rate_contract(self) -> None:
+        test = build_transient_uniform_storage_vg_test({})
+
+        self.assertIn("transient_uniform_storage_vg", TEST_BUILDERS)
+        self.assertGreater(transient_rate_m3_day(test, test.period_days / 4.0), 0.0)
+        self.assertAlmostEqual(transient_rate_m3_day(test, 0.0), 0.0, places=12)
+
+
+class VerificationRunnerModuleTests(unittest.TestCase):
+    def test_single_test_generation_is_runner_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = Path(tmpdir)
+            args = SimpleNamespace(output_dir=None, workdir=workdir, test="linear_darcy")
+
+            self.assertEqual(resolve_test_workdir(args, "linear_darcy"), workdir)
+            generated = generate_richards_test_files("linear_darcy", {}, workdir)
+
+            self.assertEqual(generated.test_case_id, "linear_darcy_saturated_column")
+            self.assertTrue((workdir / "pflotran.in").exists())
+            self.assertTrue((workdir / "analytical_solution.csv").exists())
+            self.assertTrue((workdir / "analytical_test_summary.txt").exists())
+
+    def test_profile_generation_is_runner_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = Path(tmpdir)
+
+            generate_profile_test_files("theis_radial_flow", workdir)
+
+            self.assertTrue((workdir / "pflotran.in").exists())
+            self.assertTrue((workdir / "analytical_solution.csv").exists())
+            self.assertTrue((workdir / "analytical_solution.svg").exists())
+            self.assertTrue((workdir / "analytical_profiles.csv").exists())
+            self.assertTrue((workdir / "analytical_test_summary.txt").exists())
+
+    def test_dry_run_mode_writes_suite_status_without_solver(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            input_json = root / "input.json"
+            output_dir = root / "out"
+            input_json.write_text(
+                '{"test_scenarios": {"linear_darcy": {"column_height_m": 2.0}}}',
+                encoding="utf-8",
+            )
+            args = SimpleNamespace(
+                input_json=input_json,
+                output_dir=output_dir,
+                workdir=None,
+                test="linear_darcy",
+                dry_run=True,
+                run=False,
+                pflotran_exe=None,
+                prefer_wsl=False,
+            )
+
+            self.assertEqual(run_verification_test_mode(args), 0)
+
+            status_path = output_dir / "runs" / "_test_suite" / "TEST_SUITE_STATUS.txt"
+            status_text = status_path.read_text(encoding="utf-8")
+            self.assertIn("TEST_SUITE_STATUS=DRY_RUN", status_text)
+            self.assertIn("_test_linear_darcy=GENERATED", status_text)
+            self.assertIn("strict_analytical_total=1", status_text)
 
 
 class ExtendedAnalyticalTests(unittest.TestCase):
@@ -354,6 +471,29 @@ class TestEvaluationTests(unittest.TestCase):
         self.assertIn("strict_analytical_total=1", lines)
         self.assertIn("strict_analytical_passed=1", lines)
 
+    def test_suite_status_writer_emits_text_json_and_csv_artifacts(self) -> None:
+        result = SimpleNamespace(
+            test_id="_test_richards_mms",
+            status="PASS_WITH_WARNINGS",
+            output_dir=Path("/tmp/_test_richards_mms"),
+            metrics={
+                "verification_level": "profile_smoke",
+                "warning_count": 1,
+                "profile_overlay_comparison": "REFERENCE_OVERLAY",
+                "profile_overlay_points": 96,
+            },
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            suite_dir = Path(tmpdir)
+
+            write_suite_status_file([result], suite_dir, dry_run=False)
+
+            self.assertIn("TEST_SUITE_STATUS=PASS_WITH_WARNINGS", (suite_dir / "TEST_SUITE_STATUS.txt").read_text(encoding="utf-8"))
+            self.assertIn('"profile_smoke_ready": 1', (suite_dir / "TEST_SUITE_STATUS.json").read_text(encoding="utf-8"))
+            csv_text = (suite_dir / "TEST_SUITE_RESULTS.csv").read_text(encoding="utf-8")
+            self.assertIn("profile_overlay_comparison", csv_text)
+            self.assertIn("REFERENCE_OVERLAY", csv_text)
+
 
 class TestRegistryTests(unittest.TestCase):
     def test_registry_selection_and_json_lookup(self) -> None:
@@ -442,6 +582,46 @@ class ProfileBenchmarkTests(unittest.TestCase):
             self.assertEqual(fields["profile_status"], "TECPLOT_READY")
             self.assertEqual(fields["analytical_overlay_check"], "PASS")
             self.assertEqual(fields["profile_points"], 2)
+            self.assertEqual(fields["profile_overlay_comparison"], "REFERENCE_OVERLAY")
+            self.assertEqual(fields["profile_overlay_points"], 2)
+            self.assertEqual(fields["profile_overlay_source"], "profile_overlay_comparison.csv")
+            self.assertTrue((workdir / "profile_overlay_comparison.csv").exists())
+
+    def test_profile_overlay_metrics_compare_numerical_and_reference_profiles(self) -> None:
+        metrics = profile_overlay_error_metrics(
+            [
+                {"z_m": 0.0, "pressure_pa": 101325.0, "saturation": 0.5},
+                {"z_m": 1.0, "pressure_pa": 101325.0, "saturation": 0.5},
+            ],
+            [
+                {"depth_m": 0.0, "theta_m3_m3": 0.215, "pressure_head_m": 0.0},
+                {"depth_m": 1.0, "theta_m3_m3": 0.215, "pressure_head_m": 0.0},
+            ],
+        )
+
+        self.assertEqual(metrics["profile_overlay_comparison"], "REFERENCE_OVERLAY")
+        self.assertEqual(metrics["profile_overlay_points"], 2)
+        self.assertEqual(metrics["theta_overlay_max_abs_m3_m3"], "0")
+
+    def test_profile_overlay_comparison_csv_is_written(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = Path(tmpdir)
+
+            metrics = write_profile_overlay_comparison(
+                workdir,
+                [
+                    {"z_m": 0.0, "pressure_pa": 101325.0, "saturation": 0.5},
+                    {"z_m": 1.0, "pressure_pa": 101325.0, "saturation": 0.5},
+                ],
+                [
+                    {"depth_m": 0.0, "theta_m3_m3": 0.215, "pressure_head_m": 0.0},
+                    {"depth_m": 1.0, "theta_m3_m3": 0.215, "pressure_head_m": 0.0},
+                ],
+            )
+
+            text = (workdir / "profile_overlay_comparison.csv").read_text(encoding="utf-8")
+            self.assertEqual(metrics["profile_overlay_source"], "profile_overlay_comparison.csv")
+            self.assertIn("theta_numerical_m3_m3", text)
 
 
 class ResultDiagnosticsTests(unittest.TestCase):
@@ -540,6 +720,31 @@ class SolverRunnerTests(unittest.TestCase):
 
             self.assertEqual(run_native(tmpdir_path, str(executable), 0), 7)
             self.assertIn("fake solver", (tmpdir_path / "run_pflotran.log").read_text(encoding="utf-8"))
+
+    def test_test_solver_execution_reports_missing_and_nonzero_solver(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = Path(tmpdir)
+            args = SimpleNamespace(pflotran_exe=str(workdir / "missing"), prefer_wsl=False)
+
+            missing = execute_test_solver(args, "linear_darcy", workdir, mpi_processes=1)
+
+            self.assertEqual(missing.status, "GENERATED_ONLY")
+            self.assertFalse(missing.executed)
+            self.assertIn("GENERATED_ONLY", (workdir / "TEST_STATUS.txt").read_text(encoding="utf-8"))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = Path(tmpdir)
+            executable = workdir / "fake_pflotran.sh"
+            executable.write_text("#!/usr/bin/env sh\nexit 7\n", encoding="utf-8")
+            executable.chmod(0o755)
+            (workdir / "pflotran.in").write_text("# smoke\n", encoding="utf-8")
+            args = SimpleNamespace(pflotran_exe=str(executable), prefer_wsl=False)
+
+            failed = execute_test_solver(args, "linear_darcy", workdir, mpi_processes=1)
+
+            self.assertEqual(failed.status, "PFLOTRAN_ERROR")
+            self.assertTrue(failed.executed)
+            self.assertEqual(failed.exit_code, 7)
 
 
 class CliContractTests(unittest.TestCase):

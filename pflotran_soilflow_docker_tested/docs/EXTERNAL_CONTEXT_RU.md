@@ -1,9 +1,9 @@
 # Внешний контекст проекта
 
-**Проект:** Влагоперенос в почве  
-**Папка проекта:** `/home/zenbook/SF/pflotran_soilflow_docker_tested`  
-**Папка git-репозитория:** `/home/zenbook/SF`  
-**Дата фиксации контекста:** 2026-06-16  
+**Проект:** Влагоперенос в почве
+**Папка проекта:** `/home/zenbook/SF/pflotran_soilflow_docker_tested`
+**Папка git-репозитория:** `/home/zenbook/SF`
+**Дата фиксации контекста:** 2026-06-28
 **Назначение файла:** восстановить состояние разработки в новом чате Codex без потери архитектурного контекста.
 
 ## 1. Краткое состояние
@@ -54,12 +54,12 @@ pflotran_soilflow_docker_tested/
     soilflow_pflotran_demo.xlsx      исторический/выводной формат, не внутренняя БД
 
   scripts/
-    soilflow_pflotran.py             совместимый CLI-фасад: чтение JSON, маршрутизация demo/_test, специализированные тесты
+    soilflow_pflotran.py             совместимый CLI-фасад: чтение JSON, demo-mode, передача _test в verification_runner
     soilflow_visualize.py            HTML/SVG/CSV визуализация 1D/XY/XZ профилей
     check_project.sh                 единая проверка: Python compile, backend unittest, frontend build, restart, API smoke
     api_smoke.sh                     read-only проверка базового API-контракта живого web-сервиса
     sync_to_running_container.sh     документированный hot-copy workflow для запущенного контейнера
-    soilflow_pflotran_modules/       вынесенные контракты parser/model/deck/floodplain/result diagnostics/result contract/solver runner/surface balance/test evaluation
+    soilflow_pflotran_modules/       вынесенные контракты parser/model/deck/floodplain/result diagnostics/result contract/solver runner/surface balance/test evaluation/test runners
     *.sh                             вспомогательные Docker-команды
 
   web/backend/app/
@@ -362,9 +362,10 @@ web/frontend/src/pages/VisualizationPage.tsx
 - графики должны иметь читаемые оси, светлую сетку, без дублирования подписей и наложений;
 - скорость проигрывания графиков задается логарифмическим ползунком от `0.1x` до `1000x`.
 
-## 8. Расчетный слой: `soilflow_pflotran.py`
+## 8. Расчетный слой: CLI-фасад и модули PFLOTRAN
 
-Скрипт выполняет несколько ролей:
+`soilflow_pflotran.py` оставлен совместимым CLI-фасадом. Сейчас он выполняет
+только верхнюю маршрутизацию и demo-mode:
 
 1. читает JSON workbook;
 2. извлекает параметры и weather rows;
@@ -372,8 +373,26 @@ web/frontend/src/pages/VisualizationPage.tsx
 4. строит structured grid для 1D, 2D_XY, 2D_XZ и частично 3D;
 5. генерирует PFLOTRAN input deck;
 6. пишет вспомогательные CSV/summary;
-7. запускает PFLOTRAN;
-8. оценивает аналитические тесты и пишет `TEST_STATUS.txt`.
+7. запускает PFLOTRAN для demo/пользовательских расчетов;
+8. передает режим `_test` в `soilflow_pflotran_modules.verification_runner`.
+
+Verification-suite разделен на модули:
+
+- `test_registry.py`: реестр тестов, выбор `all`, рабочие пути и уровень
+  проверки (`strict_analytical`, `partial_balance`, `profile_smoke`);
+- `richards_test_cases.py`: dataclass-параметры, PFLOTRAN deck'и и
+  аналитические artifacts strict/partial Richards-тестов;
+- `richards_test_evaluators.py`: сравнение PFLOTRAN-профилей с аналитикой и
+  запись `TEST_STATUS.txt`;
+- `profile_benchmarks.py`: profile-smoke overlay, TECPLOT-ready status и
+  диагностические `REFERENCE_OVERLAY` ошибки по профилю;
+- `richards_test_runner.py`: запуск strict/partial Richards-сценариев;
+- `profile_test_runner.py`: запуск profile-smoke benchmark'ов;
+- `test_solver_execution.py`: общий native/WSL PFLOTRAN execution-helper для
+  verification runners;
+- `test_suite_artifacts.py`: запись suite summary в TXT/JSON/CSV для анализа;
+- `verification_runner.py`: suite-router `_test`, выбор сценариев, рабочие
+  папки и запись suite status.
 
 Поддержанные типы сетки:
 
@@ -620,7 +639,9 @@ scripts/__pycache__/
 6. Для многофакторного исследования дождя/импеданса нужны более легкие расчетные сетки или план эксперимента, иначе серия 3 x 3 работает долго.
 7. Табличные экспериментальные кривые уже хранятся в SQLite, редактируются через frontend, проходят UI-валидацию/предпросмотр и попадают в временный JSON-снимок расчета как `soil_curve_tables`; табличное водоудерживание передается в PFLOTRAN через `LOOKUP_TABLE`, табличная влагопроводность - через `PCHIP_LIQ`.
 8. Пара `Голованов-Аверьянов` обозначена как предметная цель, но не доведена до проверенной PFLOTRAN-реализации.
-9. Профильные benchmark artifacts и TECPLOT-ready status вынесены в `soilflow_pflotran_modules.profile_benchmarks`; strict-evaluator'ы для Theis/Ogata/Terzaghi/heat/Buckley/Boussinesq/Richards MMS еще не подключены.
+9. Профильные benchmark artifacts, TECPLOT-ready status, diagnostic `REFERENCE_OVERLAY` метрики и `profile_overlay_comparison.csv` вынесены в `soilflow_pflotran_modules.profile_benchmarks`; strict-evaluator'ы для Theis/Ogata/Terzaghi/heat/Buckley/Boussinesq/Richards MMS еще не подключены.
+10. Suite summary теперь пишется в `TEST_SUITE_STATUS.txt`, `TEST_SUITE_STATUS.json` и `TEST_SUITE_RESULTS.csv`; JSON/CSV предназначены для последующего анализа и web/API-интеграции без парсинга текстового status-файла.
+11. Strict/partial Richards verification слой, profile-smoke запуск и suite-router `_test` вынесены из `soilflow_pflotran.py` в `richards_test_cases.py`, `richards_test_evaluators.py`, `richards_test_runner.py`, `profile_test_runner.py` и `verification_runner.py`; CLI-фасад должен оставаться тонким маршрутизатором, а не местом новой физики тестов.
 
 ## 15. Что важно сохранить в следующих итерациях
 
@@ -629,7 +650,7 @@ scripts/__pycache__/
 - Любой новый расчет через интерфейс должен сохранять JSON-снимок в SQLite как новый `расчет №...`.
 - При выборе старого расчета поля формы должны заполняться значениями этого расчета.
 - Любые новые графики должны иметь расчетные и аналитические профили на одном графике, если для теста есть аналитика.
-- Любые новые тесты должны явно указывать `verification_level`: `strict_analytical`, `partial_balance` или `profile_smoke`; profile smoke нельзя показывать как строгую аналитическую верификацию.
+- Любые новые тесты должны явно указывать `verification_level`: `strict_analytical`, `partial_balance` или `profile_smoke`; profile smoke нельзя показывать как строгую аналитическую верификацию, даже если для него есть `REFERENCE_OVERLAY` диагностика.
 - Любые новые модели водоудерживания/влагопроводности должны проходить явную валидацию совместимости.
 - Для пользовательских путей и имен run обязательно использовать существующие safe helpers.
 - Новые комментарии и документация должны быть на русском языке.
@@ -637,8 +658,8 @@ scripts/__pycache__/
 ## 16. Рекомендуемый следующий план разработки
 
 1. Для релизного состояния выполнить полную пересборку Docker image и сверить ее с hot-copy workflow.
-2. Продолжить перенос тестового слоя `soilflow_pflotran.py` в `test_builders` и `test_evaluators`: dataclass-параметры, generator и строгие evaluator'ы для Richards/VG/Brooks-Corey тестов.
-3. Довести расширенные profile carrier тесты до строгих физических deck'ов PFLOTRAN для transport/heat/two-phase/groundwater задач, подключая их через `profile_benchmarks.py`.
+2. Новые семейства тестов/постановок добавлять отдельными case/evaluator/runner-модулями, не возвращая orchestration и физику тестов в `soilflow_pflotran.py` или центральный `verification_runner.py`.
+3. Довести расширенные profile carrier тесты до строгих физических deck'ов PFLOTRAN для transport/heat/two-phase/groundwater задач, подключая их через `profile_benchmarks.py` и отдельные evaluator-модули.
 4. При замене solver-а подключать новый adapter рядом с `solver_runner.py` и parser-adapter рядом с `result_diagnostics.py`, возвращая `result_contract.py`; при замене испарения подключать новую реализацию через `surface_balance.py`/forcing contract.
 5. Для дренажной задачи вынести исследовательские сценарии в отдельный воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`, `УГВ`, `C`, `G`, `Z`.
 6. Отдельно решить, остается ли регулируемый колодец эквивалентным sink или нужен явный модуль hydraulic network.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import math
 from pathlib import Path
 from typing import Any, Protocol
@@ -17,6 +18,11 @@ from soilflow_pflotran_modules.result_diagnostics import (
 )
 from soilflow_pflotran_modules.test_artifacts import analytical_profile_overlay_diagnostics, write_rows_csv
 from soilflow_pflotran_modules.test_registry import verification_level_for_test
+
+PROFILE_POROSITY = 0.43
+PROFILE_RHO_WATER_KG_M3 = 997.0
+PROFILE_GRAVITY_M_S2 = 9.80665
+PROFILE_ATMOSPHERIC_PRESSURE_PA = 101325.0
 
 
 class ProfileTestResultFactory(Protocol):
@@ -104,6 +110,118 @@ def write_richards_profile_analytical_profiles(test_name: str, workdir: Path) ->
     write_rows_csv(workdir / "analytical_profiles.csv", rows)
 
 
+def _read_analytical_profile_rows(path: Path) -> list[dict[str, float]]:
+    with path.open("r", newline="", encoding="utf-8") as file_obj:
+        reader = csv.DictReader(file_obj)
+        if reader.fieldnames is None:
+            return []
+        rows: list[dict[str, float]] = []
+        for raw_row in reader:
+            try:
+                rows.append({key: float(value) for key, value in raw_row.items() if value not in (None, "")})
+            except ValueError:
+                continue
+    if not rows:
+        return []
+    if "frame_index" in rows[0]:
+        final_frame = max(row["frame_index"] for row in rows if "frame_index" in row)
+        return [row for row in rows if row.get("frame_index") == final_frame]
+    if "time_days" in rows[0] and len({row.get("time_days") for row in rows}) > 1:
+        final_time = max(row["time_days"] for row in rows if "time_days" in row)
+        return [row for row in rows if row.get("time_days") == final_time]
+    return rows
+
+
+def _interpolate_by_depth(rows: list[dict[str, float]], depth_m: float, value_key: str) -> float:
+    points = sorted((row["depth_m"], row[value_key]) for row in rows if "depth_m" in row and value_key in row)
+    if not points:
+        raise ValueError(f"В аналитическом профиле нет колонки {value_key}")
+    if depth_m <= points[0][0]:
+        return points[0][1]
+    if depth_m >= points[-1][0]:
+        return points[-1][1]
+    for left, right in zip(points, points[1:]):
+        z0, y0 = left
+        z1, y1 = right
+        if z0 <= depth_m <= z1:
+            if math.isclose(z0, z1):
+                return 0.5 * (y0 + y1)
+            ratio = (depth_m - z0) / (z1 - z0)
+            return y0 + ratio * (y1 - y0)
+    return points[-1][1]
+
+
+def profile_overlay_comparison_rows(
+    numerical_rows: list[dict[str, float]],
+    analytical_rows: list[dict[str, float]],
+) -> list[dict[str, float]]:
+    if not numerical_rows or not analytical_rows:
+        return []
+
+    max_z_m = max(row["z_m"] for row in numerical_rows)
+    comparison_rows: list[dict[str, float]] = []
+    for row in numerical_rows:
+        depth_m = max_z_m - row["z_m"]
+        theta_numerical = PROFILE_POROSITY * row["saturation"]
+        pressure_head_numerical = (
+            row["pressure_pa"] - PROFILE_ATMOSPHERIC_PRESSURE_PA
+        ) / (PROFILE_RHO_WATER_KG_M3 * PROFILE_GRAVITY_M_S2)
+        theta_analytical = _interpolate_by_depth(analytical_rows, depth_m, "theta_m3_m3")
+        pressure_head_analytical = _interpolate_by_depth(analytical_rows, depth_m, "pressure_head_m")
+        comparison_rows.append(
+            {
+                "depth_m": depth_m,
+                "z_m": row["z_m"],
+                "theta_numerical_m3_m3": theta_numerical,
+                "theta_analytical_m3_m3": theta_analytical,
+                "theta_error_m3_m3": theta_numerical - theta_analytical,
+                "pressure_head_numerical_m": pressure_head_numerical,
+                "pressure_head_analytical_m": pressure_head_analytical,
+                "pressure_head_error_m": pressure_head_numerical - pressure_head_analytical,
+            }
+        )
+    return sorted(comparison_rows, key=lambda item: item["depth_m"])
+
+
+def profile_overlay_error_metrics(
+    numerical_rows: list[dict[str, float]],
+    analytical_rows: list[dict[str, float]],
+) -> dict[str, object]:
+    comparison_rows = profile_overlay_comparison_rows(numerical_rows, analytical_rows)
+    if not comparison_rows:
+        return {"profile_overlay_comparison": "SKIP", "profile_overlay_points": 0}
+
+    theta_errors = [row["theta_error_m3_m3"] for row in comparison_rows]
+    pressure_head_errors = [row["pressure_head_error_m"] for row in comparison_rows]
+
+    def rmse(values: list[float]) -> float:
+        return math.sqrt(sum(value * value for value in values) / len(values))
+
+    return {
+        "profile_overlay_comparison": "REFERENCE_OVERLAY",
+        "profile_overlay_points": len(comparison_rows),
+        "theta_overlay_rmse_m3_m3": f"{rmse(theta_errors):.12g}",
+        "theta_overlay_max_abs_m3_m3": f"{max(abs(value) for value in theta_errors):.12g}",
+        "pressure_head_overlay_rmse_m": f"{rmse(pressure_head_errors):.12g}",
+        "pressure_head_overlay_max_abs_m": f"{max(abs(value) for value in pressure_head_errors):.12g}",
+        "profile_overlay_note": "Reference overlay metric only; profile_smoke не является строгой физической верификацией.",
+    }
+
+
+def write_profile_overlay_comparison(
+    workdir: Path,
+    numerical_rows: list[dict[str, float]],
+    analytical_rows: list[dict[str, float]],
+) -> dict[str, object]:
+    comparison_rows = profile_overlay_comparison_rows(numerical_rows, analytical_rows)
+    if not comparison_rows:
+        return {"profile_overlay_comparison": "SKIP", "profile_overlay_points": 0}
+    output_path = workdir / "profile_overlay_comparison.csv"
+    write_rows_csv(output_path, comparison_rows)
+    metrics = profile_overlay_error_metrics(numerical_rows, analytical_rows)
+    return {**metrics, "profile_overlay_source": output_path.name}
+
+
 def profile_status_fields_after_run(test_name: str, workdir: Path) -> dict[str, object]:
     tec_files = sorted(p for p in workdir.glob("pflotran-[0-9]*.tec") if p.is_file() and "-vel-" not in p.name)
     if not tec_files:
@@ -133,6 +251,7 @@ def profile_status_fields_after_run(test_name: str, workdir: Path) -> dict[str, 
         "note": "PFLOTRAN расчетные профили построены; строгая аналитическая метрика для этого benchmark будет подключена отдельной задачей.",
     }
     status_fields.update(analytical_profile_overlay_diagnostics(workdir))
+    status_fields.update(write_profile_overlay_comparison(workdir, converted, _read_analytical_profile_rows(workdir / "analytical_profiles.csv")))
     return status_fields
 
 

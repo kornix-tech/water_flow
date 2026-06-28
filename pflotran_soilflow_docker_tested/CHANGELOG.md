@@ -12,6 +12,13 @@
 - Добавлены модули `soilflow_pflotran_modules.floodplain_deck_writer`, `result_contract` и `test_evaluation`, а также smoke `scripts/smoke_modular_scenarios.sh`.
 - Добавлены модули `soilflow_pflotran_modules.test_registry` и `test_artifacts` для маршрутизации тестов, путей suite и общих CSV/SVG/overlay artifacts.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmarks` для генерации аналитических profile overlay и оценки TECPLOT-ready статусов профильных benchmarks.
+- Добавлены модули `soilflow_pflotran_modules.richards_test_cases` и `richards_test_evaluators` для strict/partial Richards verification builders и evaluators.
+- Добавлен модуль `soilflow_pflotran_modules.verification_runner` для orchestration режима `_test`: выбора сценариев, рабочих папок, запуска solver-а и записи suite status.
+- Добавлены модули `soilflow_pflotran_modules.richards_test_runner` и `profile_test_runner`, чтобы запуск strict/partial и profile-smoke тестов был отделен от центрального suite-router.
+- Добавлен модуль `soilflow_pflotran_modules.test_solver_execution` для общего native/WSL PFLOTRAN запуска внутри verification runners.
+- Добавлен модуль `soilflow_pflotran_modules.test_suite_artifacts` для записи suite summary в TXT/JSON/CSV.
+- Добавлены reference overlay метрики для profile-smoke benchmark'ов: RMSE/max-error по объемной влажности и напору относительно `analytical_profiles.csv`.
+- Для profile-smoke benchmark'ов теперь записывается `profile_overlay_comparison.csv` с построчным сравнением `PFLOTRAN vs analytical`.
 - Добавлена архитектурная схема `docs/ARCHITECTURE_RU.md` с текущими потоками данных и заменяемыми adapter-границами.
 - Добавлен модуль `soilflow_pflotran_modules.tabular_curves` с нормализацией табличных кривых, записью PFLOTRAN `.dat` файлов и unit-тестами монотонности.
 - Добавлен интерфейс редактирования табличных кривых почвы на странице `Исходные данные`: паспорт кривой, точки `h/P/theta/S/kr/K`, сохранение, обновление и удаление через SQLite API.
@@ -62,6 +69,13 @@
 - Специализированная floodplain-постановка, базовая сборка статусов тестов и suite status вынесены из `soilflow_pflotran.py`; `check_project.sh` теперь компилирует весь каталог `scripts` и запускает modular scenario smoke.
 - Список verification/profile тестов, выбор `all`, пути рабочих папок и общие CSV/SVG helpers вынесены из `soilflow_pflotran.py`; CLI сохраняет прежний контракт `--test`, `--workdir`, `--output-dir`.
 - Генерация `analytical_profiles.csv` и оценка profile-smoke TECPLOT-статуса вынесены из `soilflow_pflotran.py`; helper'ы van Genuchten saturation/kr перенесены в `physical_models.py`.
+- Strict/partial Richards test builders, PFLOTRAN deck writers, analytical artifacts и numerical evaluators вынесены из `soilflow_pflotran.py`; CLI-контракт `--mode test/_test` сохранён.
+- Orchestration режима `_test` вынесена из `soilflow_pflotran.py`; основной скрипт стал тоньше и передает verification-suite в отдельный runner-модуль.
+- `verification_runner` упрощен до suite-router: физика и запуск конкретных семейств тестов перенесены в family runner-модули.
+- Дублирующая native/WSL solver-execution логика удалена из family runner'ов и заменена общим helper-модулем.
+- Verification-suite теперь кроме `TEST_SUITE_STATUS.txt` пишет `TEST_SUITE_STATUS.json` и `TEST_SUITE_RESULTS.csv`, чтобы анализ результатов не зависел от парсинга текстового файла.
+- Dry-run verification-suite теперь сохраняет `verification_level` в suite summary, поэтому счетчики `strict_analytical`/`partial_balance`/`profile_smoke` информативны без запуска PFLOTRAN.
+- Profile-smoke benchmark'и теперь явно пишут `profile_overlay_comparison=REFERENCE_OVERLAY`; это диагностическое сравнение не повышает их до strict analytical verification.
 - Verification-suite теперь явно разделяет уровни `strict_analytical`, `partial_balance` и `profile_smoke` в `TEST_STATUS.txt`, suite summary и web-описаниях тестов.
 - Первый блок `soilflow_pflotran.py` вынесен из монолита в модули: парсинг входных значений, PFLOTRAN float-format и валидация пар моделей почвы.
 - Все расширенные аналитические benchmarks теперь генерируют PFLOTRAN `RICHARDS` profile carrier, `pflotran.in` и `analytical_profiles.csv`, чтобы после запуска были расчетные TECPLOT-профили для графиков.

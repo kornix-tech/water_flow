@@ -35,9 +35,16 @@ MODULE_BOUNDARIES = {
     "result_contract": "Solver-neutral профиль, diagnostics и статус для будущих parser-adapter реализаций.",
     "solver_runner": "Поиск и запуск внешнего solver-а без знания физической постановки.",
     "test_evaluation": "Единая сборка PASS/WARN/FAIL, UNKNOWN/PFLOTRAN_ERROR и suite status.",
+    "test_suite_artifacts": "Запись suite summary в TXT/JSON/CSV для машинного анализа verification-suite.",
     "test_registry": "Реестр verification/profile тестов, выбор сценариев и рабочие пути suite.",
     "test_artifacts": "Общие CSV/SVG artifacts и diagnostics аналитического overlay.",
     "profile_benchmarks": "Генерация аналитических profile overlay и оценка TECPLOT-ready статуса профильных benchmarks.",
+    "richards_test_cases": "Dataclass-параметры, PFLOTRAN deck'и и аналитические artifacts strict/partial Richards-тестов.",
+    "richards_test_evaluators": "Сравнение PFLOTRAN профилей с analytical strict/partial Richards-метриками.",
+    "richards_test_runner": "Запуск strict/partial Richards-тестов: artifacts, solver и выбор evaluator-а.",
+    "profile_test_runner": "Запуск profile-smoke benchmark'ов: reference artifacts, profile-carrier deck, solver и TECPLOT-ready status.",
+    "test_solver_execution": "Общий test-runner adapter для native/WSL PFLOTRAN запуска и ошибок внешнего solver-а.",
+    "verification_runner": "Suite-router режима _test: чтение JSON, выбор сценариев, рабочие папки и suite status.",
     "analytical_tests": "Аналитические профили и метрики сравнения численных тестов.",
 }
 

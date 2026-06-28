@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
-
-class TestResultLike(Protocol):
-    test_id: str
-    status: str
-    metrics: dict[str, Any]
+from soilflow_pflotran_modules.test_registry import verification_level_for_test
+from soilflow_pflotran_modules.test_suite_artifacts import (
+    TestResultLike,
+    suite_result_rows,
+    suite_status_lines,
+    suite_status_summary,
+    write_suite_status_file,
+)
 
 
 def pass_fail(passed: bool) -> str:
@@ -42,6 +45,10 @@ def write_pflotran_error_status(path: Path, exit_code: int) -> None:
     path.write_text(f"TEST_STATUS=PFLOTRAN_ERROR\nexit_code={exit_code}\n", encoding="utf-8")
 
 
+def base_result_metrics(test_name: str, **extra_metrics: Any) -> dict[str, Any]:
+    return {"verification_level": verification_level_for_test(test_name), **extra_metrics}
+
+
 def direct_flux_output_file(direct_probe: dict[str, Any]) -> str:
     files = (
         list(direct_probe.get("conservation_files", []))
@@ -51,51 +58,17 @@ def direct_flux_output_file(direct_probe: dict[str, Any]) -> str:
     return str(files[0]) if files else "NA"
 
 
-def suite_status_lines(results: list[TestResultLike], dry_run: bool = False) -> list[str]:
-    accepted = {"PASS", "PASS_WITH_WARNINGS", "SKIP"}
-    if dry_run:
-        accepted = accepted | {"GENERATED", "GENERATED_ONLY"}
-    failed = [result for result in results if result.status not in accepted]
-    warned = [result for result in results if result.status == "PASS_WITH_WARNINGS"]
-    skipped = [result for result in results if result.status == "SKIP"]
-    suite_status = (
-        "DRY_RUN"
-        if dry_run
-        else ("FAIL" if failed else ("PASS_WITH_SKIPS" if skipped else ("PASS_WITH_WARNINGS" if warned else "PASS")))
-    )
-    lines = [
-        f"TEST_SUITE_STATUS={suite_status}",
-        f"tests_total={len(results)}",
-        f"tests_passed={sum(1 for result in results if result.status == 'PASS')}",
-        f"tests_passed_with_warnings={sum(1 for result in results if result.status == 'PASS_WITH_WARNINGS')}",
-        f"tests_skipped={len(skipped)}",
-        f"tests_failed={len(failed)}",
-        f"strict_analytical_total={sum(1 for result in results if result.metrics.get('verification_level') == 'strict_analytical')}",
-        f"strict_analytical_passed={sum(1 for result in results if result.metrics.get('verification_level') == 'strict_analytical' and result.status in accepted)}",
-        f"partial_balance_total={sum(1 for result in results if result.metrics.get('verification_level') == 'partial_balance')}",
-        f"partial_balance_passed={sum(1 for result in results if result.metrics.get('verification_level') == 'partial_balance' and result.status in accepted)}",
-        f"profile_smoke_total={sum(1 for result in results if result.metrics.get('verification_level') == 'profile_smoke')}",
-        f"profile_smoke_ready={sum(1 for result in results if result.metrics.get('verification_level') == 'profile_smoke' and result.status in accepted)}",
-        "",
-    ]
-    for result in results:
-        lines.append(f"{result.test_id}={result.status}")
-    lines.extend(
-        [
-            "",
-            f"warnings_total={sum(int(result.metrics.get('warning_count', 0)) for result in results)}",
-            f"unexpected_warnings_total={sum(int(result.metrics.get('unexpected_warning_count', 0)) for result in results)}",
-            f"solver_errors_total={sum(int(result.metrics.get('solver_error_count', 0)) for result in results)}",
-            f"solver_divergences_total={sum(1 for result in results if bool(result.metrics.get('solver_diverged', False)))}",
-            f"solver_cuts_total={sum(int(result.metrics.get('solver_cuts', 0)) for result in results)}",
-        ]
-    )
-    return lines
-
-
-def write_suite_status_file(results: list[TestResultLike], suite_dir: Path, dry_run: bool = False) -> None:
-    suite_dir.mkdir(parents=True, exist_ok=True)
-    (suite_dir / "TEST_SUITE_STATUS.txt").write_text(
-        "\n".join(suite_status_lines(results, dry_run=dry_run)) + "\n",
-        encoding="utf-8",
-    )
+__all__ = [
+    "TestResultLike",
+    "base_result_metrics",
+    "combined_test_status",
+    "direct_flux_output_file",
+    "pass_fail",
+    "solver_check_passed",
+    "suite_result_rows",
+    "suite_status_lines",
+    "suite_status_summary",
+    "write_pflotran_error_status",
+    "write_suite_status_file",
+    "write_unknown_status",
+]
