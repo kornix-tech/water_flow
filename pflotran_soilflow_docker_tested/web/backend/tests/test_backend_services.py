@@ -421,6 +421,19 @@ class RunStatusOverviewServiceTests(unittest.TestCase):
             self.assertEqual(len(overview["items"]), 1)
             self.assertEqual(overview["items"][0]["kind"], "run-files")
 
+    def test_read_run_status_overview_uses_json_only_suite_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            (run_dir / "TEST_SUITE_STATUS.json").write_text(
+                '{"summary": {"TEST_SUITE_STATUS": "PASS", "tests_total": 1, "tests_passed": 1}, "results": []}',
+                encoding="utf-8",
+            )
+
+            overview = read_run_status_overview("_test_suite", run_dir)
+
+            self.assertEqual(overview["items"][0]["kind"], "test-suite")
+            self.assertEqual(overview["items"][0]["source"], "TEST_SUITE_STATUS.json")
+
 
 if __name__ == "__main__":
     unittest.main()

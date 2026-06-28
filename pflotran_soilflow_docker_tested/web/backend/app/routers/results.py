@@ -10,7 +10,7 @@ from ..file_manager import safe_resolve_under, safe_run_name
 from ..schemas import RunInfo, RunStatusOverview, TestRunStatus, TestSuiteStatus
 from ..services.run_status_overview_service import read_run_status_overview
 from ..services.test_run_status_service import read_test_run_status
-from ..services.test_suite_summary_service import read_test_suite_status
+from ..services.test_suite_summary_service import SUITE_STATUS_ARTIFACTS, read_test_suite_status
 
 router = APIRouter()
 
@@ -21,7 +21,10 @@ def _run_info(run_dir: Path, file_manager, *, include_files: bool = True) -> Run
         run_name=run_dir.name,
         path=str(run_dir),
         has_test_status=(run_dir / "TEST_STATUS.txt").exists(),
-        has_suite_status=(run_dir / "TEST_SUITE_STATUS.txt").exists(),
+        has_suite_status=any(
+            (run_dir / filename).is_file() and not (run_dir / filename).is_symlink()
+            for filename in SUITE_STATUS_ARTIFACTS
+        ),
         has_visualization=(run_dir / "plots" / "profiles_animation.html").exists(),
         files=files[:500],
     )

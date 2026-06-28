@@ -6,7 +6,7 @@
 **Git root:** `/home/zenbook/SF`  
 **Текущий сервис:** `http://localhost:18080/`  
 **Контейнер:** `pflotran_soilflow_docker_tested-soilflow-web-1`  
-**Базовый commit перед текущим stability/performance этапом:** `d1c97dc Summarize strict readiness stages`
+**Базовый commit перед текущим stability/performance этапом:** `70cbdcf Harden results status artifact handling`
 **Статус этого handoff:** предназначен для открытия нового чата Codex без восстановления истории из текущего длинного чата.
 
 ## 1. Решение по переходу в новый чат
@@ -53,10 +53,12 @@ wsl -d Ubuntu --cd /home/zenbook/SF/pflotran_soilflow_docker_tested -- bash -lc 
 c685e46 Add typed run status overviews
 ```
 
-Текущий следующий этап: первый инкремент устойчивости и производительности
-results/status layer. `/api/results/runs` переведен в быстрый summary-режим без
-рекурсивного сканирования файлов каждой run-папки, а чтение suite/test status
-artifacts стало устойчивым к частично записанным JSON/CSV diagnostics.
+Текущий следующий этап: второй инкремент устойчивости и производительности
+results/status layer. Первый инкремент уже перевел `/api/results/runs` в
+быстрый summary-режим без рекурсивного сканирования файлов каждой run-папки и
+сделал чтение suite/test status artifacts устойчивым к частично записанным
+JSON/CSV diagnostics. Второй инкремент добавляет живой performance/stability
+smoke и выравнивает JSON-only suite status в summary/overview.
 
 ## 4. Что было сделано после последнего commit
 
@@ -217,7 +219,7 @@ GET /api/results/runs/{run_name}/file/{file_path}
 Важно: `GET /api/results/runs` теперь является быстрым summary endpoint и не
 обязан возвращать список `files` для каждой run-папки. Детальный ограниченный
 список файлов остается в `GET /api/results/runs/{run_name}` для выбранного
-запуска.
+запуска. Флаг `has_suite_status` считается по JSON/TXT suite artifacts.
 
 Новые/расширенные endpoints:
 
@@ -285,14 +287,15 @@ RunStatusOverview
 Состав gate:
 
 ```text
-[1/8] Python compile
-[2/8] Backend unit tests
-[3/8] Core modular tests
-[4/8] Frontend production build
-[5/8] Cleanup generated frontend build
-[6/8] Restart web service
-[7/8] API contract and workflow checks
-[8/8] Frontend route smoke
+[1/9] Python compile
+[2/9] Backend unit tests
+[3/9] Core modular tests
+[4/9] Frontend production build
+[5/9] Cleanup generated frontend build
+[6/9] Restart web service
+[7/9] API contract and workflow checks
+[8/9] Results performance smoke
+[9/9] Frontend route smoke
 ```
 
 Итог последнего запуска:
@@ -303,6 +306,7 @@ Core tests: 51 tests OK
 Frontend production build: OK
 API smoke: OK
 tabular API workflow smoke: OK
+results performance smoke: OK
 UI route smoke: OK
 project checks passed on http://localhost:18080
 ```
@@ -317,6 +321,7 @@ docker run --rm -v /home/zenbook/SF/pflotran_soilflow_docker_tested:/app -w /app
 ./scripts/sync_to_running_container.sh
 curl -fsS http://localhost:18080/api/health/ready
 curl -fsS http://localhost:18080/api/results/runs/_test_linear_darcy/overview
+WEB_PORT=18080 ./scripts/api_results_performance_smoke.sh
 python3 -m compileall -q scripts tests web/backend/app
 git diff --check
 ```
@@ -375,7 +380,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:0c6fa227482a802ac0890cf7258837333ce124d1d30b3f9ece35a5d99244f212
+sha256:1119aea091fa576177151822e0f6ac3dee014cf71c16a3f2dbef9526203e84f3
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -391,11 +396,14 @@ docs/NEXT_CHAT_CONTEXT_RU.md
 Смысл изменений:
 
 - добавлены `/test-suite`, `/test-status`, `/overview`;
-- добавлен `scripts/ui_route_smoke.sh` и обязательный `[8/8] Frontend route smoke` в `scripts/check_project.sh`;
+- добавлен `scripts/ui_route_smoke.sh` и обязательный `[9/9] Frontend route smoke` в `scripts/check_project.sh`;
+- добавлен `scripts/api_results_performance_smoke.sh` и обязательный
+  `[8/9] Results performance smoke` в `scripts/check_project.sh`;
 - зафиксировано, что frontend больше не парсит status TXT напрямую;
 - описан общий reader status-сводок;
 - зафиксировано, что `/api/results/runs` является быстрым summary endpoint без
   рекурсивного списка файлов каждой run-папки;
+- JSON-only suite artifacts теперь видны в summary/overview как suite status;
 - частично записанные suite/status artifacts больше не должны давать 500 при
   наличии пригодного fallback;
 - web smoke examples дополнены curl-командами для новых endpoints.
@@ -440,8 +448,9 @@ flowchart LR
 рестартах контейнера и частичных artifacts.
 
 1. Ввести performance/stability smoke для чтения результатов:
-   - измерять `/api/results/runs`, `/overview`, `/test-suite`, `/test-status`
-     на репозитории с большим числом run-папок;
+   - уже добавлен `scripts/api_results_performance_smoke.sh`, который измеряет
+     `/api/results/runs`, `/overview`, `/test-suite`, `/test-status` на наборе
+     временных run-папок;
    - проверять лимиты времени ответа и размер JSON;
    - фиксировать деградации отдельным скриптом, не смешивая с физикой PFLOTRAN.
 2. Ужесточить filesystem-контракты result endpoints:
@@ -582,7 +591,7 @@ workflow_smoke
 Работай в проекте /home/zenbook/SF/pflotran_soilflow_docker_tested.
 Сначала прочитай docs/NEXT_CHAT_CONTEXT_RU.md и docs/EXTERNAL_CONTEXT_RU.md.
 Проверь git status и текущее состояние сервиса.
-Дальше продолжай с блока: если stability/performance этап не закоммичен,
+Дальше продолжай с блока: если второй stability/performance этап не закоммичен,
 проверить `git status`, запустить `./scripts/check_project.sh`, выполнить Docker
 rebuild gate, очистить generated artifacts `runs/_test_suite`, затем
 commit/push.

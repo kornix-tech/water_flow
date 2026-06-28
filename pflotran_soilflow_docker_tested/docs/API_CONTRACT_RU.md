@@ -128,7 +128,8 @@ Endpoints:
 
 - `GET /api/results/runs` - быстрый summary-список: endpoint не обязан
   возвращать полный список файлов внутри каждой run-папки, чтобы не делать
-  дорогое рекурсивное сканирование на больших архивах.
+  дорогое рекурсивное сканирование на больших архивах. Флаг
+  `has_suite_status` считается по JSON/TXT suite artifacts.
 - `GET /api/results/runs/{run_name}` - сведения о конкретном запуске, включая
   ограниченный список файлов выбранной run-папки.
 - `GET /api/results/runs/{run_name}/status` - текстовый статус расчета/теста.
@@ -173,6 +174,8 @@ Endpoints:
   marker `artifact_readiness=PARTIAL`.
 - `GET /api/results/runs/{run_name}/overview` - единый обзор состояния запуска:
   verification-suite, отдельный тест, графики или fallback по файлам результата.
+  Suite-карточка строится и для JSON-only suite artifact, если TXT еще не
+  создан или уже удален.
 - `GET /api/results/runs/{run_name}/plots` - список файлов графиков.
 - `GET /api/results/runs/{run_name}/file/{file_path}` - безопасное чтение файла
   внутри папки запуска.

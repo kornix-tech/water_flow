@@ -40,6 +40,7 @@ PFLOTRAN: /opt/pflotran/src/pflotran/pflotran
 8. SQLite schema version 2 содержит табличные экспериментальные кривые почвы: `soil_curve_tables` и `soil_curve_points`; backend API и frontend-редактор доступны на странице `Исходные данные`.
 9. Страница `Тесты` содержит workflow `Табличная почва`: он создает расчет в SQLite, сохраняет демо-кривые Pc(S)/kr(S), запускает PFLOTRAN и затем строит графики.
 10. Полный API-контур табличной почвы закреплен в `scripts/api_tabular_workflow_smoke.sh` и включен в `scripts/check_project.sh`; smoke удаляет созданный расчет, если не задано `KEEP_TABULAR_API_SMOKE=1`.
+11. Performance/stability контур results API закреплен в `scripts/api_results_performance_smoke.sh`: smoke создает временные run-папки, проверяет summary/detail/status endpoints и очищает временные данные.
 
 ## 3. Карта каталогов
 
@@ -59,7 +60,7 @@ pflotran_soilflow_docker_tested/
   scripts/
     soilflow_pflotran.py             совместимый CLI-фасад: чтение JSON, demo-mode, передача _test в verification_runner
     soilflow_visualize.py            HTML/SVG/CSV визуализация 1D/XY/XZ профилей
-    check_project.sh                 единая проверка: Python compile, backend unittest, frontend build, restart, API/UI smoke
+    check_project.sh                 единая проверка: Python compile, backend unittest, frontend build, restart, API/performance/UI smoke
     api_smoke.sh                     read-only проверка базового API-контракта живого web-сервиса
     ui_route_smoke.sh                read-only проверка коротких frontend URL и SPA/API fallback
     sync_to_running_container.sh     документированный hot-copy workflow для запущенного контейнера
@@ -657,7 +658,8 @@ scripts/__pycache__/
 8. Пара `Голованов-Аверьянов` обозначена как предметная цель, но не доведена до проверенной PFLOTRAN-реализации.
 9. Профильные benchmark artifacts, TECPLOT-ready status, diagnostic `REFERENCE_OVERLAY` метрики и `profile_overlay_comparison.csv` вынесены в `soilflow_pflotran_modules.profile_benchmarks`; case metadata, `profile_case_manifest.json` и `profile_strict_plan.json` вынесены в `soilflow_pflotran_modules.profile_benchmark_cases`; диагностическая оценка overlay, MMS adapter artifact check и pending strict evaluator status вынесены в `soilflow_pflotran_modules.profile_benchmark_evaluators`/`profile_benchmarks`; strict-кандидат для `richards_mms` вынесен в `soilflow_pflotran_modules.profile_strict_evaluators`; uniform storage source-term candidate, cell-wise MMS residual table и matrix adapter artifacts вынесены в `soilflow_pflotran_modules.richards_mms_case`, но strict gate ждет PFLOTRAN deck adapter для spatial source и nonuniform initial profile. Strict-evaluator'ы для Theis/Ogata/Terzaghi/heat/Buckley/Boussinesq еще не подключены.
 10. Suite summary теперь пишется в `TEST_SUITE_STATUS.txt`, `TEST_SUITE_STATUS.json` и `TEST_SUITE_RESULTS.csv`; backend отдает его через `GET /api/results/runs/{run_name}/test-suite`, отдельные `TEST_STATUS.txt` доступны через `GET /api/results/runs/{run_name}/test-status`, а единая карточка состояния запуска собирается через `GET /api/results/runs/{run_name}/overview`. Suite summary агрегирует strict-readiness stage counts, чтобы видеть текущий класс blocker'ов profile benchmark'ов. Страницы `Статус` и `Расчеты` используют общий frontend-компонент карточек состояния без парсинга status-файлов во frontend. Частично записанные `TEST_SUITE_STATUS.json`, `TEST_SUITE_RESULTS.csv` и `test_diagnostics.json` не должны ломать API: backend возвращает пригодный TXT/CSV fallback или partial diagnostics marker.
-11. Strict/partial Richards verification слой, profile-smoke запуск и suite-router `_test` вынесены из `soilflow_pflotran.py` в `richards_test_cases.py`, `richards_test_evaluators.py`, `richards_test_runner.py`, `profile_test_runner.py` и `verification_runner.py`; CLI-фасад должен оставаться тонким маршрутизатором, а не местом новой физики тестов.
+11. JSON-only suite artifacts считаются полноценным suite status для `/api/results/runs` и `/overview`; это важно для частично записанных или минимальных suite-директорий, где TXT artifact может отсутствовать.
+12. Strict/partial Richards verification слой, profile-smoke запуск и suite-router `_test` вынесены из `soilflow_pflotran.py` в `richards_test_cases.py`, `richards_test_evaluators.py`, `richards_test_runner.py`, `profile_test_runner.py` и `verification_runner.py`; CLI-фасад должен оставаться тонким маршрутизатором, а не местом новой физики тестов.
 
 ## 15. Что важно сохранить в следующих итерациях
 
@@ -674,8 +676,8 @@ scripts/__pycache__/
 ## 16. Рекомендуемый следующий план разработки
 
 1. Устойчивость API/result layer:
-   - добавить performance/stability smoke для `/api/results/runs`,
-     `/overview`, `/test-suite`, `/test-status` на большом числе run-папок;
+   - расширять `scripts/api_results_performance_smoke.sh` для дополнительных
+     больших artifacts и threshold-профилей;
    - централизовать safe path helpers для result endpoints;
    - продолжить покрывать отсутствующие/битые/частично записанные status
      artifacts без 500; первый инкремент уже покрывает suite JSON/CSV и

@@ -5,7 +5,7 @@ from typing import Any
 
 from .result_status_artifacts import existing_status_artifact, parse_key_value_status
 from .test_run_status_service import TEST_STATUS_TEXT, read_test_run_status
-from .test_suite_summary_service import SUITE_STATUS_TEXT, read_test_suite_status
+from .test_suite_summary_service import SUITE_STATUS_ARTIFACTS, read_test_suite_status
 
 VISUALIZATION_STATUS_TEXT = "VISUALIZATION_STATUS.txt"
 
@@ -23,7 +23,7 @@ def _first_present(fields: dict[str, Any], *keys: str) -> Any:
 
 
 def _suite_item(run_name: str, run_dir: Path) -> dict[str, Any] | None:
-    if existing_status_artifact(run_dir, SUITE_STATUS_TEXT) is None:
+    if not any(existing_status_artifact(run_dir, filename) is not None for filename in SUITE_STATUS_ARTIFACTS):
         return None
     suite = read_test_suite_status(run_name, run_dir)
     summary = suite["summary"]
