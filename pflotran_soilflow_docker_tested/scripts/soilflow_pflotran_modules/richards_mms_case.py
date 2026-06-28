@@ -9,6 +9,7 @@ from soilflow_pflotran_modules.input_contract import pf_float
 from soilflow_pflotran_modules.physical_models import (
     saturation_from_effective_saturation,
     vg_effective_saturation_from_pressure_head,
+    vg_mualem_relative_permeability,
 )
 from soilflow_pflotran_modules.profile_carrier import _test_output_block
 
@@ -96,6 +97,80 @@ def richards_mms_mean_theta(case: RichardsMmsCase, time_days: float) -> float:
     return sum(row["theta_m3_m3"] for row in rows) / len(rows)
 
 
+def richards_mms_hydraulic_conductivity_m_day(case: RichardsMmsCase, z_m: float, time_days: float) -> float:
+    head_m = richards_mms_pressure_head_m(case, z_m, time_days)
+    effective = vg_effective_saturation_from_pressure_head(head_m, case.alpha_1_m, case.n, case.m)
+    return case.ksat_m_s * 86400.0 * vg_mualem_relative_permeability(effective, case.m)
+
+
+def richards_mms_flux_m_day(case: RichardsMmsCase, z_m: float, time_days: float) -> float:
+    dh_dz = (
+        case.amplitude_m
+        * (math.pi / case.length_z_m)
+        * math.cos(math.pi * z_m / case.length_z_m)
+        * math.exp(-time_days / case.tau_days)
+    )
+    return -richards_mms_hydraulic_conductivity_m_day(case, z_m, time_days) * (dh_dz + 1.0)
+
+
+def _central_difference(value_at: object, coordinate: float, step: float) -> float:
+    left = float(value_at(coordinate - step))
+    right = float(value_at(coordinate + step))
+    return (right - left) / (2.0 * step)
+
+
+def richards_mms_storage_derivative_1_day(case: RichardsMmsCase, z_m: float, time_days: float) -> float:
+    # Дифференцируем theta(h(z,t)) численно, чтобы сохранить ровно тот же
+    # retention-контракт, который используется для аналитических профилей.
+    dt = min(1.0e-5, max(1.0e-7, case.maximum_timestep_days * 0.01))
+    left = max(0.0, time_days - dt)
+    right = min(case.final_time_days, time_days + dt)
+    if math.isclose(left, right):
+        return 0.0
+    theta_left = richards_mms_theta_m3_m3(case, z_m, left)
+    theta_right = richards_mms_theta_m3_m3(case, z_m, right)
+    return (theta_right - theta_left) / (right - left)
+
+
+def richards_mms_flux_divergence_1_day(case: RichardsMmsCase, z_m: float, time_days: float) -> float:
+    dz = min(case.length_z_m * 1.0e-4, case.length_z_m / max(1000.0, case.nz * 10.0))
+    low = max(dz, z_m - dz)
+    high = min(case.length_z_m - dz, z_m + dz)
+    if math.isclose(low, high):
+        return 0.0
+    if not math.isclose(low, z_m - dz) or not math.isclose(high, z_m + dz):
+        return (richards_mms_flux_m_day(case, high, time_days) - richards_mms_flux_m_day(case, low, time_days)) / (
+            high - low
+        )
+    return _central_difference(lambda z_value: richards_mms_flux_m_day(case, z_value, time_days), z_m, dz)
+
+
+def richards_mms_spatial_source_rows(case: RichardsMmsCase) -> list[dict[str, float]]:
+    dz = case.length_z_m / case.nz
+    cell_volume_m3 = case.length_x_m * case.length_y_m * dz
+    rows: list[dict[str, float]] = []
+    for time_days in richards_mms_time_grid(case):
+        for cell_id in range(1, case.nz + 1):
+            z_center_m = (cell_id - 0.5) * dz
+            storage_derivative = richards_mms_storage_derivative_1_day(case, z_center_m, time_days)
+            flux_divergence = richards_mms_flux_divergence_1_day(case, z_center_m, time_days)
+            # Уравнение в форме dtheta/dt + dq/dz = source. q положителен вверх.
+            source_per_volume = storage_derivative + flux_divergence
+            rows.append(
+                {
+                    "time_days": time_days,
+                    "cell_id": float(cell_id),
+                    "z_m": z_center_m,
+                    "storage_derivative_1_day": storage_derivative,
+                    "flux_m_day": richards_mms_flux_m_day(case, z_center_m, time_days),
+                    "flux_divergence_1_day": flux_divergence,
+                    "source_rate_per_volume_1_day": source_per_volume,
+                    "source_rate_cell_m3_day": source_per_volume * cell_volume_m3,
+                }
+            )
+    return rows
+
+
 def richards_mms_source_rate_m3_day(case: RichardsMmsCase, time_days: float) -> float:
     # PFLOTRAN SOURCE_SINK RATE LIST принимает объемный расход на всю область.
     # Для MMS-кандидата используем производную среднего хранения, пока spatial
@@ -132,6 +207,22 @@ def write_richards_mms_case_artifacts(case: RichardsMmsCase, workdir: Path) -> N
         writer = csv.DictWriter(file_obj, fieldnames=["time_days", "mean_theta_m3_m3", "source_rate_m3_day"])
         writer.writeheader()
         writer.writerows(richards_mms_source_rate_rows(case))
+    with (workdir / "richards_mms_spatial_source_profile.csv").open("w", newline="", encoding="utf-8") as file_obj:
+        writer = csv.DictWriter(
+            file_obj,
+            fieldnames=[
+                "time_days",
+                "cell_id",
+                "z_m",
+                "storage_derivative_1_day",
+                "flux_m_day",
+                "flux_divergence_1_day",
+                "source_rate_per_volume_1_day",
+                "source_rate_cell_m3_day",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(richards_mms_spatial_source_rows(case))
 
 
 def generate_richards_mms_source_term_input(case: RichardsMmsCase = RichardsMmsCase()) -> str:
@@ -148,7 +239,8 @@ def generate_richards_mms_source_term_input(case: RichardsMmsCase = RichardsMmsC
         [
             "# Generated by soilflow_pflotran.py --mode _test --test richards_mms",
             "# Richards MMS source-term candidate: uniform storage source from analytical mean theta.",
-            "# Spatial MMS source-term and nonuniform initial condition are tracked in profile_case_manifest.json.",
+            "# Cell-wise MMS residual is exported to richards_mms_spatial_source_profile.csv.",
+            "# PFLOTRAN still uses the uniform source until a verified cell-wise source adapter is added.",
             "",
             "SIMULATION",
             "  SIMULATION_TYPE SUBSURFACE",

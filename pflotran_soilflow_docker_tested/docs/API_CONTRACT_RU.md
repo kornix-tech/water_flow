@@ -150,7 +150,9 @@ Endpoints:
   RMSE/max-error напора и влажности. Сейчас `richards_mms` использует
   `richards_mms_uniform_source_candidate`: PFLOTRAN deck уже содержит
   `SOURCE_SINK`/`RATE LIST` по среднему хранению, но до spatial MMS source-term
-  он остается диагностикой, а не suite PASS/FAIL критерием.
+  он остается диагностикой, а не suite PASS/FAIL критерием. Дополнительно
+  пишется `richards_mms_spatial_source_profile.csv` с cell-wise residual, но
+  текущий deck еще не применяет этот artifact как PFLOTRAN source.
 - `GET /api/results/runs/{run_name}/overview` - единый обзор состояния запуска:
   verification-suite, отдельный тест, графики или fallback по файлам результата.
 - `GET /api/results/runs/{run_name}/plots` - список файлов графиков.

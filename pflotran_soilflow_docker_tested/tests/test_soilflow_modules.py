@@ -67,6 +67,7 @@ from soilflow_pflotran_modules.richards_test_evaluators import write_test_compar
 from soilflow_pflotran_modules.richards_mms_case import (
     RichardsMmsCase,
     generate_richards_mms_source_term_input,
+    richards_mms_spatial_source_rows,
     richards_mms_source_rate_rows,
     write_richards_mms_case_artifacts,
 )
@@ -241,6 +242,7 @@ class VerificationRunnerModuleTests(unittest.TestCase):
             self.assertTrue((workdir / "analytical_test_summary.txt").exists())
             self.assertTrue((workdir / "richards_mms_initial_profile.csv").exists())
             self.assertTrue((workdir / "richards_mms_source_rate.csv").exists())
+            self.assertTrue((workdir / "richards_mms_spatial_source_profile.csv").exists())
             manifest = json.loads((workdir / "profile_case_manifest.json").read_text(encoding="utf-8"))
             deck = (workdir / "pflotran.in").read_text(encoding="utf-8")
             summary = (workdir / "analytical_test_summary.txt").read_text(encoding="utf-8")
@@ -586,16 +588,22 @@ class ProfileBenchmarkTests(unittest.TestCase):
     def test_richards_mms_source_term_candidate_writes_artifacts_and_deck(self) -> None:
         case = RichardsMmsCase(nz=8)
         rows = richards_mms_source_rate_rows(case)
+        spatial_rows = richards_mms_spatial_source_rows(case)
         deck = generate_richards_mms_source_term_input(case)
         with tempfile.TemporaryDirectory() as tmpdir:
             workdir = Path(tmpdir)
             write_richards_mms_case_artifacts(case, workdir)
 
             self.assertGreater(len(rows), 2)
+            self.assertEqual(len(spatial_rows), len(rows) * case.nz)
             self.assertTrue(any(abs(row["source_rate_m3_day"]) > 0.0 for row in rows))
+            self.assertTrue(any(abs(row["flux_divergence_1_day"]) > 0.0 for row in spatial_rows))
+            self.assertTrue(any(abs(row["source_rate_cell_m3_day"]) > 0.0 for row in spatial_rows))
             self.assertIn("SOURCE_SINK mms_uniform_storage", deck)
             self.assertIn("RATE SCALED_VOLUMETRIC_RATE VOLUME", deck)
+            self.assertIn("richards_mms_spatial_source_profile.csv", deck)
             self.assertIn("richards_mms_source_rate.csv", "\n".join(path.name for path in workdir.iterdir()))
+            self.assertIn("source_rate_per_volume_1_day", (workdir / "richards_mms_spatial_source_profile.csv").read_text(encoding="utf-8"))
             self.assertIn("pressure_head_m", (workdir / "richards_mms_initial_profile.csv").read_text(encoding="utf-8"))
 
     def test_richards_profile_overlay_rows_are_written_for_mms(self) -> None:

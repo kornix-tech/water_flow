@@ -53,9 +53,10 @@ CLI и web-backend. Этот пакет задает безопасные гра
   Сейчас реализован кандидат Richards MMS по RMSE/max-error напора и влажности;
   он остается диагностическим до замены carrier deck'а на MMS source-term deck.
 - `richards_mms_case.py`: первый Richards MMS source-term candidate: пишет
-  `richards_mms_initial_profile.csv`, `richards_mms_source_rate.csv` и PFLOTRAN
-  `SOURCE_SINK`/`RATE LIST` deck с uniform storage source. Это еще не spatial
-  MMS source-term, поэтому strict-кандидат не gate'ит suite.
+  `richards_mms_initial_profile.csv`, `richards_mms_source_rate.csv`,
+  `richards_mms_spatial_source_profile.csv` и PFLOTRAN `SOURCE_SINK`/`RATE LIST`
+  deck с uniform storage source. Cell-wise residual table уже готовит spatial
+  MMS source, но strict-кандидат не gate'ит suite до PFLOTRAN adapter-а.
 - `richards_test_cases.py`: dataclass-параметры, PFLOTRAN deck'и,
   аналитические CSV/summary и builders для strict/partial Richards verification.
 - `richards_test_evaluators.py`: сравнение PFLOTRAN TECPLOT-профилей с
