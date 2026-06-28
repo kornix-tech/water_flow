@@ -95,8 +95,10 @@ flowchart LR
   между генерацией artifacts, API-статусом и suite summary.
 - Первый strict-кандидат для `richards_mms` вынесен в
   `profile_strict_evaluators.py` и считает RMSE/max-error напора и влажности по
-  overlay. Он помечен как `EVALUATOR_READY_DECK_PENDING`, потому что текущий
-  PFLOTRAN input еще остается profile-carrier без MMS source-term.
+  overlay. `richards_mms` уже генерирует uniform storage `SOURCE_SINK` candidate
+  через `richards_mms_case.py`, но помечен как `EVALUATOR_READY_DECK_PENDING`,
+  потому что до strict gate нужен spatial MMS source-term и nonuniform initial
+  condition.
 - Profile smoke тесты не считаются строгой верификацией: они проверяют
   генерацию PFLOTRAN-профиля и аналитического reference artifact, но не
   физическое совпадение с Theis/Ogata/Terzaghi/heat/Buckley и другими моделями.

@@ -24,6 +24,7 @@
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_cases` с машинно-читаемой картой profile benchmark'ов, физическими семействами и blocker'ами будущих strict evaluator'ов.
 - Добавлен модуль `soilflow_pflotran_modules.profile_strict_evaluators` с первым strict-кандидатом для `richards_mms` по RMSE/max-error напора и влажности.
 - Для profile benchmark'ов теперь записывается `profile_case_manifest.json` с физическим семейством, типом deck'а, готовностью carrier-а и флагом допуска strict-кандидата к suite gate.
+- Добавлен `soilflow_pflotran_modules.richards_mms_case`: `richards_mms` теперь генерирует uniform storage `SOURCE_SINK`/`RATE LIST` candidate deck и artifacts `richards_mms_initial_profile.csv`, `richards_mms_source_rate.csv`.
 - Добавлены reference overlay метрики для profile-smoke benchmark'ов: RMSE/max-error по объемной влажности и напору относительно `analytical_profiles.csv`.
 - Для profile-smoke benchmark'ов теперь записывается `profile_overlay_comparison.csv` с построчным сравнением `PFLOTRAN vs analytical`.
 - Добавлена архитектурная схема `docs/ARCHITECTURE_RU.md` с текущими потоками данных и заменяемыми adapter-границами.
@@ -75,6 +76,7 @@
 - Profile-smoke TEST_STATUS и suite CSV теперь включают физическое семейство benchmark'а и готовность carrier deck'а.
 - `richards_mms` помечен как `EVALUATOR_READY_DECK_PENDING`: strict-кандидат готов, но остается диагностическим до замены carrier deck на MMS source-term постановку.
 - Profile-smoke TEST_STATUS и suite CSV теперь явно различают `profile_deck_kind` и `strict_candidate_can_gate_suite`, чтобы strict-кандидат нельзя было случайно сделать обязательным до готовности физического deck'а.
+- `richards_mms` переведен с generic profile-carrier на `richards_mms_uniform_source_candidate`; strict-кандидат остается диагностическим, пока не добавлен spatial MMS source-term.
 - `scripts/check_project.sh` теперь включает полный расчетный smoke для табличной почвы через публичный API.
 - Стандартный PFLOTRAN deck writer вынесен из `soilflow_pflotran.py`; основной скрипт оставлен совместимым CLI-фасадом и отдельно маршрутизирует `floodplain_controlled_drainage`.
 - Парсинг результатов PFLOTRAN, solver diagnostics и запись `TEST_STATUS.txt` вынесены из `soilflow_pflotran.py` в модуль с unit-тестами.

@@ -21,12 +21,12 @@ PROFILE_BENCHMARK_CASES: dict[str, ProfileBenchmarkCase] = {
     "richards_mms": ProfileBenchmarkCase(
         name="richards_mms",
         physics_family="richards",
-        carrier_status="PROFILE_CARRIER_READY",
+        carrier_status="MMS_SOURCE_TERM_CANDIDATE",
         strict_evaluator_status="EVALUATOR_READY_DECK_PENDING",
-        deck_kind="richards_profile_carrier",
+        deck_kind="richards_mms_uniform_source_candidate",
         strict_candidate_can_gate_suite=False,
-        strict_blocker="Нужен PFLOTRAN deck с MMS source-term и начальным профилем, совпадающим с аналитическим h(z,t).",
-        next_step="Добавить Richards MMS case-builder с source/sink term и подключить готовый strict pressure/theta evaluator как PASS/FAIL критерий.",
+        strict_blocker="Есть uniform storage source-term candidate, но нужен spatial MMS source-term и начальный профиль, совпадающий с аналитическим h(z,t).",
+        next_step="Заменить uniform storage candidate на spatial MMS source-term deck и включить strict pressure/theta evaluator как PASS/FAIL критерий.",
     ),
     "philip_infiltration": ProfileBenchmarkCase(
         name="philip_infiltration",

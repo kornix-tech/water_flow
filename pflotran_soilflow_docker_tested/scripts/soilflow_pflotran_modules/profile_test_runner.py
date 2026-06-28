@@ -11,6 +11,11 @@ from soilflow_pflotran_modules.profile_benchmarks import (
 )
 from soilflow_pflotran_modules.profile_benchmark_cases import profile_benchmark_case_manifest, write_profile_benchmark_case_manifest
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
+from soilflow_pflotran_modules.richards_mms_case import (
+    RichardsMmsCase,
+    generate_richards_mms_source_term_input,
+    write_richards_mms_case_artifacts,
+)
 from soilflow_pflotran_modules.richards_test_cases import TestResult
 from soilflow_pflotran_modules.test_artifacts import write_curve_svg, write_rows_csv
 from soilflow_pflotran_modules.test_evaluation import base_result_metrics, write_unknown_status
@@ -26,7 +31,12 @@ def generate_profile_test_files(test_name: str, workdir: Path) -> None:
     write_richards_profile_analytical_profiles(test_name, workdir)
     case_manifest = profile_benchmark_case_manifest(test_name)
     write_profile_benchmark_case_manifest(test_name, workdir)
-    (workdir / "pflotran.in").write_text(generate_richards_profile_input(test_name), encoding="utf-8")
+    if test_name == "richards_mms":
+        mms_case = RichardsMmsCase()
+        write_richards_mms_case_artifacts(mms_case, workdir)
+        (workdir / "pflotran.in").write_text(generate_richards_mms_source_term_input(mms_case), encoding="utf-8")
+    else:
+        (workdir / "pflotran.in").write_text(generate_richards_profile_input(test_name), encoding="utf-8")
     (workdir / "analytical_test_summary.txt").write_text(
         "\n".join(
             [

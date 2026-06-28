@@ -52,6 +52,10 @@ CLI и web-backend. Этот пакет задает безопасные гра
 - `profile_strict_evaluators.py`: strict-кандидаты для profile benchmark'ов.
   Сейчас реализован кандидат Richards MMS по RMSE/max-error напора и влажности;
   он остается диагностическим до замены carrier deck'а на MMS source-term deck.
+- `richards_mms_case.py`: первый Richards MMS source-term candidate: пишет
+  `richards_mms_initial_profile.csv`, `richards_mms_source_rate.csv` и PFLOTRAN
+  `SOURCE_SINK`/`RATE LIST` deck с uniform storage source. Это еще не spatial
+  MMS source-term, поэтому strict-кандидат не gate'ит suite.
 - `richards_test_cases.py`: dataclass-параметры, PFLOTRAN deck'и,
   аналитические CSV/summary и builders для strict/partial Richards verification.
 - `richards_test_evaluators.py`: сравнение PFLOTRAN TECPLOT-профилей с

@@ -42,6 +42,7 @@ MODULE_BOUNDARIES = {
     "profile_benchmark_cases": "Case metadata для profile benchmark'ов: физическое семейство, carrier readiness и blockers strict evaluator-а.",
     "profile_benchmark_evaluators": "Диагностические evaluator-метрики для profile benchmark overlay без повышения их до strict verification.",
     "profile_strict_evaluators": "Strict-кандидаты для profile benchmark'ов, готовые к подключению после замены carrier deck'ов физическими постановками.",
+    "richards_mms_case": "Richards MMS source-term candidate deck, initial-profile artifacts и uniform storage source RATE LIST.",
     "richards_test_cases": "Dataclass-параметры, PFLOTRAN deck'и и аналитические artifacts strict/partial Richards-тестов.",
     "richards_test_evaluators": "Сравнение PFLOTRAN профилей с analytical strict/partial Richards-метриками.",
     "richards_test_runner": "Запуск strict/partial Richards-тестов: artifacts, solver и выбор evaluator-а.",

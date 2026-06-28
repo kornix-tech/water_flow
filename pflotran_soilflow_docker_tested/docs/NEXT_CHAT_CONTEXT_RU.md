@@ -453,13 +453,16 @@ flowchart LR
   `profile_deck_kind` и `strict_candidate_can_gate_suite`;
 - добавлен `profile_strict_evaluators.py` с первым strict-кандидатом
   `richards_mms` по RMSE/max-error напора и влажности;
+- добавлен `richards_mms_case.py`: `richards_mms` генерирует uniform storage
+  `SOURCE_SINK`/`RATE LIST` candidate deck и artifacts
+  `richards_mms_initial_profile.csv`, `richards_mms_source_rate.csv`;
 - `TEST_STATUS.txt` profile benchmark'ов теперь может содержать
   `profile_evaluator=reference_overlay`, `strict_profile_evaluator` и
   `profile_overlay_quality_check`, `profile_physics_family`,
   `profile_carrier_status`;
-- для `richards_mms` значение strict evaluator readiness теперь
-  `EVALUATOR_READY_DECK_PENDING`, потому что evaluator готов, но текущий deck
-  еще не содержит MMS source-term;
+- для `richards_mms` значение strict evaluator readiness остается
+  `EVALUATOR_READY_DECK_PENDING`: evaluator готов, uniform source-term candidate
+  есть, но strict gate ждет spatial MMS source-term;
 - `strict_candidate_can_gate_suite=false` сохраняет strict-кандидат
   диагностическим до замены carrier deck'а физической MMS постановкой;
 - suite CSV расширен колонками качества overlay и pending strict evaluator;
