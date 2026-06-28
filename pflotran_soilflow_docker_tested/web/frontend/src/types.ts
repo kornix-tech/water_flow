@@ -64,6 +64,7 @@ export interface StrictReadinessTarget {
   output_dir?: string;
   profile_physics_family?: string;
   profile_carrier_status?: string;
+  profile_case_builder_status?: string;
   profile_deck_kind?: string;
   strict_profile_evaluator?: string;
   strict_readiness_stage?: string;

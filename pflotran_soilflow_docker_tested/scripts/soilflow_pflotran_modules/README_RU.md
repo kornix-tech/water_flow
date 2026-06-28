@@ -48,6 +48,10 @@ CLI и web-backend. Этот пакет задает безопасные гра
   где отдельно зафиксированы `profile_deck_kind`, `strict_readiness_stage` и
   `strict_candidate_can_gate_suite`, а также `profile_strict_plan.json` с
   machine-readable следующим шагом.
+- `profile_case_builders.py`: candidate case-builder artifacts для heat,
+  Ogata-Banks transport, Theis radial groundwater и Boussinesq groundwater
+  mound. Эти artifacts фиксируют постановку и parser/evaluator contract, но не
+  подменяют текущий `RICHARDS` profile carrier и не включают strict gate.
 - `profile_benchmark_evaluators.py`: диагностическая оценка качества
   `REFERENCE_OVERLAY` по инженерным smoke-границам и явная отметка, что strict
   evaluator для benchmark'а еще `PENDING`.

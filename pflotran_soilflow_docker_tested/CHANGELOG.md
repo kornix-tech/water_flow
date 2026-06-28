@@ -29,6 +29,8 @@
 - Backend `/test-suite` теперь отдает `strict_readiness_plan` как структурированное поле, suite plan сохраняет blocker-поля, а `/overview` добавляет в карточку suite следующий strict-блок, первый target и blocker.
 - На странице `Расчеты` добавлена таблица результатов verification-suite с фильтрами по статусу, `failure_stage` и `strict_readiness_stage`.
 - На странице `Расчеты` добавлен отдельный блок `Strict-readiness plan` и фильтр suite results по `strict_candidate_can_gate_suite`.
+- Добавлен модуль `soilflow_pflotran_modules.profile_case_builders`: для heat, Ogata-Banks transport, Theis radial groundwater и Boussinesq groundwater mound теперь генерируются candidate case-builder artifacts, а dry-run suite получает readiness metadata и переводит эти targets из `CASE_BUILDER_PENDING` в `STRICT_EVALUATOR_PENDING`.
+- Suite/API/UI strict-readiness plan теперь передает `profile_case_builder_status` для targets с candidate case-builder artifacts.
 - Для `richards_mms` подключен spatial MMS adapter deck: основной `pflotran.in` теперь использует per-cell PFLOTRAN regions/source sinks для nonuniform initial pressure и cell-wise source, а uniform-source deck сохранен как отдельный candidate artifact.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_evaluators` для диагностической оценки `REFERENCE_OVERLAY` profile-smoke benchmark'ов и явной отметки pending strict evaluator.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_cases` с машинно-читаемой картой profile benchmark'ов, физическими семействами и blocker'ами будущих strict evaluator'ов.

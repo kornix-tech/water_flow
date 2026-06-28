@@ -43,6 +43,12 @@ from soilflow_pflotran_modules.profile_benchmark_cases import (
     write_profile_benchmark_case_manifest,
     write_profile_benchmark_strict_plan,
 )
+from soilflow_pflotran_modules.profile_case_builders import (
+    generate_profile_case_builder_candidate_input,
+    profile_case_builder_manifest,
+    profile_case_builder_spec,
+    write_profile_case_builder_artifacts,
+)
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
 from soilflow_pflotran_modules.profile_strict_evaluators import evaluate_richards_mms_strict_candidate
 from soilflow_pflotran_modules.profile_test_runner import generate_profile_test_files
@@ -137,6 +143,7 @@ class ArchitectureContractTests(unittest.TestCase):
         self.assertIn("test_suite_artifacts", MODULE_BOUNDARIES)
         self.assertIn("profile_benchmarks", MODULE_BOUNDARIES)
         self.assertIn("profile_benchmark_cases", MODULE_BOUNDARIES)
+        self.assertIn("profile_case_builders", MODULE_BOUNDARIES)
         self.assertIn("profile_benchmark_evaluators", MODULE_BOUNDARIES)
         self.assertIn("richards_mms_case", MODULE_BOUNDARIES)
         self.assertIn("richards_test_cases", MODULE_BOUNDARIES)
@@ -273,6 +280,50 @@ class VerificationRunnerModuleTests(unittest.TestCase):
             self.assertIn("richards_mms_adapter_deck_status=PFLOTRAN_SPATIAL_ADAPTER_ACTIVE", summary)
             self.assertIn("richards_mms_spatial_adapter_deck_status=SPATIAL_DECK_DEFAULT_ACTIVE", summary)
 
+    def test_profile_case_builder_writes_heat_transport_groundwater_candidates(self) -> None:
+        candidate_tests = {
+            "heat_conduction_1d": ("thermal_1d_conduction", "temperature_profile_x_t"),
+            "ogata_banks_1d_transport": ("transport_1d_advection_dispersion", "concentration_profile_x_t"),
+            "theis_radial_flow": ("groundwater_radial_drawdown", "drawdown_radius_t"),
+            "boussinesq_groundwater_mound": ("groundwater_unconfined_mound", "water_table_head_x_t"),
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = Path(tmpdir)
+            for test_name, (adapter, parser_contract) in candidate_tests.items():
+                spec = profile_case_builder_spec(test_name)
+                self.assertIsNotNone(spec)
+                assert spec is not None
+
+                manifest = profile_case_builder_manifest(test_name)
+                candidate_text = generate_profile_case_builder_candidate_input(spec)
+                written = write_profile_case_builder_artifacts(test_name, workdir)
+
+                self.assertEqual(manifest["builder_status"], "CASE_BUILDER_CANDIDATE_READY")
+                self.assertEqual(manifest["physics_adapter"], adapter)
+                self.assertEqual(manifest["parser_contract"], parser_contract)
+                self.assertIn("Candidate case-builder artifact", candidate_text)
+                self.assertTrue((workdir / spec.candidate_input_name).exists())
+                self.assertIn(workdir / "profile_case_builder_manifest.json", written)
+
+    def test_profile_generation_writes_case_builder_candidate_without_replacing_profile_carrier(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = Path(tmpdir)
+
+            generate_profile_test_files("heat_conduction_1d", workdir)
+
+            manifest = json.loads((workdir / "profile_case_manifest.json").read_text(encoding="utf-8"))
+            builder_manifest = json.loads((workdir / "profile_case_builder_manifest.json").read_text(encoding="utf-8"))
+            active_deck = (workdir / "pflotran.in").read_text(encoding="utf-8")
+            summary = (workdir / "analytical_test_summary.txt").read_text(encoding="utf-8")
+
+            self.assertEqual(manifest["profile_case_builder_status"], "CASE_BUILDER_CANDIDATE_READY")
+            self.assertEqual(manifest["strict_readiness_stage"], "STRICT_EVALUATOR_PENDING")
+            self.assertEqual(builder_manifest["candidate_input"], "pflotran_heat_conduction_candidate.in")
+            self.assertTrue((workdir / "pflotran_heat_conduction_candidate.in").exists())
+            self.assertIn("MODE RICHARDS", active_deck)
+            self.assertIn("profile_case_builder_status=CASE_BUILDER_CANDIDATE_READY", summary)
+            self.assertIn("case_builder_candidate=pflotran_heat_conduction_candidate.in", summary)
+
     def test_dry_run_mode_writes_suite_status_without_solver(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -301,6 +352,41 @@ class VerificationRunnerModuleTests(unittest.TestCase):
             self.assertIn("TEST_SUITE_STATUS=DRY_RUN", status_text)
             self.assertIn("_test_linear_darcy=GENERATED", status_text)
             self.assertIn("strict_analytical_total=1", status_text)
+
+    def test_profile_dry_run_suite_status_includes_strict_readiness_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            input_json = root / "input.json"
+            output_dir = root / "out"
+            input_json.write_text('{"test_scenarios": {}}', encoding="utf-8")
+            args = SimpleNamespace(
+                input_json=input_json,
+                output_dir=output_dir,
+                workdir=None,
+                test="heat_conduction_1d",
+                dry_run=True,
+                run=False,
+                pflotran_exe=None,
+                prefer_wsl=False,
+                solver_timeout_seconds=None,
+            )
+
+            self.assertEqual(run_verification_test_mode(args), 0)
+
+            suite_dir = output_dir / "runs" / "_test_suite"
+            status_json = json.loads((suite_dir / "TEST_SUITE_STATUS.json").read_text(encoding="utf-8"))
+            strict_plan = json.loads((suite_dir / "STRICT_READINESS_PLAN.json").read_text(encoding="utf-8"))
+            result_row = status_json["results"][0]
+
+            self.assertEqual(result_row["profile_carrier_status"], "CASE_BUILDER_CANDIDATE_READY")
+            self.assertEqual(result_row["profile_case_builder_status"], "CASE_BUILDER_CANDIDATE_READY")
+            self.assertEqual(result_row["strict_readiness_stage"], "STRICT_EVALUATOR_PENDING")
+            self.assertEqual(strict_plan["next_stage"], "STRICT_EVALUATOR_PENDING")
+            self.assertEqual(strict_plan["next_targets"][0]["test_id"], "_test_heat_conduction_1d")
+            self.assertEqual(
+                strict_plan["next_targets"][0]["profile_case_builder_status"],
+                "CASE_BUILDER_CANDIDATE_READY",
+            )
 
     def test_generation_failure_is_recorded_in_suite_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -859,6 +945,9 @@ class ProfileBenchmarkTests(unittest.TestCase):
     def test_profile_benchmark_case_metadata_declares_strict_evaluator_blockers(self) -> None:
         richards = profile_benchmark_case_status_fields("richards_mms")
         heat = profile_benchmark_case_status_fields("heat_conduction_1d")
+        theis = profile_benchmark_case_status_fields("theis_radial_flow")
+        ogata = profile_benchmark_case_status_fields("ogata_banks_1d_transport")
+        boussinesq = profile_benchmark_case_status_fields("boussinesq_groundwater_mound")
 
         self.assertEqual(richards["profile_physics_family"], "richards")
         self.assertEqual(richards["profile_carrier_status"], "MMS_SPATIAL_ADAPTER_READY")
@@ -866,8 +955,12 @@ class ProfileBenchmarkTests(unittest.TestCase):
         self.assertTrue(richards["strict_candidate_can_gate_suite"])
         self.assertEqual(richards["strict_readiness_stage"], "STRICT_GATE_READY")
         self.assertEqual(richards["strict_profile_evaluator"], "STRICT_CANDIDATE_READY")
-        self.assertEqual(heat["profile_carrier_status"], "REFERENCE_ONLY")
-        self.assertEqual(heat["strict_readiness_stage"], "CASE_BUILDER_PENDING")
+        self.assertEqual(heat["profile_carrier_status"], "CASE_BUILDER_CANDIDATE_READY")
+        self.assertEqual(heat["profile_case_builder_status"], "CASE_BUILDER_CANDIDATE_READY")
+        self.assertEqual(heat["strict_readiness_stage"], "STRICT_EVALUATOR_PENDING")
+        self.assertEqual(theis["strict_readiness_stage"], "STRICT_EVALUATOR_PENDING")
+        self.assertEqual(ogata["strict_readiness_stage"], "STRICT_EVALUATOR_PENDING")
+        self.assertEqual(boussinesq["strict_readiness_stage"], "STRICT_EVALUATOR_PENDING")
 
     def test_profile_benchmark_case_manifest_is_written(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -880,10 +973,15 @@ class ProfileBenchmarkTests(unittest.TestCase):
             self.assertTrue(manifest["strict_candidate_can_gate_suite"])
             strict_plan_path = write_profile_benchmark_strict_plan("heat_conduction_1d", Path(tmpdir))
             strict_plan = json.loads(strict_plan_path.read_text(encoding="utf-8"))
-            self.assertEqual(strict_plan["strict_readiness_stage"], "CASE_BUILDER_PENDING")
+            self.assertEqual(strict_plan["strict_readiness_stage"], "STRICT_EVALUATOR_PENDING")
+            self.assertEqual(strict_plan["profile_case_builder_status"], "CASE_BUILDER_CANDIDATE_READY")
             self.assertEqual(
                 profile_benchmark_strict_plan("philip_infiltration")["strict_readiness_stage"],
                 "STRICT_EVALUATOR_PENDING",
+            )
+            self.assertEqual(
+                profile_benchmark_strict_plan("buckley_leverett")["strict_readiness_stage"],
+                "CASE_BUILDER_PENDING",
             )
 
 

@@ -58,6 +58,7 @@ export function StrictReadinessPlanPanel({ plan }: { plan: StrictReadinessPlan |
                 <th>Stage</th>
                 <th>Gate</th>
                 <th>Deck</th>
+                <th>Builder</th>
                 <th>Blocker</th>
               </tr>
             </thead>
@@ -68,6 +69,7 @@ export function StrictReadinessPlanPanel({ plan }: { plan: StrictReadinessPlan |
                   <td>{textValue(target.strict_readiness_stage)}</td>
                   <td>{isGateAllowed(target)}</td>
                   <td>{textValue(target.profile_deck_kind)}</td>
+                  <td>{textValue(target.profile_case_builder_status)}</td>
                   <td>{textValue(target.strict_profile_evaluator_blocker)}</td>
                 </tr>
               ))}

@@ -11,6 +11,7 @@ class ProfileBenchmarkCase:
     physics_family: str
     carrier_status: str
     strict_evaluator_status: str
+    case_builder_status: str
     deck_kind: str
     strict_candidate_can_gate_suite: bool
     strict_blocker: str
@@ -23,6 +24,7 @@ PROFILE_BENCHMARK_CASES: dict[str, ProfileBenchmarkCase] = {
         physics_family="richards",
         carrier_status="MMS_SPATIAL_ADAPTER_READY",
         strict_evaluator_status="STRICT_CANDIDATE_READY",
+        case_builder_status="CASE_BUILDER_READY",
         deck_kind="richards_mms_spatial_source_candidate",
         strict_candidate_can_gate_suite=True,
         strict_blocker="Spatial MMS adapter deck подключен; следующий риск - подтвердить устойчивость на расширенных сетках и tolerances.",
@@ -33,6 +35,7 @@ PROFILE_BENCHMARK_CASES: dict[str, ProfileBenchmarkCase] = {
         physics_family="richards_infiltration",
         carrier_status="PROFILE_CARRIER_READY",
         strict_evaluator_status="PENDING",
+        case_builder_status="CASE_BUILDER_READY",
         deck_kind="richards_profile_carrier",
         strict_candidate_can_gate_suite=False,
         strict_blocker="Текущий reference overlay использует wetting-front профиль, а не строгий Richards/Philip field solution.",
@@ -43,6 +46,7 @@ PROFILE_BENCHMARK_CASES: dict[str, ProfileBenchmarkCase] = {
         physics_family="richards_infiltration",
         carrier_status="PROFILE_CARRIER_READY",
         strict_evaluator_status="PENDING",
+        case_builder_status="CASE_BUILDER_READY",
         deck_kind="richards_profile_carrier",
         strict_candidate_can_gate_suite=False,
         strict_blocker="Нужна явная метрика положения фронта и cumulative infiltration из PFLOTRAN mass balance.",
@@ -51,28 +55,31 @@ PROFILE_BENCHMARK_CASES: dict[str, ProfileBenchmarkCase] = {
     "theis_radial_flow": ProfileBenchmarkCase(
         name="theis_radial_flow",
         physics_family="groundwater_radial",
-        carrier_status="REFERENCE_ONLY",
+        carrier_status="CASE_BUILDER_CANDIDATE_READY",
         strict_evaluator_status="PENDING",
-        deck_kind="reference_only",
+        case_builder_status="CASE_BUILDER_CANDIDATE_READY",
+        deck_kind="groundwater_radial_drawdown_candidate",
         strict_candidate_can_gate_suite=False,
-        strict_blocker="Нужен radial groundwater PFLOTRAN deck, а не Richards profile-carrier.",
-        next_step="Добавить radial-flow case-builder и evaluator drawdown(r,t).",
+        strict_blocker="Case-builder candidate есть; strict gate ждет groundwater parser/evaluator drawdown(r,t) и solver adapter.",
+        next_step="Подключить parser drawdown(r,t), сверить Theis well-function и только затем включать strict_candidate_can_gate_suite.",
     ),
     "ogata_banks_1d_transport": ProfileBenchmarkCase(
         name="ogata_banks_1d_transport",
         physics_family="transport",
-        carrier_status="REFERENCE_ONLY",
+        carrier_status="CASE_BUILDER_CANDIDATE_READY",
         strict_evaluator_status="PENDING",
-        deck_kind="reference_only",
+        case_builder_status="CASE_BUILDER_CANDIDATE_READY",
+        deck_kind="transport_1d_advection_dispersion_candidate",
         strict_candidate_can_gate_suite=False,
-        strict_blocker="Нужен transport deck с концентрацией и parser концентрационного output.",
-        next_step="Добавить transport case-builder и evaluator C(x,t).",
+        strict_blocker="Case-builder candidate есть; strict gate ждет concentration parser/evaluator C(x,t).",
+        next_step="Подключить parser концентрационного output и evaluator Ogata-Banks C(x,t).",
     ),
     "terzaghi_1d_consolidation": ProfileBenchmarkCase(
         name="terzaghi_1d_consolidation",
         physics_family="poroelastic_consolidation",
         carrier_status="REFERENCE_ONLY",
         strict_evaluator_status="PENDING",
+        case_builder_status="CASE_BUILDER_PENDING",
         deck_kind="reference_only",
         strict_candidate_can_gate_suite=False,
         strict_blocker="Текущий solver path не содержит poroelastic consolidation постановку.",
@@ -81,18 +88,20 @@ PROFILE_BENCHMARK_CASES: dict[str, ProfileBenchmarkCase] = {
     "heat_conduction_1d": ProfileBenchmarkCase(
         name="heat_conduction_1d",
         physics_family="heat",
-        carrier_status="REFERENCE_ONLY",
+        carrier_status="CASE_BUILDER_CANDIDATE_READY",
         strict_evaluator_status="PENDING",
-        deck_kind="reference_only",
+        case_builder_status="CASE_BUILDER_CANDIDATE_READY",
+        deck_kind="thermal_1d_conduction_candidate",
         strict_candidate_can_gate_suite=False,
-        strict_blocker="Нужен heat deck и parser температурного output.",
-        next_step="Добавить heat case-builder и evaluator T(x,t).",
+        strict_blocker="Case-builder candidate есть; strict gate ждет temperature parser/evaluator T(x,t).",
+        next_step="Подключить parser температурного output и evaluator erfc T(x,t).",
     ),
     "buckley_leverett": ProfileBenchmarkCase(
         name="buckley_leverett",
         physics_family="two_phase",
         carrier_status="REFERENCE_ONLY",
         strict_evaluator_status="PENDING",
+        case_builder_status="CASE_BUILDER_PENDING",
         deck_kind="reference_only",
         strict_candidate_can_gate_suite=False,
         strict_blocker="Нужен two-phase deck и parser saturation/front output.",
@@ -101,12 +110,13 @@ PROFILE_BENCHMARK_CASES: dict[str, ProfileBenchmarkCase] = {
     "boussinesq_groundwater_mound": ProfileBenchmarkCase(
         name="boussinesq_groundwater_mound",
         physics_family="groundwater_unconfined",
-        carrier_status="REFERENCE_ONLY",
+        carrier_status="CASE_BUILDER_CANDIDATE_READY",
         strict_evaluator_status="PENDING",
-        deck_kind="reference_only",
+        case_builder_status="CASE_BUILDER_CANDIDATE_READY",
+        deck_kind="groundwater_unconfined_mound_candidate",
         strict_candidate_can_gate_suite=False,
-        strict_blocker="Нужна unconfined groundwater постановка и метрика head(x,t).",
-        next_step="Добавить Boussinesq-compatible case-builder или отдельный solver adapter.",
+        strict_blocker="Case-builder candidate есть; strict gate ждет water-table/head parser/evaluator h(x,t).",
+        next_step="Подключить parser head(x,t) и evaluator Boussinesq mound decay.",
     ),
 }
 
@@ -124,6 +134,7 @@ def profile_benchmark_case_status_fields(test_name: str) -> dict[str, object]:
     return {
         "profile_physics_family": case.physics_family,
         "profile_carrier_status": case.carrier_status,
+        "profile_case_builder_status": case.case_builder_status,
         "profile_deck_kind": case.deck_kind,
         "strict_profile_evaluator": case.strict_evaluator_status,
         "strict_candidate_can_gate_suite": case.strict_candidate_can_gate_suite,
@@ -139,7 +150,7 @@ def profile_benchmark_strict_plan(test_name: str) -> dict[str, object]:
         readiness_stage = "STRICT_GATE_READY"
     elif case.strict_evaluator_status == "EVALUATOR_READY_DECK_PENDING":
         readiness_stage = "DECK_ADAPTER_PENDING"
-    elif case.carrier_status == "REFERENCE_ONLY":
+    elif case.case_builder_status == "CASE_BUILDER_PENDING":
         readiness_stage = "CASE_BUILDER_PENDING"
     else:
         readiness_stage = "STRICT_EVALUATOR_PENDING"
@@ -148,6 +159,7 @@ def profile_benchmark_strict_plan(test_name: str) -> dict[str, object]:
         "test_name": case.name,
         "profile_physics_family": case.physics_family,
         "profile_carrier_status": case.carrier_status,
+        "profile_case_builder_status": case.case_builder_status,
         "profile_deck_kind": case.deck_kind,
         "strict_profile_evaluator": case.strict_evaluator_status,
         "strict_candidate_can_gate_suite": case.strict_candidate_can_gate_suite,
@@ -165,6 +177,7 @@ def profile_benchmark_case_manifest(test_name: str) -> dict[str, object]:
         "test_name": case.name,
         "profile_physics_family": case.physics_family,
         "profile_carrier_status": case.carrier_status,
+        "profile_case_builder_status": case.case_builder_status,
         "profile_deck_kind": case.deck_kind,
         "strict_profile_evaluator": case.strict_evaluator_status,
         "strict_candidate_can_gate_suite": case.strict_candidate_can_gate_suite,

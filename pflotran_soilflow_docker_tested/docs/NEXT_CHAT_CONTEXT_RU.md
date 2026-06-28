@@ -385,7 +385,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:ed652ed9f176ed85d8151d9a00eee5df45a3c62e03bfd481ba7d9f40c58a672b
+sha256:26dc4928d4d693af6d61fc8e79d6b4730a2e4e404f00f9b392d1793c8c5bdcf9
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -561,9 +561,11 @@ flowchart LR
      suite results по `strict_candidate_can_gate_suite`;
    - `DECK_ADAPTER_PENDING` для `richards_mms` закрыт через spatial adapter
      deck и solver validation `RESEARCH_DRY_RUN=0`;
-   - следующий крупный блок: `CASE_BUILDER_PENDING` для
-     heat/transport/groundwater;
-   - затем `STRICT_EVALUATOR_PENDING` для infiltration/profile carrier.
+   - `CASE_BUILDER_PENDING` для heat/transport/groundwater закрыт candidate
+     case-builder artifacts;
+   - следующий крупный блок: `STRICT_EVALUATOR_PENDING` для
+     infiltration/profile carrier и новых heat/transport/groundwater
+     case-builder candidates.
 4. Не повышать `profile_smoke` до strict gate без физического deck/evaluator и
    явного `strict_candidate_can_gate_suite=true`.
 
@@ -580,6 +582,15 @@ flowchart LR
   `strict_readiness_stage`;
 - profile benchmark generation теперь также пишет `profile_strict_plan.json`
   как machine-readable план подключения strict evaluator-а;
+- добавлен `profile_case_builders.py`: для `heat_conduction_1d`,
+  `ogata_banks_1d_transport`, `theis_radial_flow` и
+  `boussinesq_groundwater_mound` генерируются
+  `profile_case_builder_manifest.json` и `pflotran_*_candidate.in`, а
+  readiness metadata переведена из `CASE_BUILDER_PENDING` в
+  `STRICT_EVALUATOR_PENDING`;
+- dry-run suite теперь включает profile readiness metadata для profile targets,
+  а `STRICT_READINESS_PLAN.json`/API/UI показывают
+  `profile_case_builder_status`;
 - добавлен `profile_strict_evaluators.py` с первым strict-кандидатом
   `richards_mms` по RMSE/max-error напора и влажности;
 - добавлен `richards_mms_case.py`: `richards_mms` генерирует uniform storage
@@ -609,9 +620,11 @@ flowchart LR
 - suite summary агрегирует strict-readiness stages в счетчики
   `strict_gate_ready_total`, `strict_deck_adapter_pending_total`,
   `strict_case_builder_pending_total`, `strict_evaluator_pending_total`;
-- физические strict-evaluator'ы для Theis/Ogata/Terzaghi/heat/Buckley/
-  Boussinesq еще не подключены; Richards MMS имеет strict-кандидат и spatial
-  adapter, но пока остается в profile_smoke группе до расширенной validation;
+- физические strict-evaluator'ы для Theis/Ogata/heat/Boussinesq еще не
+  подключены, но case-builder candidates уже есть; Terzaghi/Buckley пока
+  остаются `CASE_BUILDER_PENDING`; Richards MMS имеет strict-кандидат и
+  spatial adapter, но пока остается в profile_smoke группе до расширенной
+  validation;
 - полный Docker rebuild gate выполнен после strict-readiness/API инкремента;
 - затем переходить к следующей физической/исследовательской модели.
 

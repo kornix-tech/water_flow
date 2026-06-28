@@ -216,6 +216,14 @@ boussinesq_groundwater_mound
 устраняет отсутствие расчетных профилей, но не заменяет будущую строгую численную
 постановку соответствующей физики.
 
+Для heat, Ogata-Banks transport, Theis radial groundwater и Boussinesq
+groundwater mound дополнительно пишутся candidate case-builder artifacts:
+`profile_case_builder_manifest.json` и отдельный `pflotran_*_candidate.in`.
+Они фиксируют физический adapter, ожидаемый parser contract и evaluator
+contract, но основной `pflotran.in` пока остается profile-carrier deck'ом.
+Поэтому эти тесты переходят из `CASE_BUILDER_PENDING` в
+`STRICT_EVALUATOR_PENDING`, не становясь strict gate.
+
 `TEST_STATUS.txt` для расширенных profile-тестов дополнительно содержит:
 
 ```text

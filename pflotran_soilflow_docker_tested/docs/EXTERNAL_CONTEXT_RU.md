@@ -501,6 +501,7 @@ XZ:
 - надпись давления в интерфейсе: `Давление почвенной влаги`;
 - для всех расширенных benchmark'ов добавлен PFLOTRAN `RICHARDS` profile carrier и `analytical_profiles.csv`, чтобы после запуска были расчетные TECPLOT-профили для графиков;
 - статус profile-тестов содержит `analytical_overlay_check`, источник аналитического профиля и число точек overlay;
+- для heat/transport/groundwater benchmark'ов дополнительно пишутся `profile_case_builder_manifest.json` и `pflotran_*_candidate.in`, чтобы зафиксировать будущий physics adapter, parser contract и evaluator contract;
 - для неричардсовых benchmark'ов профиль пока является нормированным carrier-сравнением, а не строгой численной постановкой transport/heat/two-phase/groundwater физики.
 
 ## 10. Аналитические и verification-тесты

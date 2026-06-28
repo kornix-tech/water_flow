@@ -14,6 +14,10 @@ from soilflow_pflotran_modules.profile_benchmark_cases import (
     write_profile_benchmark_case_manifest,
     write_profile_benchmark_strict_plan,
 )
+from soilflow_pflotran_modules.profile_case_builders import (
+    profile_case_builder_spec,
+    write_profile_case_builder_artifacts,
+)
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
 from soilflow_pflotran_modules.richards_mms_case import (
     RichardsMmsCase,
@@ -39,6 +43,8 @@ def generate_profile_test_files(test_name: str, workdir: Path) -> None:
     case_manifest = profile_benchmark_case_manifest(test_name)
     write_profile_benchmark_case_manifest(test_name, workdir)
     write_profile_benchmark_strict_plan(test_name, workdir)
+    case_builder_spec = profile_case_builder_spec(test_name)
+    case_builder_artifacts = write_profile_case_builder_artifacts(test_name, workdir)
     if test_name == "richards_mms":
         mms_case = RichardsMmsCase()
         write_richards_mms_case_artifacts(mms_case, workdir)
@@ -62,10 +68,13 @@ def generate_profile_test_files(test_name: str, workdir: Path) -> None:
                 f"analytical_solution={analytical_note}",
                 "numerical_status=pflotran_profile_enabled",
                 f"profile_physics_family={case_manifest['profile_physics_family']}",
+                f"profile_case_builder_status={case_manifest['profile_case_builder_status']}",
                 f"profile_deck_kind={case_manifest['profile_deck_kind']}",
                 f"strict_profile_evaluator={case_manifest['strict_profile_evaluator']}",
                 f"strict_readiness_stage={case_manifest['strict_readiness_stage']}",
                 f"strict_candidate_can_gate_suite={str(case_manifest['strict_candidate_can_gate_suite']).lower()}",
+                f"case_builder_candidate={case_builder_spec.candidate_input_name if case_builder_spec else 'NA'}",
+                f"case_builder_artifacts={','.join(path.name for path in case_builder_artifacts) if case_builder_artifacts else 'NA'}",
                 *adapter_summary_lines,
                 "note=PFLOTRAN запускается для получения расчетных TECPLOT-профилей; строгая метрика сравнения будет добавлена отдельно.",
             ]
@@ -73,6 +82,12 @@ def generate_profile_test_files(test_name: str, workdir: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
+
+
+def profile_generation_metrics(test_name: str) -> dict[str, object]:
+    manifest = profile_benchmark_case_manifest(test_name)
+    manifest.pop("test_name", None)
+    return base_result_metrics(test_name, **manifest)
 
 
 def evaluate_profile_benchmark_result(test_name: str, workdir: Path) -> TestResult:
@@ -97,7 +112,7 @@ def run_profile_test(args: argparse.Namespace, test_name: str, workdir: Path) ->
     generate_profile_test_files(test_name, workdir)
 
     if args.dry_run or not args.run:
-        return TestResult(f"_test_{test_name}", "GENERATED", workdir, base_result_metrics(test_name))
+        return TestResult(f"_test_{test_name}", "GENERATED", workdir, profile_generation_metrics(test_name))
 
     execution = execute_test_solver(args, test_name, workdir, 1)
     if execution.status != "RAN":
@@ -105,6 +120,6 @@ def run_profile_test(args: argparse.Namespace, test_name: str, workdir: Path) ->
             f"_test_{test_name}",
             execution.status,
             workdir,
-            base_result_metrics(test_name, **execution.metrics),
+            {**profile_generation_metrics(test_name), **execution.metrics},
         )
     return evaluate_profile_benchmark_result(test_name, workdir)
