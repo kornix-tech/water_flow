@@ -135,6 +135,10 @@ Endpoints:
 - `GET /api/results/runs/{run_name}/test-status` - типизированная JSON-сводка
   отдельного тестового запуска из `TEST_STATUS.txt` и, если есть,
   `test_diagnostics.json`.
+  Для profile-smoke benchmark'ов статус может включать диагностические поля
+  `profile_evaluator=reference_overlay`, `profile_overlay_quality_check` и
+  `strict_profile_evaluator=PENDING`; эти поля не повышают тест до strict
+  analytical verification.
 - `GET /api/results/runs/{run_name}/overview` - единый обзор состояния запуска:
   verification-suite, отдельный тест, графики или fallback по файлам результата.
 - `GET /api/results/runs/{run_name}/plots` - список файлов графиков.

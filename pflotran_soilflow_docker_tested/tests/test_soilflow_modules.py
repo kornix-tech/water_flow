@@ -35,6 +35,7 @@ from soilflow_pflotran_modules.profile_benchmarks import (
     write_profile_overlay_comparison,
     write_richards_profile_analytical_profiles,
 )
+from soilflow_pflotran_modules.profile_benchmark_evaluators import evaluate_reference_overlay_quality
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
 from soilflow_pflotran_modules.profile_test_runner import generate_profile_test_files
 from soilflow_pflotran_modules.result_contract import profile_rows_to_contract
@@ -116,6 +117,7 @@ class ArchitectureContractTests(unittest.TestCase):
         self.assertIn("test_evaluation", MODULE_BOUNDARIES)
         self.assertIn("test_suite_artifacts", MODULE_BOUNDARIES)
         self.assertIn("profile_benchmarks", MODULE_BOUNDARIES)
+        self.assertIn("profile_benchmark_evaluators", MODULE_BOUNDARIES)
         self.assertIn("richards_test_cases", MODULE_BOUNDARIES)
         self.assertIn("richards_test_evaluators", MODULE_BOUNDARIES)
         self.assertIn("richards_test_runner", MODULE_BOUNDARIES)
@@ -481,6 +483,8 @@ class TestEvaluationTests(unittest.TestCase):
                 "warning_count": 1,
                 "profile_overlay_comparison": "REFERENCE_OVERLAY",
                 "profile_overlay_points": 96,
+                "profile_overlay_quality_check": "PASS",
+                "strict_profile_evaluator": "PENDING",
             },
         )
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -492,6 +496,8 @@ class TestEvaluationTests(unittest.TestCase):
             self.assertIn('"profile_smoke_ready": 1', (suite_dir / "TEST_SUITE_STATUS.json").read_text(encoding="utf-8"))
             csv_text = (suite_dir / "TEST_SUITE_RESULTS.csv").read_text(encoding="utf-8")
             self.assertIn("profile_overlay_comparison", csv_text)
+            self.assertIn("profile_overlay_quality_check", csv_text)
+            self.assertIn("strict_profile_evaluator", csv_text)
             self.assertIn("REFERENCE_OVERLAY", csv_text)
 
 
@@ -585,6 +591,9 @@ class ProfileBenchmarkTests(unittest.TestCase):
             self.assertEqual(fields["profile_overlay_comparison"], "REFERENCE_OVERLAY")
             self.assertEqual(fields["profile_overlay_points"], 2)
             self.assertEqual(fields["profile_overlay_source"], "profile_overlay_comparison.csv")
+            self.assertEqual(fields["profile_evaluator"], "reference_overlay")
+            self.assertEqual(fields["strict_profile_evaluator"], "PENDING")
+            self.assertEqual(fields["profile_overlay_quality_check"], "PASS")
             self.assertTrue((workdir / "profile_overlay_comparison.csv").exists())
 
     def test_profile_overlay_metrics_compare_numerical_and_reference_profiles(self) -> None:
@@ -622,6 +631,27 @@ class ProfileBenchmarkTests(unittest.TestCase):
             text = (workdir / "profile_overlay_comparison.csv").read_text(encoding="utf-8")
             self.assertEqual(metrics["profile_overlay_source"], "profile_overlay_comparison.csv")
             self.assertIn("theta_numerical_m3_m3", text)
+
+    def test_profile_overlay_quality_evaluator_classifies_pass_warn_and_skip(self) -> None:
+        passing = evaluate_reference_overlay_quality(
+            {
+                "profile_overlay_comparison": "REFERENCE_OVERLAY",
+                "theta_overlay_max_abs_m3_m3": "0.01",
+                "pressure_head_overlay_max_abs_m": "0.5",
+            }
+        )
+        warning = evaluate_reference_overlay_quality(
+            {
+                "profile_overlay_comparison": "REFERENCE_OVERLAY",
+                "theta_overlay_max_abs_m3_m3": "0.8",
+                "pressure_head_overlay_max_abs_m": "0.5",
+            }
+        )
+        skipped = evaluate_reference_overlay_quality({"profile_overlay_comparison": "SKIP"})
+
+        self.assertEqual(passing["profile_overlay_quality_check"], "PASS")
+        self.assertEqual(warning["profile_overlay_quality_check"], "WARN")
+        self.assertEqual(skipped["profile_overlay_quality_check"], "SKIP")
 
 
 class ResultDiagnosticsTests(unittest.TestCase):

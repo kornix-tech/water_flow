@@ -24,8 +24,12 @@ SUITE_RESULT_CSV_FIELDS = [
     "solver_cuts",
     "profile_overlay_comparison",
     "profile_overlay_points",
+    "profile_overlay_quality_check",
     "theta_overlay_rmse_m3_m3",
+    "theta_overlay_max_abs_m3_m3",
     "pressure_head_overlay_rmse_m",
+    "pressure_head_overlay_max_abs_m",
+    "strict_profile_evaluator",
 ]
 
 

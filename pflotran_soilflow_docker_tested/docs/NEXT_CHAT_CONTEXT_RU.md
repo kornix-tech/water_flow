@@ -443,11 +443,18 @@ flowchart LR
 
 ### Блок C. Следующий архитектурный шаг
 
-После фиксации status overview можно продолжать:
+После UI smoke был выполнен следующий архитектурный шаг:
 
-- добавить строгие evaluator-модули для profile-smoke benchmarks;
-- при необходимости добавить полноценный browser smoke с Playwright или отдельным инструментом;
-- полный Docker rebuild gate уже был выполнен после `d955c6b`;
+- добавлен `profile_benchmark_evaluators.py` для диагностической оценки
+  `REFERENCE_OVERLAY` profile-smoke benchmark'ов;
+- `TEST_STATUS.txt` profile benchmark'ов теперь может содержать
+  `profile_evaluator=reference_overlay`, `strict_profile_evaluator=PENDING` и
+  `profile_overlay_quality_check`;
+- suite CSV расширен колонками качества overlay и pending strict evaluator;
+- физические strict-evaluator'ы для Theis/Ogata/Terzaghi/heat/Buckley/
+  Boussinesq/Richards MMS еще не подключены;
+- полный Docker rebuild gate уже был выполнен после `d955c6b` и повторяется
+  после значимых изменений;
 - затем переходить к следующей физической/исследовательской модели.
 
 ## 13. Что нельзя потерять
@@ -484,8 +491,8 @@ workflow_smoke
 Работай в проекте /home/zenbook/SF/pflotran_soilflow_docker_tested.
 Сначала прочитай docs/NEXT_CHAT_CONTEXT_RU.md и docs/EXTERNAL_CONTEXT_RU.md.
 Проверь git status и текущее состояние сервиса.
-Дальше продолжай с блока: если UI smoke-этап не закоммичен, проверить
-`git status`, запустить `./scripts/check_project.sh`, очистить generated
-artifacts `runs/_test_suite`, затем commit/push.
+Дальше продолжай с блока: если profile evaluator этап не закоммичен, проверить
+`git status`, запустить `./scripts/check_project.sh`, выполнить Docker rebuild
+gate, очистить generated artifacts `runs/_test_suite`, затем commit/push.
 Работай через WSL bash, не через PowerShell heredoc/pipes.
 ```

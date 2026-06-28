@@ -10,6 +10,10 @@ from soilflow_pflotran_modules.physical_models import (
     saturation_from_effective_saturation,
     vg_effective_saturation_from_pressure_head,
 )
+from soilflow_pflotran_modules.profile_benchmark_evaluators import (
+    evaluate_reference_overlay_quality,
+    profile_evaluator_metadata,
+)
 from soilflow_pflotran_modules.result_diagnostics import (
     find_final_tec_file,
     load_tecpotran_records,
@@ -250,8 +254,16 @@ def profile_status_fields_after_run(test_name: str, workdir: Path) -> dict[str, 
         "saturation_max": f"{max(saturation_values):.12g}",
         "note": "PFLOTRAN расчетные профили построены; строгая аналитическая метрика для этого benchmark будет подключена отдельной задачей.",
     }
+    status_fields.update(profile_evaluator_metadata(test_name))
     status_fields.update(analytical_profile_overlay_diagnostics(workdir))
-    status_fields.update(write_profile_overlay_comparison(workdir, converted, _read_analytical_profile_rows(workdir / "analytical_profiles.csv")))
+    status_fields.update(
+        write_profile_overlay_comparison(
+            workdir,
+            converted,
+            _read_analytical_profile_rows(workdir / "analytical_profiles.csv"),
+        )
+    )
+    status_fields.update(evaluate_reference_overlay_quality(status_fields))
     return status_fields
 
 

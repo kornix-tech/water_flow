@@ -39,6 +39,7 @@ MODULE_BOUNDARIES = {
     "test_registry": "Реестр verification/profile тестов, выбор сценариев и рабочие пути suite.",
     "test_artifacts": "Общие CSV/SVG artifacts и diagnostics аналитического overlay.",
     "profile_benchmarks": "Генерация аналитических profile overlay и оценка TECPLOT-ready статуса профильных benchmarks.",
+    "profile_benchmark_evaluators": "Диагностические evaluator-метрики для profile benchmark overlay без повышения их до strict verification.",
     "richards_test_cases": "Dataclass-параметры, PFLOTRAN deck'и и аналитические artifacts strict/partial Richards-тестов.",
     "richards_test_evaluators": "Сравнение PFLOTRAN профилей с analytical strict/partial Richards-метриками.",
     "richards_test_runner": "Запуск strict/partial Richards-тестов: artifacts, solver и выбор evaluator-а.",
