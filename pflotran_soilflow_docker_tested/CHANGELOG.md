@@ -26,6 +26,7 @@
 - Добавлен быстрый профиль проверки `CHECK_PROFILE=fast ./scripts/check_project.sh` и Makefile-цель `project-check-fast` для compile/unit/modular/API/UI smoke без тяжелого full-gate.
 - Добавлен отдельный research-профиль `CHECK_PROFILE=research ./scripts/check_project.sh` и Makefile-цель `project-check-research` для verification-suite dry/run gate вне основного full-gate.
 - Verification-suite теперь пишет `STRICT_READINESS_PLAN.json` с priority order, `next_stage` и `next_targets` для следующего strict-readiness блока.
+- Backend `/test-suite` теперь отдает `strict_readiness_plan` как структурированное поле, suite plan сохраняет blocker-поля, а `/overview` добавляет в карточку suite следующий strict-блок, первый target и blocker.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_evaluators` для диагностической оценки `REFERENCE_OVERLAY` profile-smoke benchmark'ов и явной отметки pending strict evaluator.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_cases` с машинно-читаемой картой profile benchmark'ов, физическими семействами и blocker'ами будущих strict evaluator'ов.
 - Добавлен модуль `soilflow_pflotran_modules.profile_strict_evaluators` с первым strict-кандидатом для `richards_mms` по RMSE/max-error напора и влажности.
@@ -79,6 +80,7 @@
   `docs/EXTERNAL_CONTEXT_RU.md`: приоритеты смещены на устойчивость runtime/API,
   производительность чтения результатов, ленивую загрузку тяжелых artifacts и
   разделение fast/full/research verification gates.
+- SQLite-соединения `JobStore` теперь закрываются явно после транзакций; backend unit-тесты дополнительно проходят с `ResourceWarning` как ошибкой.
 - `/api/results/runs` больше не сканирует до 500 файлов внутри каждой run-папки
   при построении списка; детальный список файлов остается в endpoint конкретного
   run.

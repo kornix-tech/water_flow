@@ -207,6 +207,7 @@ def richards_mms_adapter_summary(case: RichardsMmsCase) -> dict[str, object]:
         "richards_mms_adapter_time_count": manifest["time_count"],
         "richards_mms_adapter_cell_count": manifest["cell_count"],
         "richards_mms_adapter_deck_status": "PFLOTRAN_DECK_ADAPTER_PENDING",
+        "deck_adapter_blocker": manifest["deck_adapter_blocker"],
     }
 
 

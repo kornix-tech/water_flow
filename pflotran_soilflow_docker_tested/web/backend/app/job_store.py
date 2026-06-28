@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 import sqlite3
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterator
 
 from .job_lifecycle import (
     ACTIVE_JOB_STATUSES,
@@ -132,8 +133,19 @@ class JobStore:
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
+        conn = self._connect()
+        try:
+            # `sqlite3.Connection` как context manager коммитит/откатывает
+            # транзакцию, но не закрывает descriptor; закрываем его явно.
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
     def _init_db(self) -> None:
-        with self._connect() as conn:
+        with self._connection() as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -156,16 +168,16 @@ class JobStore:
                 )
 
     def schema_version(self) -> int:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             row = conn.execute("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations").fetchone()
         return int(row["version"] if row else 0)
 
     def ping(self) -> None:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             conn.execute("SELECT 1").fetchone()
 
     def create(self, job: Job) -> None:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             conn.execute(
                 """
                 INSERT INTO jobs (
@@ -209,16 +221,16 @@ class JobStore:
             columns.append(f"{key} = ?")
             values.append(_dt_to_text(value) if isinstance(value, datetime) else value)
         values.append(job_id)
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             conn.execute(f"UPDATE jobs SET {', '.join(columns)} WHERE id = ?", values)
 
     def get(self, job_id: str) -> Job | None:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
         return self._row_to_job(row) if row else None
 
     def list(self, limit: int = 100) -> list[Job]:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             rows = conn.execute(
                 "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?",
                 (limit,),
@@ -228,7 +240,7 @@ class JobStore:
     def mark_incomplete_jobs_interrupted(self) -> int:
         timestamp = _utcnow()
         active_statuses = tuple(ACTIVE_JOB_STATUSES)
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             rows = conn.execute(
                 f"SELECT id, calculation_id FROM jobs WHERE status IN ({','.join('?' for _ in active_statuses)})",
                 active_statuses,
@@ -279,7 +291,7 @@ class JobStore:
 
     def create_calculation(self, input_json: dict, *, now: datetime | None = None) -> Calculation:
         timestamp = now or _utcnow()
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             cursor = conn.execute(
                 """
                 INSERT INTO calculations (
@@ -305,17 +317,17 @@ class JobStore:
         return created
 
     def get_calculation(self, calculation_id: int) -> Calculation | None:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             row = conn.execute("SELECT * FROM calculations WHERE id = ?", (calculation_id,)).fetchone()
         return self._row_to_calculation(row) if row else None
 
     def latest_calculation(self) -> Calculation | None:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             row = conn.execute("SELECT * FROM calculations ORDER BY id DESC LIMIT 1").fetchone()
         return self._row_to_calculation(row) if row else None
 
     def get_calculation_by_run_name(self, run_name: str) -> Calculation | None:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             row = conn.execute("SELECT * FROM calculations WHERE run_name = ?", (run_name,)).fetchone()
         return self._row_to_calculation(row) if row else None
 
@@ -329,12 +341,12 @@ class JobStore:
             params.extend([like, like, like, like])
         sql += " ORDER BY id DESC LIMIT ?"
         params.append(limit)
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             rows = conn.execute(sql, params).fetchall()
         return [self._row_to_calculation(row) for row in rows]
 
     def set_calculation_job(self, calculation_id: int, *, run_name: str, job_id: str, result_dir: str, status: str) -> None:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             conn.execute(
                 """
                 UPDATE calculations
@@ -345,14 +357,14 @@ class JobStore:
             )
 
     def update_calculation_status(self, calculation_id: int, status: str) -> None:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             conn.execute(
                 "UPDATE calculations SET status = ?, updated_at = ? WHERE id = ?",
                 (status, _dt_to_text(_utcnow()), calculation_id),
             )
 
     def delete_calculation(self, calculation_id: int) -> None:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             conn.execute("UPDATE jobs SET calculation_id = NULL WHERE calculation_id = ?", (calculation_id,))
             conn.execute("DELETE FROM calculations WHERE id = ?", (calculation_id,))
 
@@ -363,7 +375,7 @@ class JobStore:
         points: list[dict[str, object]],
     ) -> dict[str, object]:
         timestamp = _utcnow()
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             cursor = conn.execute(
                 """
                 INSERT INTO soil_curve_tables (
@@ -411,7 +423,7 @@ class JobStore:
         return created
 
     def list_soil_curve_tables(self, calculation_id: int) -> list[dict[str, object]]:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             rows = conn.execute(
                 "SELECT * FROM soil_curve_tables WHERE calculation_id = ? ORDER BY id DESC",
                 (calculation_id,),
@@ -419,18 +431,18 @@ class JobStore:
         return [self._soil_curve_table_with_points(int(row["id"])) for row in rows]
 
     def get_soil_curve_table(self, table_id: int) -> dict[str, object] | None:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             row = conn.execute("SELECT * FROM soil_curve_tables WHERE id = ?", (table_id,)).fetchone()
         if row is None:
             return None
         return self._soil_curve_table_with_points(table_id)
 
     def delete_soil_curve_table(self, table_id: int) -> None:
-        with self._lock, self._connect() as conn:
+        with self._lock, self._connection() as conn:
             conn.execute("DELETE FROM soil_curve_tables WHERE id = ?", (table_id,))
 
     def _soil_curve_table_with_points(self, table_id: int) -> dict[str, object]:
-        with self._connect() as conn:
+        with self._connection() as conn:
             table_row = conn.execute("SELECT * FROM soil_curve_tables WHERE id = ?", (table_id,)).fetchone()
             point_rows = conn.execute(
                 "SELECT * FROM soil_curve_points WHERE table_id = ? ORDER BY point_index",

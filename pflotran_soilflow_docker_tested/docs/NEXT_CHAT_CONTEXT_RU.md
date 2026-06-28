@@ -373,8 +373,8 @@ GET http://localhost:18080/api/health/ready
 }
 ```
 
-После stability/performance этапа была выполнена релизная сверка через полный
-Docker rebuild:
+После stability/performance этапа и текущего strict-readiness/API инкремента
+была выполнена релизная сверка через полный Docker rebuild:
 
 ```bash
 WEB_PORT=18080 BUILD_JOBS=12 docker compose build soilflow-web
@@ -385,7 +385,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:b2d27f7a8c84588030ac7562861af3ec221537e284fb73287f82bbb1aa299cbf
+sha256:b9fd47bf1d8bd87ef2fe95ace98780a188b17645e09212027969ab9c3bc660dc
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -554,8 +554,10 @@ flowchart LR
      результатов suite.
 3. Использовать `strict_readiness_stage` для выбора следующего блока:
    - suite writer теперь создает `STRICT_READINESS_PLAN.json` с `stage_order`,
-     `next_stage`, `next_targets` и списком candidates для машинного выбора
-     следующего strict-readiness блока;
+     `next_stage`, `next_targets`, blocker-полями и списком candidates для
+     машинного выбора следующего strict-readiness блока;
+   - backend `/test-suite` отдает `strict_readiness_plan`, а `/overview`
+     показывает следующий strict-блок, первый target и blocker в карточке suite;
    - сначала закрывать `DECK_ADAPTER_PENDING` для `richards_mms`;
    - затем `CASE_BUILDER_PENDING` для heat/transport/groundwater;
    - затем `STRICT_EVALUATOR_PENDING` для infiltration/profile carrier.
@@ -596,14 +598,14 @@ flowchart LR
   содержит readiness matrix/manifest artifacts и pending deck adapter status;
 - `strict_candidate_can_gate_suite=false` сохраняет strict-кандидат
   диагностическим до замены carrier deck'а физической MMS постановкой;
-- suite CSV расширен колонками качества overlay и pending strict evaluator;
+- suite CSV расширен колонками качества overlay, blocker-полями и pending
+  strict evaluator;
 - suite summary агрегирует strict-readiness stages в счетчики
   `strict_gate_ready_total`, `strict_deck_adapter_pending_total`,
   `strict_case_builder_pending_total`, `strict_evaluator_pending_total`;
 - физические strict-evaluator'ы для Theis/Ogata/Terzaghi/heat/Buckley/
   Boussinesq/Richards MMS еще не подключены;
-- полный Docker rebuild gate уже был выполнен после `d955c6b` и повторяется
-  после значимых изменений;
+- полный Docker rebuild gate выполнен после strict-readiness/API инкремента;
 - затем переходить к следующей физической/исследовательской модели.
 
 ## 13. Что нельзя потерять

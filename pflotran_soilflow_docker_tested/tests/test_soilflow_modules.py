@@ -586,6 +586,8 @@ class TestEvaluationTests(unittest.TestCase):
             self.assertIn("profile_deck_kind", csv_text)
             self.assertIn("strict_candidate_can_gate_suite", csv_text)
             self.assertIn("strict_readiness_stage", csv_text)
+            self.assertIn("strict_profile_evaluator_blocker", csv_text)
+            self.assertIn("deck_adapter_blocker", csv_text)
             self.assertIn("failure_stage", csv_text)
             self.assertIn("richards_mms_adapter_artifact_check", csv_text)
             self.assertIn("strict_profile_evaluator", csv_text)
@@ -603,7 +605,11 @@ class TestEvaluationTests(unittest.TestCase):
                 test_id="_test_richards_mms",
                 status="PASS_WITH_WARNINGS",
                 output_dir=Path("/tmp/mms"),
-                metrics={"verification_level": "profile_smoke", "strict_readiness_stage": "DECK_ADAPTER_PENDING"},
+                metrics={
+                    "verification_level": "profile_smoke",
+                    "strict_readiness_stage": "DECK_ADAPTER_PENDING",
+                    "deck_adapter_blocker": "Нужен spatial source adapter",
+                },
             ),
         ]
 
@@ -611,6 +617,7 @@ class TestEvaluationTests(unittest.TestCase):
 
         self.assertEqual(plan["next_stage"], "DECK_ADAPTER_PENDING")
         self.assertEqual(plan["next_targets"][0]["test_id"], "_test_richards_mms")
+        self.assertEqual(plan["next_targets"][0]["deck_adapter_blocker"], "Нужен spatial source adapter")
 
 
 class TestRegistryTests(unittest.TestCase):
@@ -696,6 +703,7 @@ class ProfileBenchmarkTests(unittest.TestCase):
             adapter_summary = richards_mms_adapter_summary(case)
             self.assertEqual(adapter_check["richards_mms_adapter_artifact_check"], "PASS")
             self.assertEqual(adapter_summary["richards_mms_adapter_cell_count"], case.nz)
+            self.assertIn("cell-wise source", str(adapter_summary["deck_adapter_blocker"]))
 
     def test_richards_profile_overlay_rows_are_written_for_mms(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

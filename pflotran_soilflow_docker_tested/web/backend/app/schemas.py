@@ -86,6 +86,7 @@ class TestSuiteStatus(BaseModel):
     status: str
     summary: dict[str, str | int]
     results: list[TestSuiteResult]
+    strict_readiness_plan: dict[str, Any] | None = None
     source: str
     files: list[str]
 

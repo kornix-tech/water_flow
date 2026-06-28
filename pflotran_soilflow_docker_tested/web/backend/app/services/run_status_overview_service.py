@@ -25,23 +25,50 @@ def _first_present(fields: dict[str, Any], *keys: str) -> Any:
     return None
 
 
+def _strict_plan_metrics(plan: Any) -> list[dict[str, str]]:
+    if not isinstance(plan, dict):
+        return []
+    metrics: list[dict[str, str]] = []
+    next_stage = plan.get("next_stage")
+    if isinstance(next_stage, str) and next_stage and next_stage != "NONE":
+        metrics.append(_metric("Следующий strict-блок", next_stage))
+    next_targets = plan.get("next_targets")
+    if isinstance(next_targets, list) and next_targets:
+        first_target = next_targets[0]
+        if isinstance(first_target, dict):
+            target_id = first_target.get("test_id")
+            if target_id:
+                metrics.append(_metric("Первый strict-target", target_id))
+            blocker = (
+                first_target.get("blocker")
+                or first_target.get("strict_blocker")
+                or first_target.get("strict_profile_evaluator_blocker")
+                or first_target.get("deck_adapter_blocker")
+            )
+            if blocker:
+                metrics.append(_metric("Blocker", blocker))
+    return metrics
+
+
 def _suite_item(run_name: str, run_dir: Path) -> dict[str, Any] | None:
     if not any(has_status_artifact(run_dir, filename) for filename in SUITE_STATUS_ARTIFACTS):
         return None
     suite = read_test_suite_status(run_name, run_dir)
     summary = suite["summary"]
+    metrics = [
+        _metric("Всего тестов", summary.get("tests_total", 0)),
+        _metric("С предупреждениями", summary.get("tests_passed_with_warnings", 0)),
+        _metric("Ошибки", summary.get("tests_failed", 0)),
+        _metric("Строгая аналитика", f"{summary.get('strict_analytical_passed', 0)}/{summary.get('strict_analytical_total', 0)}"),
+        _metric("Profile smoke", f"{summary.get('profile_smoke_ready', 0)}/{summary.get('profile_smoke_total', 0)}"),
+    ]
+    metrics.extend(_strict_plan_metrics(suite.get("strict_readiness_plan")))
     return {
         "kind": "test-suite",
         "title": "Verification-suite",
         "status": suite["status"],
         "subtitle": f"{summary.get('tests_passed', 0)} из {summary.get('tests_total', 0)} без предупреждений",
-        "metrics": [
-            _metric("Всего тестов", summary.get("tests_total", 0)),
-            _metric("С предупреждениями", summary.get("tests_passed_with_warnings", 0)),
-            _metric("Ошибки", summary.get("tests_failed", 0)),
-            _metric("Строгая аналитика", f"{summary.get('strict_analytical_passed', 0)}/{summary.get('strict_analytical_total', 0)}"),
-            _metric("Profile smoke", f"{summary.get('profile_smoke_ready', 0)}/{summary.get('profile_smoke_total', 0)}"),
-        ],
+        "metrics": metrics,
         "source": suite["source"],
         "files": suite["files"],
     }

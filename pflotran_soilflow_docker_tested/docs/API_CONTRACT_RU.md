@@ -155,7 +155,12 @@ Endpoints:
   `strict_evaluator_pending_total`.
   Дополнительно suite writer создает `STRICT_READINESS_PLAN.json` с
   `stage_order`, `next_stage`, `next_targets` и полным списком strict-readiness
-  candidates; backend включает этот artifact в список `files` endpoint-а.
+  candidates. Plan candidates сохраняют диагностические blocker-поля
+  `strict_profile_evaluator_blocker` и `deck_adapter_blocker`; backend включает
+  этот artifact в список `files` endpoint-а и отдает его содержимое в поле
+  `strict_readiness_plan`. Если plan artifact
+  прочитан в частично записанном состоянии, endpoint сохраняет основную suite
+  сводку и возвращает `artifact_readiness=PARTIAL` внутри `strict_readiness_plan`.
   Если JSON suite artifact прочитан в частично записанном состоянии, backend
   откатывается к TXT/CSV и помечает summary как `artifact_readiness=PARTIAL`.
 - `GET /api/results/runs/{run_name}/test-status` - типизированная JSON-сводка

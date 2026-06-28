@@ -138,10 +138,25 @@ def _read_text_summary(path: Path) -> tuple[dict[str, str | int], list[dict[str,
     return _normalize_summary(summary), _normalize_results(results)
 
 
+def _read_strict_readiness_plan(path: Path | None) -> dict[str, Any] | None:
+    if path is None:
+        return None
+    try:
+        payload = json.loads(read_status_artifact_text(path))
+        if not isinstance(payload, dict):
+            raise ValueError("STRICT_READINESS_PLAN.json must contain an object")
+        return payload
+    except (json.JSONDecodeError, ValueError) as exc:
+        # План пишется рядом с suite artifacts и может быть прочитан в момент
+        # дозаписи. Не ломаем весь endpoint: показываем partial marker для UI.
+        return {"artifact_readiness": "PARTIAL", "plan_error": str(exc)}
+
+
 def read_test_suite_status(run_name: str, run_dir: Path) -> dict[str, Any]:
     json_path = existing_status_artifact(run_dir, SUITE_STATUS_JSON)
     csv_path = existing_status_artifact(run_dir, SUITE_RESULTS_CSV)
     text_path = existing_status_artifact(run_dir, SUITE_STATUS_TEXT)
+    plan_path = existing_status_artifact(run_dir, STRICT_READINESS_PLAN_JSON)
     if json_path is None and text_path is None:
         raise FileNotFoundError("Test-suite status artifact was not found")
 
@@ -178,6 +193,7 @@ def read_test_suite_status(run_name: str, run_dir: Path) -> dict[str, Any]:
         "status": str(summary.get("TEST_SUITE_STATUS", "UNKNOWN")),
         "summary": summary,
         "results": results,
+        "strict_readiness_plan": _read_strict_readiness_plan(plan_path),
         "source": source,
         "files": existing_status_artifact_names(run_dir, SUITE_ARTIFACTS),
     }

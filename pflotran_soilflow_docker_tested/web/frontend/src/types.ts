@@ -62,6 +62,7 @@ export interface TestSuiteStatus {
   status: string;
   summary: Record<string, string | number>;
   results: TestSuiteResult[];
+  strict_readiness_plan: Record<string, unknown> | null;
   source: string;
   files: string[];
 }

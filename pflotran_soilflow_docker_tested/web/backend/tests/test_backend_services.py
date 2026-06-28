@@ -5,8 +5,10 @@ import sys
 import tempfile
 import types
 import unittest
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Iterator
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
@@ -40,6 +42,16 @@ from app.services.test_suite_summary_service import read_test_suite_status
 
 def _utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+@contextmanager
+def _sqlite_connection(path: Path) -> Iterator[sqlite3.Connection]:
+    conn = sqlite3.connect(path)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def _minimal_workbook_snapshot(value: object, description: str = "Исходное описание") -> dict:
@@ -139,7 +151,7 @@ class JobStoreTests(unittest.TestCase):
     def test_existing_jobs_table_without_calculation_id_is_migrated(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             db_path = Path(directory) / "jobs.sqlite"
-            with sqlite3.connect(db_path) as conn:
+            with _sqlite_connection(db_path) as conn:
                 conn.execute(
                     """
                     CREATE TABLE jobs (
@@ -161,7 +173,7 @@ class JobStoreTests(unittest.TestCase):
 
             store = JobStore(db_path)
 
-            with sqlite3.connect(db_path) as conn:
+            with _sqlite_connection(db_path) as conn:
                 columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
             self.assertIn("calculation_id", columns)
             self.assertEqual(store.schema_version(), 2)
@@ -172,7 +184,7 @@ class JobStoreTests(unittest.TestCase):
             store = JobStore(db_path)
             calculation = store.create_calculation(_minimal_workbook_snapshot("demo"))
             timestamp = _utcnow().isoformat()
-            with sqlite3.connect(db_path) as conn:
+            with _sqlite_connection(db_path) as conn:
                 conn.execute("PRAGMA foreign_keys = ON")
                 cursor = conn.execute(
                     """
@@ -195,7 +207,7 @@ class JobStoreTests(unittest.TestCase):
 
             store.delete_calculation(calculation.id)
 
-            with sqlite3.connect(db_path) as conn:
+            with _sqlite_connection(db_path) as conn:
                 tables_count = conn.execute("SELECT COUNT(*) FROM soil_curve_tables").fetchone()[0]
                 points_count = conn.execute("SELECT COUNT(*) FROM soil_curve_points").fetchone()[0]
             self.assertEqual(tables_count, 0)
@@ -346,8 +358,21 @@ class TestSuiteSummaryServiceTests(unittest.TestCase):
 
             self.assertEqual(suite["summary"]["tests_failed"], 0)
             self.assertEqual(suite["results"][0]["verification_level"], "strict_analytical")
+            self.assertEqual(suite["strict_readiness_plan"]["next_stage"], "NONE")
             self.assertIn("TEST_SUITE_RESULTS.csv", suite["files"])
             self.assertIn("STRICT_READINESS_PLAN.json", suite["files"])
+
+    def test_read_test_suite_status_marks_partial_when_strict_plan_is_partial(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            (run_dir / "TEST_SUITE_STATUS.txt").write_text("TEST_SUITE_STATUS=PASS\ntests_total=0\n", encoding="utf-8")
+            (run_dir / "STRICT_READINESS_PLAN.json").write_text('{"next_stage": ', encoding="utf-8")
+
+            suite = read_test_suite_status("_test_suite", run_dir)
+
+            self.assertEqual(suite["status"], "PASS")
+            self.assertEqual(suite["strict_readiness_plan"]["artifact_readiness"], "PARTIAL")
+            self.assertIn("plan_error", suite["strict_readiness_plan"])
 
     def test_read_test_suite_status_falls_back_when_json_is_partial(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -507,6 +532,32 @@ class RunStatusOverviewServiceTests(unittest.TestCase):
 
             self.assertEqual(overview["items"][0]["kind"], "test-suite")
             self.assertEqual(overview["items"][0]["source"], "TEST_SUITE_STATUS.json")
+
+    def test_read_run_status_overview_adds_strict_plan_metrics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            (run_dir / "TEST_SUITE_STATUS.txt").write_text(
+                "TEST_SUITE_STATUS=PASS_WITH_WARNINGS\ntests_total=1\ntests_passed=0\ntests_passed_with_warnings=1\n",
+                encoding="utf-8",
+            )
+            (run_dir / "STRICT_READINESS_PLAN.json").write_text(
+                """
+                {
+                  "next_stage": "DECK_ADAPTER_PENDING",
+                  "next_targets": [
+                    {"test_id": "_test_richards_mms", "blocker": "PFLOTRAN deck adapter"}
+                  ]
+                }
+                """,
+                encoding="utf-8",
+            )
+
+            overview = read_run_status_overview("_test_suite", run_dir)
+            metrics = {item["label"]: item["value"] for item in overview["items"][0]["metrics"]}
+
+            self.assertEqual(metrics["Следующий strict-блок"], "DECK_ADAPTER_PENDING")
+            self.assertEqual(metrics["Первый strict-target"], "_test_richards_mms")
+            self.assertEqual(metrics["Blocker"], "PFLOTRAN deck adapter")
 
     def test_read_run_status_overview_cache_invalidates_on_status_change(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
