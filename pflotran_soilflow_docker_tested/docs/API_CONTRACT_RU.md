@@ -155,7 +155,9 @@ Endpoints:
   текущий deck еще не применяет этот artifact как PFLOTRAN source. Для будущего
   adapter-а также пишутся `richards_mms_spatial_source_matrix.json` и
   `richards_mms_spatial_source_manifest.json` с initial pressure profile и
-  source matrices.
+  source matrices. В `TEST_STATUS.txt` может приходить
+  `richards_mms_adapter_artifact_check=PASS|FAIL` как проверка согласованности
+  manifest и matrix shapes.
 - `GET /api/results/runs/{run_name}/overview` - единый обзор состояния запуска:
   verification-suite, отдельный тест, графики или fallback по файлам результата.
 - `GET /api/results/runs/{run_name}/plots` - список файлов графиков.

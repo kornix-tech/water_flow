@@ -27,6 +27,8 @@
 - Добавлен `soilflow_pflotran_modules.richards_mms_case`: `richards_mms` теперь генерирует uniform storage `SOURCE_SINK`/`RATE LIST` candidate deck и artifacts `richards_mms_initial_profile.csv`, `richards_mms_source_rate.csv`.
 - Для `richards_mms` добавлен cell-wise residual artifact `richards_mms_spatial_source_profile.csv` с storage derivative, flux divergence и расчетным MMS source по ячейкам.
 - Для `richards_mms` добавлены adapter-ready artifacts `richards_mms_spatial_source_matrix.json` и `richards_mms_spatial_source_manifest.json` с initial pressure profile и матрицами cell-wise source по времени.
+- Profile status для `richards_mms` теперь проверяет согласованность MMS adapter artifacts и добавляет `richards_mms_adapter_artifact_check`.
+- Suite CSV теперь включает `richards_mms_adapter_artifact_check` для машинного контроля готовности adapter artifacts.
 - Добавлены reference overlay метрики для profile-smoke benchmark'ов: RMSE/max-error по объемной влажности и напору относительно `analytical_profiles.csv`.
 - Для profile-smoke benchmark'ов теперь записывается `profile_overlay_comparison.csv` с построчным сравнением `PFLOTRAN vs analytical`.
 - Добавлена архитектурная схема `docs/ARCHITECTURE_RU.md` с текущими потоками данных и заменяемыми adapter-границами.
@@ -81,6 +83,7 @@
 - `richards_mms` переведен с generic profile-carrier на `richards_mms_uniform_source_candidate`; strict-кандидат остается диагностическим, пока не добавлен spatial MMS source-term.
 - Blocker `richards_mms` уточнен: spatial residual table уже пишется, но PFLOTRAN deck еще не применяет cell-wise source и nonuniform initial profile.
 - Blocker `richards_mms` уточнен до уровня deck adapter: matrix/manifest artifacts готовы, но текущий PFLOTRAN input еще остается uniform-source candidate.
+- `analytical_test_summary.txt` для `richards_mms` теперь явно публикует readiness MMS adapter artifacts и pending-статус PFLOTRAN deck adapter-а.
 - `scripts/check_project.sh` теперь включает полный расчетный smoke для табличной почвы через публичный API.
 - Стандартный PFLOTRAN deck writer вынесен из `soilflow_pflotran.py`; основной скрипт оставлен совместимым CLI-фасадом и отдельно маршрутизирует `floodplain_controlled_drainage`.
 - Парсинг результатов PFLOTRAN, solver diagnostics и запись `TEST_STATUS.txt` вынесены из `soilflow_pflotran.py` в модуль с unit-тестами.

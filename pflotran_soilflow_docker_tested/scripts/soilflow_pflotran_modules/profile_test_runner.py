@@ -14,6 +14,7 @@ from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_
 from soilflow_pflotran_modules.richards_mms_case import (
     RichardsMmsCase,
     generate_richards_mms_source_term_input,
+    richards_mms_adapter_summary,
     write_richards_mms_case_artifacts,
 )
 from soilflow_pflotran_modules.richards_test_cases import TestResult
@@ -35,8 +36,11 @@ def generate_profile_test_files(test_name: str, workdir: Path) -> None:
         mms_case = RichardsMmsCase()
         write_richards_mms_case_artifacts(mms_case, workdir)
         (workdir / "pflotran.in").write_text(generate_richards_mms_source_term_input(mms_case), encoding="utf-8")
+        adapter_summary = richards_mms_adapter_summary(mms_case)
     else:
         (workdir / "pflotran.in").write_text(generate_richards_profile_input(test_name), encoding="utf-8")
+        adapter_summary = {}
+    adapter_summary_lines = [f"{key}={value}" for key, value in adapter_summary.items()]
     (workdir / "analytical_test_summary.txt").write_text(
         "\n".join(
             [
@@ -50,6 +54,7 @@ def generate_profile_test_files(test_name: str, workdir: Path) -> None:
                 f"profile_deck_kind={case_manifest['profile_deck_kind']}",
                 f"strict_profile_evaluator={case_manifest['strict_profile_evaluator']}",
                 f"strict_candidate_can_gate_suite={str(case_manifest['strict_candidate_can_gate_suite']).lower()}",
+                *adapter_summary_lines,
                 "note=PFLOTRAN запускается для получения расчетных TECPLOT-профилей; строгая метрика сравнения будет добавлена отдельно.",
             ]
         )

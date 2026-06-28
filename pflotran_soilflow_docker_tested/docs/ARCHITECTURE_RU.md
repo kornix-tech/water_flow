@@ -97,9 +97,10 @@ flowchart LR
   `profile_strict_evaluators.py` и считает RMSE/max-error напора и влажности по
   overlay. `richards_mms` уже генерирует uniform storage `SOURCE_SINK` candidate
   и cell-wise residual table через `richards_mms_case.py`; рядом пишутся
-  matrix/manifest artifacts для будущего PFLOTRAN adapter-а. Benchmark все еще
-  помечен как `EVALUATOR_READY_DECK_PENDING`, потому что до strict gate PFLOTRAN
-  deck должен применить spatial MMS source-term и nonuniform initial condition.
+  matrix/manifest artifacts для будущего PFLOTRAN adapter-а. Эти artifacts
+  проходят shape/schema check в profile status, но benchmark все еще помечен как
+  `EVALUATOR_READY_DECK_PENDING`, потому что до strict gate PFLOTRAN deck должен
+  применить spatial MMS source-term и nonuniform initial condition.
 - Profile smoke тесты не считаются строгой верификацией: они проверяют
   генерацию PFLOTRAN-профиля и аналитического reference artifact, но не
   физическое совпадение с Theis/Ogata/Terzaghi/heat/Buckley и другими моделями.

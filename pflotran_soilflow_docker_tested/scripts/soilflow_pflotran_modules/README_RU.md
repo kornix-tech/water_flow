@@ -57,7 +57,8 @@ CLI и web-backend. Этот пакет задает безопасные гра
   `richards_mms_spatial_source_profile.csv`, `richards_mms_spatial_source_matrix.json`,
   `richards_mms_spatial_source_manifest.json` и PFLOTRAN deck с uniform storage
   `SOURCE_SINK`/`RATE LIST`. Cell-wise matrix artifact уже готовит spatial MMS
-  source, но strict-кандидат не gate'ит suite до PFLOTRAN adapter-а.
+  source и проходит shape/schema validation, но strict-кандидат не gate'ит suite
+  до PFLOTRAN adapter-а.
 - `richards_test_cases.py`: dataclass-параметры, PFLOTRAN deck'и,
   аналитические CSV/summary и builders для strict/partial Richards verification.
 - `richards_test_evaluators.py`: сравнение PFLOTRAN TECPLOT-профилей с

@@ -29,6 +29,7 @@ SUITE_RESULT_CSV_FIELDS = [
     "profile_carrier_status",
     "profile_deck_kind",
     "strict_candidate_can_gate_suite",
+    "richards_mms_adapter_artifact_check",
     "richards_mms_strict_candidate_check",
     "theta_overlay_rmse_m3_m3",
     "theta_overlay_max_abs_m3_m3",

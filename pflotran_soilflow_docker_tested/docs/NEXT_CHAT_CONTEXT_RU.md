@@ -467,6 +467,9 @@ flowchart LR
   `EVALUATOR_READY_DECK_PENDING`: evaluator готов, uniform source-term candidate
   и cell-wise matrix/manifest artifacts есть, но strict gate ждет PFLOTRAN adapter
   для spatial MMS source-term и nonuniform initial profile;
+- profile status для `richards_mms` уже публикует
+  `richards_mms_adapter_artifact_check`, а `analytical_test_summary.txt`
+  содержит readiness matrix/manifest artifacts и pending deck adapter status;
 - `strict_candidate_can_gate_suite=false` сохраняет strict-кандидат
   диагностическим до замены carrier deck'а физической MMS постановкой;
 - suite CSV расширен колонками качества overlay и pending strict evaluator;

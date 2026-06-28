@@ -25,7 +25,7 @@ PROFILE_BENCHMARK_CASES: dict[str, ProfileBenchmarkCase] = {
         strict_evaluator_status="EVALUATOR_READY_DECK_PENDING",
         deck_kind="richards_mms_uniform_source_candidate",
         strict_candidate_can_gate_suite=False,
-        strict_blocker="Есть spatial MMS source-term residual table, но PFLOTRAN deck пока применяет uniform storage source и не читает cell-wise source/initial profile.",
+        strict_blocker="Есть spatial MMS source-term matrix artifacts, но PFLOTRAN deck пока применяет uniform storage source и не читает cell-wise source/initial profile.",
         next_step="Подключить cell-wise MMS source и nonuniform initial profile к PFLOTRAN deck, затем включить strict pressure/theta evaluator как PASS/FAIL критерий.",
     ),
     "philip_infiltration": ProfileBenchmarkCase(

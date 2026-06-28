@@ -198,6 +198,18 @@ def richards_mms_spatial_source_manifest(case: RichardsMmsCase) -> dict[str, obj
     }
 
 
+def richards_mms_adapter_summary(case: RichardsMmsCase) -> dict[str, object]:
+    manifest = richards_mms_spatial_source_manifest(case)
+    return {
+        "richards_mms_adapter_artifact_status": manifest["artifact_status"],
+        "richards_mms_adapter_matrix_file": manifest["matrix_file"],
+        "richards_mms_adapter_manifest_file": "richards_mms_spatial_source_manifest.json",
+        "richards_mms_adapter_time_count": manifest["time_count"],
+        "richards_mms_adapter_cell_count": manifest["cell_count"],
+        "richards_mms_adapter_deck_status": "PFLOTRAN_DECK_ADAPTER_PENDING",
+    }
+
+
 def write_richards_mms_matrix_artifact(case: RichardsMmsCase, path: Path) -> None:
     time_values = richards_mms_time_grid(case)
     initial_rows = richards_mms_profile_rows(case, 0.0)
@@ -208,10 +220,16 @@ def write_richards_mms_matrix_artifact(case: RichardsMmsCase, path: Path) -> Non
     flux: list[list[float]] = []
     for time_days in time_values:
         source_rate_per_volume.append(
-            [rows_by_key[(time_days, float(cell_id))]["source_rate_per_volume_1_day"] for cell_id in range(1, case.nz + 1)]
+            [
+                rows_by_key[(time_days, float(cell_id))]["source_rate_per_volume_1_day"]
+                for cell_id in range(1, case.nz + 1)
+            ]
         )
         source_rate_cell.append(
-            [rows_by_key[(time_days, float(cell_id))]["source_rate_cell_m3_day"] for cell_id in range(1, case.nz + 1)]
+            [
+                rows_by_key[(time_days, float(cell_id))]["source_rate_cell_m3_day"]
+                for cell_id in range(1, case.nz + 1)
+            ]
         )
         flux.append([rows_by_key[(time_days, float(cell_id))]["flux_m_day"] for cell_id in range(1, case.nz + 1)])
 
@@ -231,6 +249,46 @@ def write_richards_mms_matrix_artifact(case: RichardsMmsCase, path: Path) -> Non
         },
     }
     path.write_text(json.dumps(artifact, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def validate_richards_mms_adapter_artifacts(workdir: Path) -> dict[str, object]:
+    manifest_path = workdir / "richards_mms_spatial_source_manifest.json"
+    matrix_path = workdir / "richards_mms_spatial_source_matrix.json"
+    csv_path = workdir / "richards_mms_spatial_source_profile.csv"
+    initial_profile_path = workdir / "richards_mms_initial_profile.csv"
+    if not manifest_path.exists() or not matrix_path.exists() or not csv_path.exists() or not initial_profile_path.exists():
+        return {
+            "richards_mms_adapter_artifact_check": "FAIL",
+            "richards_mms_adapter_artifact_note": "Не найден один из обязательных MMS adapter artifacts.",
+        }
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+        time_count = int(manifest["time_count"])
+        cell_count = int(manifest["cell_count"])
+        source_matrix = matrix["source"]["source_rate_per_volume_1_day"]
+        initial_pressure = matrix["initial"]["liquid_pressure_pa"]
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        return {
+            "richards_mms_adapter_artifact_check": "FAIL",
+            "richards_mms_adapter_artifact_note": f"MMS adapter artifacts не прошли schema check: {exc}",
+        }
+
+    matrix_shape_ok = len(source_matrix) == time_count and all(len(row) == cell_count for row in source_matrix)
+    initial_shape_ok = len(initial_pressure) == cell_count
+    if not matrix_shape_ok or not initial_shape_ok:
+        return {
+            "richards_mms_adapter_artifact_check": "FAIL",
+            "richards_mms_adapter_artifact_note": "Размерности MMS matrix artifact не совпадают с manifest.",
+        }
+    return {
+        "richards_mms_adapter_artifact_check": "PASS",
+        "richards_mms_adapter_artifact_note": "MMS adapter artifacts согласованы по manifest и matrix shape.",
+        "richards_mms_adapter_artifact_status": manifest["artifact_status"],
+        "richards_mms_adapter_time_count": time_count,
+        "richards_mms_adapter_cell_count": cell_count,
+    }
 
 
 def richards_mms_source_rate_m3_day(case: RichardsMmsCase, time_days: float) -> float:

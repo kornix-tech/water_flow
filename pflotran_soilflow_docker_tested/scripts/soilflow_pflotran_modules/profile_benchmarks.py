@@ -21,6 +21,7 @@ from soilflow_pflotran_modules.result_diagnostics import (
     records_to_z_pressure_saturation,
     write_unified_status,
 )
+from soilflow_pflotran_modules.richards_mms_case import validate_richards_mms_adapter_artifacts
 from soilflow_pflotran_modules.test_artifacts import analytical_profile_overlay_diagnostics, write_rows_csv
 from soilflow_pflotran_modules.test_registry import verification_level_for_test
 
@@ -265,6 +266,8 @@ def profile_status_fields_after_run(test_name: str, workdir: Path) -> dict[str, 
         )
     )
     status_fields.update(evaluate_reference_overlay_quality(status_fields))
+    if test_name == "richards_mms":
+        status_fields.update(validate_richards_mms_adapter_artifacts(workdir))
     status_fields.update(evaluate_profile_strict_candidate(test_name, status_fields))
     return status_fields
 

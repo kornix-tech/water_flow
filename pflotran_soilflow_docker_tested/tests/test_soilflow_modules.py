@@ -67,8 +67,10 @@ from soilflow_pflotran_modules.richards_test_evaluators import write_test_compar
 from soilflow_pflotran_modules.richards_mms_case import (
     RichardsMmsCase,
     generate_richards_mms_source_term_input,
+    richards_mms_adapter_summary,
     richards_mms_spatial_source_rows,
     richards_mms_source_rate_rows,
+    validate_richards_mms_adapter_artifacts,
     write_richards_mms_case_artifacts,
 )
 from soilflow_pflotran_modules.richards_test_runner import generate_richards_test_files
@@ -252,6 +254,8 @@ class VerificationRunnerModuleTests(unittest.TestCase):
             self.assertFalse(manifest["strict_candidate_can_gate_suite"])
             self.assertIn("SOURCE_SINK mms_uniform_storage", deck)
             self.assertIn("strict_candidate_can_gate_suite=false", summary)
+            self.assertIn("richards_mms_adapter_artifact_status=MATRIX_ARTIFACT_READY_DECK_PENDING", summary)
+            self.assertIn("richards_mms_adapter_deck_status=PFLOTRAN_DECK_ADAPTER_PENDING", summary)
 
     def test_dry_run_mode_writes_suite_status_without_solver(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -515,6 +519,7 @@ class TestEvaluationTests(unittest.TestCase):
                 "profile_carrier_status": "MMS_SOURCE_TERM_CANDIDATE",
                 "profile_deck_kind": "richards_mms_uniform_source_candidate",
                 "strict_candidate_can_gate_suite": False,
+                "richards_mms_adapter_artifact_check": "PASS",
                 "strict_profile_evaluator": "EVALUATOR_READY_DECK_PENDING",
             },
         )
@@ -532,6 +537,7 @@ class TestEvaluationTests(unittest.TestCase):
             self.assertIn("profile_carrier_status", csv_text)
             self.assertIn("profile_deck_kind", csv_text)
             self.assertIn("strict_candidate_can_gate_suite", csv_text)
+            self.assertIn("richards_mms_adapter_artifact_check", csv_text)
             self.assertIn("strict_profile_evaluator", csv_text)
             self.assertIn("REFERENCE_OVERLAY", csv_text)
 
@@ -615,6 +621,10 @@ class ProfileBenchmarkTests(unittest.TestCase):
             self.assertEqual(len(matrix_artifact["source"]["source_rate_per_volume_1_day"]), len(rows))
             self.assertEqual(len(matrix_artifact["source"]["source_rate_per_volume_1_day"][0]), case.nz)
             self.assertEqual(len(matrix_artifact["initial"]["liquid_pressure_pa"]), case.nz)
+            adapter_check = validate_richards_mms_adapter_artifacts(workdir)
+            adapter_summary = richards_mms_adapter_summary(case)
+            self.assertEqual(adapter_check["richards_mms_adapter_artifact_check"], "PASS")
+            self.assertEqual(adapter_summary["richards_mms_adapter_cell_count"], case.nz)
 
     def test_richards_profile_overlay_rows_are_written_for_mms(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -645,6 +655,7 @@ class ProfileBenchmarkTests(unittest.TestCase):
                 workdir / "analytical_profiles.csv",
                 [{"depth_m": 0.1, "theta_m3_m3": 0.3, "pressure_head_m": -1.0}],
             )
+            write_richards_mms_case_artifacts(RichardsMmsCase(nz=2), workdir)
 
             fields = profile_status_fields_after_run("richards_mms", workdir)
 
@@ -663,6 +674,7 @@ class ProfileBenchmarkTests(unittest.TestCase):
             self.assertFalse(fields["strict_candidate_can_gate_suite"])
             self.assertIn("MMS source-term", str(fields["strict_profile_evaluator_blocker"]))
             self.assertEqual(fields["profile_overlay_quality_check"], "PASS")
+            self.assertEqual(fields["richards_mms_adapter_artifact_check"], "PASS")
             self.assertEqual(fields["richards_mms_strict_evaluator"], "READY_DECK_PENDING")
             self.assertEqual(fields["richards_mms_strict_candidate_check"], "FAIL")
             self.assertTrue((workdir / "profile_overlay_comparison.csv").exists())
