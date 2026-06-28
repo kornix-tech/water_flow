@@ -43,7 +43,9 @@ CLI и web-backend. Этот пакет задает безопасные гра
   `REFERENCE_OVERLAY` ошибок после PFLOTRAN запуска.
 - `profile_benchmark_cases.py`: машинно-читаемая карта profile benchmark'ов:
   физическое семейство, готовность carrier deck'а и blocker будущего strict
-  evaluator.
+  evaluator. Для каждого profile-запуска пишет `profile_case_manifest.json`,
+  где отдельно зафиксированы `profile_deck_kind` и
+  `strict_candidate_can_gate_suite`.
 - `profile_benchmark_evaluators.py`: диагностическая оценка качества
   `REFERENCE_OVERLAY` по инженерным smoke-границам и явная отметка, что strict
   evaluator для benchmark'а еще `PENDING`.

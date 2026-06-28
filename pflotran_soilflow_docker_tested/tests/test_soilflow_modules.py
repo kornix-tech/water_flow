@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -36,7 +37,10 @@ from soilflow_pflotran_modules.profile_benchmarks import (
     write_richards_profile_analytical_profiles,
 )
 from soilflow_pflotran_modules.profile_benchmark_evaluators import evaluate_reference_overlay_quality
-from soilflow_pflotran_modules.profile_benchmark_cases import profile_benchmark_case_status_fields
+from soilflow_pflotran_modules.profile_benchmark_cases import (
+    profile_benchmark_case_status_fields,
+    write_profile_benchmark_case_manifest,
+)
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
 from soilflow_pflotran_modules.profile_strict_evaluators import evaluate_richards_mms_strict_candidate
 from soilflow_pflotran_modules.profile_test_runner import generate_profile_test_files
@@ -228,6 +232,11 @@ class VerificationRunnerModuleTests(unittest.TestCase):
             self.assertTrue((workdir / "analytical_solution.svg").exists())
             self.assertTrue((workdir / "analytical_profiles.csv").exists())
             self.assertTrue((workdir / "analytical_test_summary.txt").exists())
+            manifest = json.loads((workdir / "profile_case_manifest.json").read_text(encoding="utf-8"))
+            summary = (workdir / "analytical_test_summary.txt").read_text(encoding="utf-8")
+            self.assertEqual(manifest["profile_deck_kind"], "reference_only")
+            self.assertFalse(manifest["strict_candidate_can_gate_suite"])
+            self.assertIn("strict_candidate_can_gate_suite=false", summary)
 
     def test_dry_run_mode_writes_suite_status_without_solver(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -489,7 +498,9 @@ class TestEvaluationTests(unittest.TestCase):
                 "profile_overlay_quality_check": "PASS",
                 "profile_physics_family": "richards",
                 "profile_carrier_status": "PROFILE_CARRIER_READY",
-                "strict_profile_evaluator": "PENDING",
+                "profile_deck_kind": "richards_profile_carrier",
+                "strict_candidate_can_gate_suite": False,
+                "strict_profile_evaluator": "EVALUATOR_READY_DECK_PENDING",
             },
         )
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -504,6 +515,8 @@ class TestEvaluationTests(unittest.TestCase):
             self.assertIn("profile_overlay_quality_check", csv_text)
             self.assertIn("profile_physics_family", csv_text)
             self.assertIn("profile_carrier_status", csv_text)
+            self.assertIn("profile_deck_kind", csv_text)
+            self.assertIn("strict_candidate_can_gate_suite", csv_text)
             self.assertIn("strict_profile_evaluator", csv_text)
             self.assertIn("REFERENCE_OVERLAY", csv_text)
 
@@ -602,6 +615,8 @@ class ProfileBenchmarkTests(unittest.TestCase):
             self.assertEqual(fields["strict_profile_evaluator"], "EVALUATOR_READY_DECK_PENDING")
             self.assertEqual(fields["profile_physics_family"], "richards")
             self.assertEqual(fields["profile_carrier_status"], "PROFILE_CARRIER_READY")
+            self.assertEqual(fields["profile_deck_kind"], "richards_profile_carrier")
+            self.assertFalse(fields["strict_candidate_can_gate_suite"])
             self.assertIn("MMS source-term", str(fields["strict_profile_evaluator_blocker"]))
             self.assertEqual(fields["profile_overlay_quality_check"], "PASS")
             self.assertEqual(fields["richards_mms_strict_evaluator"], "READY_DECK_PENDING")
@@ -695,8 +710,19 @@ class ProfileBenchmarkTests(unittest.TestCase):
 
         self.assertEqual(richards["profile_physics_family"], "richards")
         self.assertEqual(richards["profile_carrier_status"], "PROFILE_CARRIER_READY")
+        self.assertEqual(richards["profile_deck_kind"], "richards_profile_carrier")
+        self.assertFalse(richards["strict_candidate_can_gate_suite"])
         self.assertEqual(richards["strict_profile_evaluator"], "EVALUATOR_READY_DECK_PENDING")
         self.assertEqual(heat["profile_carrier_status"], "REFERENCE_ONLY")
+
+    def test_profile_benchmark_case_manifest_is_written(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = write_profile_benchmark_case_manifest("richards_mms", Path(tmpdir))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(manifest["schema_version"], 1)
+            self.assertEqual(manifest["profile_deck_kind"], "richards_profile_carrier")
+            self.assertFalse(manifest["strict_candidate_can_gate_suite"])
 
 
 class ResultDiagnosticsTests(unittest.TestCase):

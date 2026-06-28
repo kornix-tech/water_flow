@@ -388,7 +388,8 @@ Verification-suite разделен на модули:
 - `profile_benchmarks.py`: profile-smoke overlay, TECPLOT-ready status и
   диагностические `REFERENCE_OVERLAY` ошибки по профилю;
 - `profile_benchmark_cases.py`: физические семейства profile benchmark'ов,
-  готовность carrier deck'ов и blocker'ы будущих strict evaluator'ов;
+  готовность carrier deck'ов, `profile_case_manifest.json` и blocker'ы будущих
+  strict evaluator'ов;
 - `profile_benchmark_evaluators.py`: инженерная оценка качества reference
   overlay и явный pending-статус будущего strict evaluator;
 - `profile_strict_evaluators.py`: strict-кандидаты profile benchmark'ов; сейчас
@@ -646,7 +647,7 @@ scripts/__pycache__/
 6. Для многофакторного исследования дождя/импеданса нужны более легкие расчетные сетки или план эксперимента, иначе серия 3 x 3 работает долго.
 7. Табличные экспериментальные кривые уже хранятся в SQLite, редактируются через frontend, проходят UI-валидацию/предпросмотр и попадают в временный JSON-снимок расчета как `soil_curve_tables`; табличное водоудерживание передается в PFLOTRAN через `LOOKUP_TABLE`, табличная влагопроводность - через `PCHIP_LIQ`.
 8. Пара `Голованов-Аверьянов` обозначена как предметная цель, но не доведена до проверенной PFLOTRAN-реализации.
-9. Профильные benchmark artifacts, TECPLOT-ready status, diagnostic `REFERENCE_OVERLAY` метрики и `profile_overlay_comparison.csv` вынесены в `soilflow_pflotran_modules.profile_benchmarks`; case metadata вынесены в `soilflow_pflotran_modules.profile_benchmark_cases`; диагностическая оценка overlay и pending strict evaluator status вынесены в `soilflow_pflotran_modules.profile_benchmark_evaluators`; strict-кандидат для `richards_mms` вынесен в `soilflow_pflotran_modules.profile_strict_evaluators`, но остается диагностическим до MMS source-term deck. Strict-evaluator'ы для Theis/Ogata/Terzaghi/heat/Buckley/Boussinesq еще не подключены.
+9. Профильные benchmark artifacts, TECPLOT-ready status, diagnostic `REFERENCE_OVERLAY` метрики и `profile_overlay_comparison.csv` вынесены в `soilflow_pflotran_modules.profile_benchmarks`; case metadata и `profile_case_manifest.json` вынесены в `soilflow_pflotran_modules.profile_benchmark_cases`; диагностическая оценка overlay и pending strict evaluator status вынесены в `soilflow_pflotran_modules.profile_benchmark_evaluators`; strict-кандидат для `richards_mms` вынесен в `soilflow_pflotran_modules.profile_strict_evaluators`, но остается диагностическим до MMS source-term deck. Strict-evaluator'ы для Theis/Ogata/Terzaghi/heat/Buckley/Boussinesq еще не подключены.
 10. Suite summary теперь пишется в `TEST_SUITE_STATUS.txt`, `TEST_SUITE_STATUS.json` и `TEST_SUITE_RESULTS.csv`; backend отдает его через `GET /api/results/runs/{run_name}/test-suite`, отдельные `TEST_STATUS.txt` доступны через `GET /api/results/runs/{run_name}/test-status`, а единая карточка состояния запуска собирается через `GET /api/results/runs/{run_name}/overview`. Страницы `Статус` и `Расчеты` используют общий frontend-компонент карточек состояния без парсинга status-файлов во frontend.
 11. Strict/partial Richards verification слой, profile-smoke запуск и suite-router `_test` вынесены из `soilflow_pflotran.py` в `richards_test_cases.py`, `richards_test_evaluators.py`, `richards_test_runner.py`, `profile_test_runner.py` и `verification_runner.py`; CLI-фасад должен оставаться тонким маршрутизатором, а не местом новой физики тестов.
 

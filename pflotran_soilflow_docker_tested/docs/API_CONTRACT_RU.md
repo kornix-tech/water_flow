@@ -141,6 +141,10 @@ Endpoints:
   `profile_carrier_status` и blocker будущего strict evaluator. Значение может
   быть `PENDING` или `EVALUATOR_READY_DECK_PENDING`; эти поля не повышают тест
   до strict analytical verification.
+  Run-директория profile benchmark'а также содержит `profile_case_manifest.json`
+  с `profile_deck_kind` и `strict_candidate_can_gate_suite`; этот manifest
+  является guard-контрактом, чтобы strict-кандидат не стал suite-gate до
+  готовности физического deck'а.
   Для `richards_mms` дополнительно может приходить
   `richards_mms_strict_candidate_check`: это готовый strict-кандидат по
   RMSE/max-error напора и влажности, но до подключения MMS source-term deck он
