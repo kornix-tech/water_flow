@@ -3,6 +3,7 @@ import { deleteCalculation, downloadRunZip, getCalculation, getRunStatusOverview
 import { ErrorNotice } from "../components/ErrorNotice";
 import { ResultFileList } from "../components/ResultFileList";
 import { StatusSummaryPanel } from "../components/StatusSummaryPanel";
+import { StrictReadinessPlanPanel } from "../components/StrictReadinessPlanPanel";
 import { TestSuiteResultsPanel } from "../components/TestSuiteResultsPanel";
 import { ROUTES } from "../routes";
 import type { CalculationSummary, RunInfo, RunStatusOverview, TestSuiteStatus } from "../types";
@@ -285,6 +286,7 @@ export function ResultsPage({ onNavigate }: ResultsPageProps) {
                 </dl>
               )}
               <StatusSummaryPanel title="Сводка состояния" items={statusOverview?.items ?? []} error={statusOverviewError} />
+              <StrictReadinessPlanPanel plan={testSuiteStatus?.strict_readiness_plan ?? null} />
               <TestSuiteResultsPanel suite={testSuiteStatus} />
               <ResultFileList runName={selected.run_name} files={selected.files} />
             </>

@@ -385,7 +385,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:fcc553d369f3213198673437731599c4be0daceedbbddf745423ec06251c1a73
+sha256:ed652ed9f176ed85d8151d9a00eee5df45a3c62e03bfd481ba7d9f40c58a672b
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -557,6 +557,8 @@ flowchart LR
      машинного выбора следующего strict-readiness блока;
    - backend `/test-suite` отдает `strict_readiness_plan`, а `/overview`
      показывает следующий strict-блок, первый target и blocker в карточке suite;
+   - frontend `Расчеты` показывает отдельный `Strict-readiness plan` и фильтр
+     suite results по `strict_candidate_can_gate_suite`;
    - `DECK_ADAPTER_PENDING` для `richards_mms` закрыт через spatial adapter
      deck и solver validation `RESEARCH_DRY_RUN=0`;
    - следующий крупный блок: `CASE_BUILDER_PENDING` для

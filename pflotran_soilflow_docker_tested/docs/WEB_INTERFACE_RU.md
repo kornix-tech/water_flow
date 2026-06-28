@@ -92,7 +92,10 @@ curl http://localhost:8080/api/results/runs/_test_linear_darcy/overview
 Для suite-запусков страница `Расчеты` показывает таблицу результатов
 verification-suite: статус каждого теста, уровень проверки, `failure_stage`,
 `strict_readiness_stage`, warnings и solver diagnostics. Таблицу можно
-фильтровать по статусу, failure stage и strict stage.
+фильтровать по статусу, failure stage, strict stage и допуску
+`strict_candidate_can_gate_suite`. Отдельный блок `Strict-readiness plan`
+показывает следующий readiness-блок, targets, stage counts и blocker/next target
+из backend-поля `strict_readiness_plan`.
 
 ## UI route smoke
 

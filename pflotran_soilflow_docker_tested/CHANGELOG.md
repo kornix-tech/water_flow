@@ -28,6 +28,7 @@
 - Verification-suite теперь пишет `STRICT_READINESS_PLAN.json` с priority order, `next_stage` и `next_targets` для следующего strict-readiness блока.
 - Backend `/test-suite` теперь отдает `strict_readiness_plan` как структурированное поле, suite plan сохраняет blocker-поля, а `/overview` добавляет в карточку suite следующий strict-блок, первый target и blocker.
 - На странице `Расчеты` добавлена таблица результатов verification-suite с фильтрами по статусу, `failure_stage` и `strict_readiness_stage`.
+- На странице `Расчеты` добавлен отдельный блок `Strict-readiness plan` и фильтр suite results по `strict_candidate_can_gate_suite`.
 - Для `richards_mms` подключен spatial MMS adapter deck: основной `pflotran.in` теперь использует per-cell PFLOTRAN regions/source sinks для nonuniform initial pressure и cell-wise source, а uniform-source deck сохранен как отдельный candidate artifact.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_evaluators` для диагностической оценки `REFERENCE_OVERLAY` profile-smoke benchmark'ов и явной отметки pending strict evaluator.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_cases` с машинно-читаемой картой profile benchmark'ов, физическими семействами и blocker'ами будущих strict evaluator'ов.

@@ -57,12 +57,37 @@ export interface TestSuiteResult {
   metrics: Record<string, string | number | boolean | null>;
 }
 
+export interface StrictReadinessTarget {
+  test_id?: string;
+  status?: string;
+  verification_level?: string;
+  output_dir?: string;
+  profile_physics_family?: string;
+  profile_carrier_status?: string;
+  profile_deck_kind?: string;
+  strict_profile_evaluator?: string;
+  strict_readiness_stage?: string;
+  strict_profile_evaluator_blocker?: string;
+  strict_candidate_can_gate_suite?: string | boolean;
+}
+
+export interface StrictReadinessPlan {
+  schema_version?: number;
+  stage_order?: string[];
+  stage_counts?: Record<string, number>;
+  next_stage?: string;
+  next_targets?: StrictReadinessTarget[];
+  candidates?: StrictReadinessTarget[];
+  artifact_readiness?: string;
+  plan_error?: string;
+}
+
 export interface TestSuiteStatus {
   run_name: string;
   status: string;
   summary: Record<string, string | number>;
   results: TestSuiteResult[];
-  strict_readiness_plan: Record<string, unknown> | null;
+  strict_readiness_plan: StrictReadinessPlan | null;
   source: string;
   files: string[];
 }
