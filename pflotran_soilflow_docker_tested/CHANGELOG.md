@@ -19,6 +19,7 @@
 - Добавлен модуль `soilflow_pflotran_modules.test_suite_artifacts` для записи suite summary в TXT/JSON/CSV.
 - Добавлены API `/api/results/runs/{run_name}/test-suite` и `/api/results/runs/{run_name}/test-status`, а также блоки сводки на странице `Расчеты` для чтения verification-suite и отдельных тестов без парсинга текстовых status-файлов во frontend.
 - Добавлен API `/api/results/runs/{run_name}/overview` и общий frontend-компонент карточек состояния для страниц `Статус` и `Расчеты`.
+- Добавлен UI route smoke `scripts/ui_route_smoke.sh` и Makefile-цель `ui-smoke` для проверки коротких frontend URL и SPA/API fallback-контракта живого сервиса.
 - Добавлены reference overlay метрики для profile-smoke benchmark'ов: RMSE/max-error по объемной влажности и напору относительно `analytical_profiles.csv`.
 - Для profile-smoke benchmark'ов теперь записывается `profile_overlay_comparison.csv` с построчным сравнением `PFLOTRAN vs analytical`.
 - Добавлена архитектурная схема `docs/ARCHITECTURE_RU.md` с текущими потоками данных и заменяемыми adapter-границами.
@@ -65,6 +66,7 @@
 - Статус расширенных profile-тестов теперь включает `analytical_overlay_check`, источник и число точек аналитического профиля.
 - `scripts/api_smoke.sh` проверяет read-only контракт `/api/soil-curves/calculations/{id}`, если в базе уже есть расчеты.
 - `scripts/api_smoke.sh` проверяет read-only контракт `/api/results/runs/{run_name}/overview` для первого доступного run без жесткой привязки к имени теста.
+- `scripts/check_project.sh` теперь включает UI route smoke после API/workflow проверок живого сервиса.
 - `scripts/check_project.sh` теперь включает полный расчетный smoke для табличной почвы через публичный API.
 - Стандартный PFLOTRAN deck writer вынесен из `soilflow_pflotran.py`; основной скрипт оставлен совместимым CLI-фасадом и отдельно маршрутизирует `floodplain_controlled_drainage`.
 - Парсинг результатов PFLOTRAN, solver diagnostics и запись `TEST_STATUS.txt` вынесены из `soilflow_pflotran.py` в модуль с unit-тестами.

@@ -347,13 +347,19 @@ GET http://localhost:18080/api/health/ready
 }
 ```
 
-Важно: изменения синхронизировались в работающий контейнер через:
+После hot-copy этапа была выполнена релизная сверка через полный Docker rebuild:
 
 ```bash
-./scripts/sync_to_running_container.sh
+WEB_PORT=18080 BUILD_JOBS=12 docker compose build soilflow-web
+WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
+./scripts/check_project.sh
 ```
 
-Полная пересборка Docker image не выполнялась на этом этапе. Для релизной фиксации позже желательно сделать полный build, но это может быть долгим из-за PETSc/MPICH/PFLOTRAN.
+Последний подтвержденный image/container id после UI smoke-этапа:
+
+```text
+sha256:c85a40633f540dac09eaeae383bb391b86ac257fd82f1980d5ba9af93a6f3666
+```
 
 ## 9. Документация, обновленная в этом этапе
 
@@ -367,6 +373,7 @@ docs/WEB_INTERFACE_RU.md
 Смысл изменений:
 
 - добавлены `/test-suite`, `/test-status`, `/overview`;
+- добавлен `scripts/ui_route_smoke.sh` и обязательный `[8/8] Frontend route smoke` в `scripts/check_project.sh`;
 - зафиксировано, что frontend больше не парсит status TXT напрямую;
 - описан общий reader status-сводок;
 - web smoke examples дополнены curl-командами для новых endpoints.
@@ -415,9 +422,19 @@ flowchart LR
 - проверяет базовую форму DTO: `run_name`, непустой `items`, обязательные поля
   `kind/title/status` у каждой карточки.
 
-### Блок B. UI smoke
+### Блок B. UI route smoke
 
-После API smoke можно добавить минимальный browser/API smoke для `/raschety`:
+Выполнено в текущем UI smoke-этапе:
+
+- добавлен `scripts/ui_route_smoke.sh`;
+- добавлена Makefile-цель `ui-smoke`;
+- `scripts/check_project.sh` расширен до `[1/8]...[8/8]` и запускает UI route
+  smoke после API/workflow проверок;
+- smoke проверяет `/`, `/ishodnye`, `/status`, `/testy`, `/raschety`,
+  `/grafiki`, `/sistema`, основные JS/CSS assets и JSON 404 для неизвестного
+  `/api/...` маршрута.
+
+Более глубокий browser smoke для `/raschety` можно добавить отдельно:
 
 - открыть `http://localhost:18080/raschety`;
 - проверить заголовок `Расчеты`;
@@ -429,8 +446,8 @@ flowchart LR
 После фиксации status overview можно продолжать:
 
 - добавить строгие evaluator-модули для profile-smoke benchmarks;
-- расширить `api_smoke.sh` и документацию;
-- подготовить полный Docker rebuild gate перед release;
+- при необходимости добавить полноценный browser smoke с Playwright или отдельным инструментом;
+- полный Docker rebuild gate уже был выполнен после `d955c6b`;
 - затем переходить к следующей физической/исследовательской модели.
 
 ## 13. Что нельзя потерять
@@ -467,8 +484,8 @@ workflow_smoke
 Работай в проекте /home/zenbook/SF/pflotran_soilflow_docker_tested.
 Сначала прочитай docs/NEXT_CHAT_CONTEXT_RU.md и docs/EXTERNAL_CONTEXT_RU.md.
 Проверь git status и текущее состояние сервиса.
-Дальше продолжай с блока: если smoke-этап не закоммичен, проверить `git status`,
-запустить `./scripts/check_project.sh`, очистить generated artifacts
-`runs/_test_suite`, затем commit/push.
+Дальше продолжай с блока: если UI smoke-этап не закоммичен, проверить
+`git status`, запустить `./scripts/check_project.sh`, очистить generated
+artifacts `runs/_test_suite`, затем commit/push.
 Работай через WSL bash, не через PowerShell heredoc/pipes.
 ```

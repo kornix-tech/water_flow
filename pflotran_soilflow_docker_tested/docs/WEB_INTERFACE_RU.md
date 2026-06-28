@@ -89,6 +89,19 @@ curl http://localhost:8080/api/results/runs/_test_linear_darcy/test-status
 curl http://localhost:8080/api/results/runs/_test_linear_darcy/overview
 ```
 
+## UI route smoke
+
+Для живого web-сервиса есть dependency-free проверка коротких frontend URL:
+
+```bash
+WEB_PORT=18080 ./scripts/ui_route_smoke.sh
+```
+
+Smoke открывает `/`, `/ishodnye`, `/status`, `/testy`, `/raschety`,
+`/grafiki`, `/sistema`, проверяет наличие SPA root, заголовка приложения,
+основных JS/CSS assets и то, что неизвестный `/api/...` возвращает JSON 404, а
+не frontend `index.html`.
+
 ## Backup
 
 ```bash

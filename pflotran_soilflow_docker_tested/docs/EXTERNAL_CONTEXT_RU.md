@@ -56,8 +56,9 @@ pflotran_soilflow_docker_tested/
   scripts/
     soilflow_pflotran.py             совместимый CLI-фасад: чтение JSON, demo-mode, передача _test в verification_runner
     soilflow_visualize.py            HTML/SVG/CSV визуализация 1D/XY/XZ профилей
-    check_project.sh                 единая проверка: Python compile, backend unittest, frontend build, restart, API smoke
+    check_project.sh                 единая проверка: Python compile, backend unittest, frontend build, restart, API/UI smoke
     api_smoke.sh                     read-only проверка базового API-контракта живого web-сервиса
+    ui_route_smoke.sh                read-only проверка коротких frontend URL и SPA/API fallback
     sync_to_running_container.sh     документированный hot-copy workflow для запущенного контейнера
     soilflow_pflotran_modules/       вынесенные контракты parser/model/deck/floodplain/result diagnostics/result contract/solver runner/surface balance/test evaluation/test runners
     *.sh                             вспомогательные Docker-команды
@@ -682,11 +683,14 @@ curl -fsS http://localhost:18080/api/results/runs
 curl -fsS http://localhost:18080/api/jobs
 curl -fsS "http://localhost:18080/api/calculations"
 WEB_PORT=18080 ./scripts/api_smoke.sh
+WEB_PORT=18080 ./scripts/ui_route_smoke.sh
 ```
 
 `api_smoke.sh` дополнительно проверяет типизированный `/api/results/runs/{run}/overview`
 для первого подходящего run и не зависит от заранее известного имени вроде
 `_test_linear_darcy`.
+`ui_route_smoke.sh` проверяет короткие SPA URL, основные JS/CSS assets и
+сохранение JSON 404 для неизвестных `/api/...` маршрутов.
 
 Работа внутри контейнера:
 
