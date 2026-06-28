@@ -25,6 +25,8 @@ SUITE_RESULT_CSV_FIELDS = [
     "profile_overlay_comparison",
     "profile_overlay_points",
     "profile_overlay_quality_check",
+    "profile_physics_family",
+    "profile_carrier_status",
     "theta_overlay_rmse_m3_m3",
     "theta_overlay_max_abs_m3_m3",
     "pressure_head_overlay_rmse_m",

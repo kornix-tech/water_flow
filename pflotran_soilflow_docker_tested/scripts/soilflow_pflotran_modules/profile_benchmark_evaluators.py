@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from soilflow_pflotran_modules.test_registry import PFLOTRAN_PROFILE_TESTS
+from soilflow_pflotran_modules.profile_benchmark_cases import profile_benchmark_case_status_fields
 
 
 @dataclass(frozen=True)
@@ -34,11 +35,11 @@ def profile_evaluator_metadata(test_name: str) -> dict[str, object]:
         raise ValueError(f"Для теста {test_name} не зарегистрирован profile benchmark evaluator")
     return {
         "profile_evaluator": "reference_overlay",
-        "strict_profile_evaluator": "PENDING",
         "strict_profile_evaluator_note": (
             "Profile benchmark пока проверяется как TECPLOT-ready reference overlay; "
             "строгий физический evaluator подключается отдельным case/evaluator модулем."
         ),
+        **profile_benchmark_case_status_fields(test_name),
     }
 
 

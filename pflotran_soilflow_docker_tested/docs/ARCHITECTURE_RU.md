@@ -86,14 +86,17 @@ flowchart LR
   generation/run/evaluate логику verification-suite.
 - Профильные benchmark overlay и TECPLOT-status уже вынесены в
   `profile_benchmarks.py`, а диагностическая оценка reference overlay - в
-  `profile_benchmark_evaluators.py`; физические strict-evaluator'ы для них еще
-  не подключены.
+  `profile_benchmark_evaluators.py`. Машинно-читаемая карта физических семейств,
+  готовности carrier deck'ов и blocker'ов strict evaluator'ов вынесена в
+  `profile_benchmark_cases.py`; физические strict-evaluator'ы для них еще не
+  подключены.
 - Profile smoke тесты не считаются строгой верификацией: они проверяют
   генерацию PFLOTRAN-профиля и аналитического reference artifact, но не
   физическое совпадение с Theis/Ogata/Terzaghi/heat/Buckley и другими моделями.
   Для них пишутся диагностические `REFERENCE_OVERLAY` ошибки по профилю,
-  инженерный `profile_overlay_quality_check` и pending-статус strict evaluator.
-  Эти ошибки пока не являются strict PASS/FAIL критерием. Подробные пары
+  инженерный `profile_overlay_quality_check`, pending-статус strict evaluator,
+  физическое семейство и статус carrier deck'а. Эти ошибки пока не являются
+  strict PASS/FAIL критерием. Подробные пары
   `PFLOTRAN vs analytical` сохраняются в `profile_overlay_comparison.csv`.
 - Suite status пишется в трех форматах: человекочитаемый
   `TEST_SUITE_STATUS.txt`, машинный `TEST_SUITE_STATUS.json` и табличный

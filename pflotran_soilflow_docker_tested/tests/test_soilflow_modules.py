@@ -36,6 +36,7 @@ from soilflow_pflotran_modules.profile_benchmarks import (
     write_richards_profile_analytical_profiles,
 )
 from soilflow_pflotran_modules.profile_benchmark_evaluators import evaluate_reference_overlay_quality
+from soilflow_pflotran_modules.profile_benchmark_cases import profile_benchmark_case_status_fields
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
 from soilflow_pflotran_modules.profile_test_runner import generate_profile_test_files
 from soilflow_pflotran_modules.result_contract import profile_rows_to_contract
@@ -117,6 +118,7 @@ class ArchitectureContractTests(unittest.TestCase):
         self.assertIn("test_evaluation", MODULE_BOUNDARIES)
         self.assertIn("test_suite_artifacts", MODULE_BOUNDARIES)
         self.assertIn("profile_benchmarks", MODULE_BOUNDARIES)
+        self.assertIn("profile_benchmark_cases", MODULE_BOUNDARIES)
         self.assertIn("profile_benchmark_evaluators", MODULE_BOUNDARIES)
         self.assertIn("richards_test_cases", MODULE_BOUNDARIES)
         self.assertIn("richards_test_evaluators", MODULE_BOUNDARIES)
@@ -484,6 +486,8 @@ class TestEvaluationTests(unittest.TestCase):
                 "profile_overlay_comparison": "REFERENCE_OVERLAY",
                 "profile_overlay_points": 96,
                 "profile_overlay_quality_check": "PASS",
+                "profile_physics_family": "richards",
+                "profile_carrier_status": "PROFILE_CARRIER_READY",
                 "strict_profile_evaluator": "PENDING",
             },
         )
@@ -497,6 +501,8 @@ class TestEvaluationTests(unittest.TestCase):
             csv_text = (suite_dir / "TEST_SUITE_RESULTS.csv").read_text(encoding="utf-8")
             self.assertIn("profile_overlay_comparison", csv_text)
             self.assertIn("profile_overlay_quality_check", csv_text)
+            self.assertIn("profile_physics_family", csv_text)
+            self.assertIn("profile_carrier_status", csv_text)
             self.assertIn("strict_profile_evaluator", csv_text)
             self.assertIn("REFERENCE_OVERLAY", csv_text)
 
@@ -593,6 +599,9 @@ class ProfileBenchmarkTests(unittest.TestCase):
             self.assertEqual(fields["profile_overlay_source"], "profile_overlay_comparison.csv")
             self.assertEqual(fields["profile_evaluator"], "reference_overlay")
             self.assertEqual(fields["strict_profile_evaluator"], "PENDING")
+            self.assertEqual(fields["profile_physics_family"], "richards")
+            self.assertEqual(fields["profile_carrier_status"], "PROFILE_CARRIER_READY")
+            self.assertIn("MMS source-term", str(fields["strict_profile_evaluator_blocker"]))
             self.assertEqual(fields["profile_overlay_quality_check"], "PASS")
             self.assertTrue((workdir / "profile_overlay_comparison.csv").exists())
 
@@ -652,6 +661,15 @@ class ProfileBenchmarkTests(unittest.TestCase):
         self.assertEqual(passing["profile_overlay_quality_check"], "PASS")
         self.assertEqual(warning["profile_overlay_quality_check"], "WARN")
         self.assertEqual(skipped["profile_overlay_quality_check"], "SKIP")
+
+    def test_profile_benchmark_case_metadata_declares_strict_evaluator_blockers(self) -> None:
+        richards = profile_benchmark_case_status_fields("richards_mms")
+        heat = profile_benchmark_case_status_fields("heat_conduction_1d")
+
+        self.assertEqual(richards["profile_physics_family"], "richards")
+        self.assertEqual(richards["profile_carrier_status"], "PROFILE_CARRIER_READY")
+        self.assertEqual(richards["strict_profile_evaluator"], "PENDING")
+        self.assertEqual(heat["profile_carrier_status"], "REFERENCE_ONLY")
 
 
 class ResultDiagnosticsTests(unittest.TestCase):

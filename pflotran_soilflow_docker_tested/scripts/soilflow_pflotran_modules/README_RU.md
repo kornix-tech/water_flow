@@ -41,6 +41,9 @@ CLI и web-backend. Этот пакет задает безопасные гра
 - `profile_benchmarks.py`: генерация `analytical_profiles.csv` для расширенных
   profile benchmark'ов, сборка TECPLOT-ready статуса и diagnostic
   `REFERENCE_OVERLAY` ошибок после PFLOTRAN запуска.
+- `profile_benchmark_cases.py`: машинно-читаемая карта profile benchmark'ов:
+  физическое семейство, готовность carrier deck'а и blocker будущего strict
+  evaluator.
 - `profile_benchmark_evaluators.py`: диагностическая оценка качества
   `REFERENCE_OVERLAY` по инженерным smoke-границам и явная отметка, что strict
   evaluator для benchmark'а еще `PENDING`.
