@@ -38,8 +38,10 @@ from soilflow_pflotran_modules.profile_benchmarks import (
 )
 from soilflow_pflotran_modules.profile_benchmark_evaluators import evaluate_reference_overlay_quality
 from soilflow_pflotran_modules.profile_benchmark_cases import (
+    profile_benchmark_strict_plan,
     profile_benchmark_case_status_fields,
     write_profile_benchmark_case_manifest,
+    write_profile_benchmark_strict_plan,
 )
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
 from soilflow_pflotran_modules.profile_strict_evaluators import evaluate_richards_mms_strict_candidate
@@ -242,6 +244,7 @@ class VerificationRunnerModuleTests(unittest.TestCase):
             self.assertTrue((workdir / "analytical_solution.svg").exists())
             self.assertTrue((workdir / "analytical_profiles.csv").exists())
             self.assertTrue((workdir / "analytical_test_summary.txt").exists())
+            self.assertTrue((workdir / "profile_strict_plan.json").exists())
             self.assertTrue((workdir / "richards_mms_initial_profile.csv").exists())
             self.assertTrue((workdir / "richards_mms_source_rate.csv").exists())
             self.assertTrue((workdir / "richards_mms_spatial_source_profile.csv").exists())
@@ -251,8 +254,10 @@ class VerificationRunnerModuleTests(unittest.TestCase):
             deck = (workdir / "pflotran.in").read_text(encoding="utf-8")
             summary = (workdir / "analytical_test_summary.txt").read_text(encoding="utf-8")
             self.assertEqual(manifest["profile_deck_kind"], "richards_mms_uniform_source_candidate")
+            self.assertEqual(manifest["strict_readiness_stage"], "DECK_ADAPTER_PENDING")
             self.assertFalse(manifest["strict_candidate_can_gate_suite"])
             self.assertIn("SOURCE_SINK mms_uniform_storage", deck)
+            self.assertIn("strict_readiness_stage=DECK_ADAPTER_PENDING", summary)
             self.assertIn("strict_candidate_can_gate_suite=false", summary)
             self.assertIn("richards_mms_adapter_artifact_status=MATRIX_ARTIFACT_READY_DECK_PENDING", summary)
             self.assertIn("richards_mms_adapter_deck_status=PFLOTRAN_DECK_ADAPTER_PENDING", summary)
@@ -519,6 +524,7 @@ class TestEvaluationTests(unittest.TestCase):
                 "profile_carrier_status": "MMS_SOURCE_TERM_CANDIDATE",
                 "profile_deck_kind": "richards_mms_uniform_source_candidate",
                 "strict_candidate_can_gate_suite": False,
+                "strict_readiness_stage": "DECK_ADAPTER_PENDING",
                 "richards_mms_adapter_artifact_check": "PASS",
                 "strict_profile_evaluator": "EVALUATOR_READY_DECK_PENDING",
             },
@@ -537,6 +543,7 @@ class TestEvaluationTests(unittest.TestCase):
             self.assertIn("profile_carrier_status", csv_text)
             self.assertIn("profile_deck_kind", csv_text)
             self.assertIn("strict_candidate_can_gate_suite", csv_text)
+            self.assertIn("strict_readiness_stage", csv_text)
             self.assertIn("richards_mms_adapter_artifact_check", csv_text)
             self.assertIn("strict_profile_evaluator", csv_text)
             self.assertIn("REFERENCE_OVERLAY", csv_text)
@@ -668,6 +675,7 @@ class ProfileBenchmarkTests(unittest.TestCase):
             self.assertEqual(fields["profile_overlay_source"], "profile_overlay_comparison.csv")
             self.assertEqual(fields["profile_evaluator"], "reference_overlay")
             self.assertEqual(fields["strict_profile_evaluator"], "EVALUATOR_READY_DECK_PENDING")
+            self.assertEqual(fields["strict_readiness_stage"], "DECK_ADAPTER_PENDING")
             self.assertEqual(fields["profile_physics_family"], "richards")
             self.assertEqual(fields["profile_carrier_status"], "MMS_SOURCE_TERM_CANDIDATE")
             self.assertEqual(fields["profile_deck_kind"], "richards_mms_uniform_source_candidate")
@@ -768,8 +776,10 @@ class ProfileBenchmarkTests(unittest.TestCase):
         self.assertEqual(richards["profile_carrier_status"], "MMS_SOURCE_TERM_CANDIDATE")
         self.assertEqual(richards["profile_deck_kind"], "richards_mms_uniform_source_candidate")
         self.assertFalse(richards["strict_candidate_can_gate_suite"])
+        self.assertEqual(richards["strict_readiness_stage"], "DECK_ADAPTER_PENDING")
         self.assertEqual(richards["strict_profile_evaluator"], "EVALUATOR_READY_DECK_PENDING")
         self.assertEqual(heat["profile_carrier_status"], "REFERENCE_ONLY")
+        self.assertEqual(heat["strict_readiness_stage"], "CASE_BUILDER_PENDING")
 
     def test_profile_benchmark_case_manifest_is_written(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -778,7 +788,15 @@ class ProfileBenchmarkTests(unittest.TestCase):
 
             self.assertEqual(manifest["schema_version"], 1)
             self.assertEqual(manifest["profile_deck_kind"], "richards_mms_uniform_source_candidate")
+            self.assertEqual(manifest["strict_readiness_stage"], "DECK_ADAPTER_PENDING")
             self.assertFalse(manifest["strict_candidate_can_gate_suite"])
+            strict_plan_path = write_profile_benchmark_strict_plan("heat_conduction_1d", Path(tmpdir))
+            strict_plan = json.loads(strict_plan_path.read_text(encoding="utf-8"))
+            self.assertEqual(strict_plan["strict_readiness_stage"], "CASE_BUILDER_PENDING")
+            self.assertEqual(
+                profile_benchmark_strict_plan("philip_infiltration")["strict_readiness_stage"],
+                "STRICT_EVALUATOR_PENDING",
+            )
 
 
 class ResultDiagnosticsTests(unittest.TestCase):

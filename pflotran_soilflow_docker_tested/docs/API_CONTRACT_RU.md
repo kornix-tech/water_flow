@@ -138,13 +138,15 @@ Endpoints:
   Для profile-smoke benchmark'ов статус может включать диагностические поля
   `profile_evaluator=reference_overlay`, `profile_overlay_quality_check` и
   `strict_profile_evaluator`, а также `profile_physics_family`,
-  `profile_carrier_status` и blocker будущего strict evaluator. Значение может
-  быть `PENDING` или `EVALUATOR_READY_DECK_PENDING`; эти поля не повышают тест
-  до strict analytical verification.
+  `profile_carrier_status`, `strict_readiness_stage` и blocker будущего strict
+  evaluator. Значение может быть `PENDING` или
+  `EVALUATOR_READY_DECK_PENDING`; эти поля не повышают тест до strict
+  analytical verification.
   Run-директория profile benchmark'а также содержит `profile_case_manifest.json`
-  с `profile_deck_kind` и `strict_candidate_can_gate_suite`; этот manifest
-  является guard-контрактом, чтобы strict-кандидат не стал suite-gate до
-  готовности физического deck'а.
+  и `profile_strict_plan.json` с `profile_deck_kind`,
+  `strict_candidate_can_gate_suite`, readiness stage, blocker'ом и следующим
+  шагом; эти artifacts являются guard-контрактом, чтобы strict-кандидат не стал
+  suite-gate до готовности физического deck'а.
   Для `richards_mms` дополнительно может приходить
   `richards_mms_strict_candidate_check`: это готовый strict-кандидат по
   RMSE/max-error напора и влажности. Сейчас `richards_mms` использует

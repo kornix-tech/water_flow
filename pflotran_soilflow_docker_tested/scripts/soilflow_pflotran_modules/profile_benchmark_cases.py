@@ -120,6 +120,7 @@ def profile_benchmark_case(test_name: str) -> ProfileBenchmarkCase:
 
 def profile_benchmark_case_status_fields(test_name: str) -> dict[str, object]:
     case = profile_benchmark_case(test_name)
+    strict_plan = profile_benchmark_strict_plan(test_name)
     return {
         "profile_physics_family": case.physics_family,
         "profile_carrier_status": case.carrier_status,
@@ -128,11 +129,37 @@ def profile_benchmark_case_status_fields(test_name: str) -> dict[str, object]:
         "strict_candidate_can_gate_suite": case.strict_candidate_can_gate_suite,
         "strict_profile_evaluator_blocker": case.strict_blocker,
         "strict_profile_evaluator_next_step": case.next_step,
+        "strict_readiness_stage": strict_plan["strict_readiness_stage"],
+    }
+
+
+def profile_benchmark_strict_plan(test_name: str) -> dict[str, object]:
+    case = profile_benchmark_case(test_name)
+    if case.strict_candidate_can_gate_suite:
+        readiness_stage = "STRICT_GATE_READY"
+    elif case.strict_evaluator_status == "EVALUATOR_READY_DECK_PENDING":
+        readiness_stage = "DECK_ADAPTER_PENDING"
+    elif case.carrier_status == "REFERENCE_ONLY":
+        readiness_stage = "CASE_BUILDER_PENDING"
+    else:
+        readiness_stage = "STRICT_EVALUATOR_PENDING"
+    return {
+        "schema_version": 1,
+        "test_name": case.name,
+        "profile_physics_family": case.physics_family,
+        "profile_carrier_status": case.carrier_status,
+        "profile_deck_kind": case.deck_kind,
+        "strict_profile_evaluator": case.strict_evaluator_status,
+        "strict_candidate_can_gate_suite": case.strict_candidate_can_gate_suite,
+        "strict_readiness_stage": readiness_stage,
+        "strict_profile_evaluator_blocker": case.strict_blocker,
+        "strict_profile_evaluator_next_step": case.next_step,
     }
 
 
 def profile_benchmark_case_manifest(test_name: str) -> dict[str, object]:
     case = profile_benchmark_case(test_name)
+    strict_plan = profile_benchmark_strict_plan(test_name)
     return {
         "schema_version": 1,
         "test_name": case.name,
@@ -143,6 +170,7 @@ def profile_benchmark_case_manifest(test_name: str) -> dict[str, object]:
         "strict_candidate_can_gate_suite": case.strict_candidate_can_gate_suite,
         "strict_profile_evaluator_blocker": case.strict_blocker,
         "strict_profile_evaluator_next_step": case.next_step,
+        "strict_readiness_stage": strict_plan["strict_readiness_stage"],
     }
 
 
@@ -153,3 +181,12 @@ def write_profile_benchmark_case_manifest(test_name: str, workdir: Path) -> Path
         encoding="utf-8",
     )
     return manifest_path
+
+
+def write_profile_benchmark_strict_plan(test_name: str, workdir: Path) -> Path:
+    plan_path = workdir / "profile_strict_plan.json"
+    plan_path.write_text(
+        json.dumps(profile_benchmark_strict_plan(test_name), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return plan_path

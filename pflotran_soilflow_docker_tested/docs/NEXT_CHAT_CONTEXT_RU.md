@@ -450,7 +450,10 @@ flowchart LR
 - добавлен `profile_benchmark_cases.py` с физическими семействами, carrier
   readiness и blocker'ами будущих strict evaluator'ов;
 - profile benchmark generation теперь пишет `profile_case_manifest.json` с
-  `profile_deck_kind` и `strict_candidate_can_gate_suite`;
+  `profile_deck_kind`, `strict_candidate_can_gate_suite` и
+  `strict_readiness_stage`;
+- profile benchmark generation теперь также пишет `profile_strict_plan.json`
+  как machine-readable план подключения strict evaluator-а;
 - добавлен `profile_strict_evaluators.py` с первым strict-кандидатом
   `richards_mms` по RMSE/max-error напора и влажности;
 - добавлен `richards_mms_case.py`: `richards_mms` генерирует uniform storage

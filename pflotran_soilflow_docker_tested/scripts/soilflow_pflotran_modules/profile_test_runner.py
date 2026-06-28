@@ -9,7 +9,11 @@ from soilflow_pflotran_modules.profile_benchmarks import (
     evaluate_profile_test_after_run as evaluate_profile_benchmark_after_run,
     write_richards_profile_analytical_profiles,
 )
-from soilflow_pflotran_modules.profile_benchmark_cases import profile_benchmark_case_manifest, write_profile_benchmark_case_manifest
+from soilflow_pflotran_modules.profile_benchmark_cases import (
+    profile_benchmark_case_manifest,
+    write_profile_benchmark_case_manifest,
+    write_profile_benchmark_strict_plan,
+)
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
 from soilflow_pflotran_modules.richards_mms_case import (
     RichardsMmsCase,
@@ -32,6 +36,7 @@ def generate_profile_test_files(test_name: str, workdir: Path) -> None:
     write_richards_profile_analytical_profiles(test_name, workdir)
     case_manifest = profile_benchmark_case_manifest(test_name)
     write_profile_benchmark_case_manifest(test_name, workdir)
+    write_profile_benchmark_strict_plan(test_name, workdir)
     if test_name == "richards_mms":
         mms_case = RichardsMmsCase()
         write_richards_mms_case_artifacts(mms_case, workdir)
@@ -53,6 +58,7 @@ def generate_profile_test_files(test_name: str, workdir: Path) -> None:
                 f"profile_physics_family={case_manifest['profile_physics_family']}",
                 f"profile_deck_kind={case_manifest['profile_deck_kind']}",
                 f"strict_profile_evaluator={case_manifest['strict_profile_evaluator']}",
+                f"strict_readiness_stage={case_manifest['strict_readiness_stage']}",
                 f"strict_candidate_can_gate_suite={str(case_manifest['strict_candidate_can_gate_suite']).lower()}",
                 *adapter_summary_lines,
                 "note=PFLOTRAN запускается для получения расчетных TECPLOT-профилей; строгая метрика сравнения будет добавлена отдельно.",

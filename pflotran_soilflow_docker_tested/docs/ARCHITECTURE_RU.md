@@ -90,9 +90,10 @@ flowchart LR
   готовности carrier deck'ов и blocker'ов strict evaluator'ов вынесена в
   `profile_benchmark_cases.py`; физические strict-evaluator'ы для них еще не
   подключены.
-  Каждый profile benchmark пишет `profile_case_manifest.json`, чтобы тип deck'а
-  и флаг `strict_candidate_can_gate_suite` были доступны машинно и не терялись
-  между генерацией artifacts, API-статусом и suite summary.
+  Каждый profile benchmark пишет `profile_case_manifest.json` и
+  `profile_strict_plan.json`, чтобы тип deck'а, readiness stage и флаг
+  `strict_candidate_can_gate_suite` были доступны машинно и не терялись между
+  генерацией artifacts, API-статусом и suite summary.
 - Первый strict-кандидат для `richards_mms` вынесен в
   `profile_strict_evaluators.py` и считает RMSE/max-error напора и влажности по
   overlay. `richards_mms` уже генерирует uniform storage `SOURCE_SINK` candidate

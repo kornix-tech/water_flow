@@ -39,7 +39,7 @@ MODULE_BOUNDARIES = {
     "test_registry": "Реестр verification/profile тестов, выбор сценариев и рабочие пути suite.",
     "test_artifacts": "Общие CSV/SVG artifacts и diagnostics аналитического overlay.",
     "profile_benchmarks": "Генерация аналитических profile overlay и оценка TECPLOT-ready статуса профильных benchmarks.",
-    "profile_benchmark_cases": "Case metadata для profile benchmark'ов: физическое семейство, carrier readiness и blockers strict evaluator-а.",
+    "profile_benchmark_cases": "Case metadata и strict-readiness plan для profile benchmark'ов: физическое семейство, carrier readiness и blockers strict evaluator-а.",
     "profile_benchmark_evaluators": "Диагностические evaluator-метрики для profile benchmark overlay без повышения их до strict verification.",
     "profile_strict_evaluators": "Strict-кандидаты для profile benchmark'ов, готовые к подключению после замены carrier deck'ов физическими постановками.",
     "richards_mms_case": "Richards MMS source-term candidate deck, adapter artifacts, initial-profile artifacts и uniform storage RATE LIST.",

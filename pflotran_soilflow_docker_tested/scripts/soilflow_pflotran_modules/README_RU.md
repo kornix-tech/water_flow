@@ -44,8 +44,9 @@ CLI и web-backend. Этот пакет задает безопасные гра
 - `profile_benchmark_cases.py`: машинно-читаемая карта profile benchmark'ов:
   физическое семейство, готовность carrier deck'а и blocker будущего strict
   evaluator. Для каждого profile-запуска пишет `profile_case_manifest.json`,
-  где отдельно зафиксированы `profile_deck_kind` и
-  `strict_candidate_can_gate_suite`.
+  где отдельно зафиксированы `profile_deck_kind`, `strict_readiness_stage` и
+  `strict_candidate_can_gate_suite`, а также `profile_strict_plan.json` с
+  machine-readable следующим шагом.
 - `profile_benchmark_evaluators.py`: диагностическая оценка качества
   `REFERENCE_OVERLAY` по инженерным smoke-границам и явная отметка, что strict
   evaluator для benchmark'а еще `PENDING`.
