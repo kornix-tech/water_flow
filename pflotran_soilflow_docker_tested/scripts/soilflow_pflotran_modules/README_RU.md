@@ -47,6 +47,9 @@ CLI и web-backend. Этот пакет задает безопасные гра
 - `profile_benchmark_evaluators.py`: диагностическая оценка качества
   `REFERENCE_OVERLAY` по инженерным smoke-границам и явная отметка, что strict
   evaluator для benchmark'а еще `PENDING`.
+- `profile_strict_evaluators.py`: strict-кандидаты для profile benchmark'ов.
+  Сейчас реализован кандидат Richards MMS по RMSE/max-error напора и влажности;
+  он остается диагностическим до замены carrier deck'а на MMS source-term deck.
 - `richards_test_cases.py`: dataclass-параметры, PFLOTRAN deck'и,
   аналитические CSV/summary и builders для strict/partial Richards verification.
 - `richards_test_evaluators.py`: сравнение PFLOTRAN TECPLOT-профилей с

@@ -4,8 +4,9 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
-from soilflow_pflotran_modules.test_registry import PFLOTRAN_PROFILE_TESTS
 from soilflow_pflotran_modules.profile_benchmark_cases import profile_benchmark_case_status_fields
+from soilflow_pflotran_modules.profile_strict_evaluators import evaluate_richards_mms_strict_candidate
+from soilflow_pflotran_modules.test_registry import PFLOTRAN_PROFILE_TESTS
 
 
 @dataclass(frozen=True)
@@ -78,4 +79,13 @@ def evaluate_reference_overlay_quality(
             if passed
             else "Диагностический reference overlay вышел за инженерные smoke-границы; это не strict FAIL."
         ),
+    }
+
+
+def evaluate_profile_strict_candidate(test_name: str, metrics: dict[str, object]) -> dict[str, object]:
+    if test_name == "richards_mms":
+        return evaluate_richards_mms_strict_candidate(metrics)
+    return {
+        "profile_strict_candidate_check": "SKIP",
+        "profile_strict_candidate_note": "Для этого profile benchmark strict evaluator еще не реализован.",
     }

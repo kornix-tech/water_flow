@@ -22,6 +22,7 @@
 - Добавлен UI route smoke `scripts/ui_route_smoke.sh` и Makefile-цель `ui-smoke` для проверки коротких frontend URL и SPA/API fallback-контракта живого сервиса.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_evaluators` для диагностической оценки `REFERENCE_OVERLAY` profile-smoke benchmark'ов и явной отметки pending strict evaluator.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_cases` с машинно-читаемой картой profile benchmark'ов, физическими семействами и blocker'ами будущих strict evaluator'ов.
+- Добавлен модуль `soilflow_pflotran_modules.profile_strict_evaluators` с первым strict-кандидатом для `richards_mms` по RMSE/max-error напора и влажности.
 - Добавлены reference overlay метрики для profile-smoke benchmark'ов: RMSE/max-error по объемной влажности и напору относительно `analytical_profiles.csv`.
 - Для profile-smoke benchmark'ов теперь записывается `profile_overlay_comparison.csv` с построчным сравнением `PFLOTRAN vs analytical`.
 - Добавлена архитектурная схема `docs/ARCHITECTURE_RU.md` с текущими потоками данных и заменяемыми adapter-границами.
@@ -71,6 +72,7 @@
 - `scripts/check_project.sh` теперь включает UI route smoke после API/workflow проверок живого сервиса.
 - Profile-smoke suite CSV теперь включает качество reference overlay и статус strict evaluator readiness.
 - Profile-smoke TEST_STATUS и suite CSV теперь включают физическое семейство benchmark'а и готовность carrier deck'а.
+- `richards_mms` помечен как `EVALUATOR_READY_DECK_PENDING`: strict-кандидат готов, но остается диагностическим до замены carrier deck на MMS source-term постановку.
 - `scripts/check_project.sh` теперь включает полный расчетный smoke для табличной почвы через публичный API.
 - Стандартный PFLOTRAN deck writer вынесен из `soilflow_pflotran.py`; основной скрипт оставлен совместимым CLI-фасадом и отдельно маршрутизирует `floodplain_controlled_drainage`.
 - Парсинг результатов PFLOTRAN, solver diagnostics и запись `TEST_STATUS.txt` вынесены из `soilflow_pflotran.py` в модуль с unit-тестами.

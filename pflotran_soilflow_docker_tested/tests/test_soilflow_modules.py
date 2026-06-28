@@ -38,6 +38,7 @@ from soilflow_pflotran_modules.profile_benchmarks import (
 from soilflow_pflotran_modules.profile_benchmark_evaluators import evaluate_reference_overlay_quality
 from soilflow_pflotran_modules.profile_benchmark_cases import profile_benchmark_case_status_fields
 from soilflow_pflotran_modules.profile_carrier import generate_richards_profile_input
+from soilflow_pflotran_modules.profile_strict_evaluators import evaluate_richards_mms_strict_candidate
 from soilflow_pflotran_modules.profile_test_runner import generate_profile_test_files
 from soilflow_pflotran_modules.result_contract import profile_rows_to_contract
 from soilflow_pflotran_modules.result_diagnostics import (
@@ -598,11 +599,13 @@ class ProfileBenchmarkTests(unittest.TestCase):
             self.assertEqual(fields["profile_overlay_points"], 2)
             self.assertEqual(fields["profile_overlay_source"], "profile_overlay_comparison.csv")
             self.assertEqual(fields["profile_evaluator"], "reference_overlay")
-            self.assertEqual(fields["strict_profile_evaluator"], "PENDING")
+            self.assertEqual(fields["strict_profile_evaluator"], "EVALUATOR_READY_DECK_PENDING")
             self.assertEqual(fields["profile_physics_family"], "richards")
             self.assertEqual(fields["profile_carrier_status"], "PROFILE_CARRIER_READY")
             self.assertIn("MMS source-term", str(fields["strict_profile_evaluator_blocker"]))
             self.assertEqual(fields["profile_overlay_quality_check"], "PASS")
+            self.assertEqual(fields["richards_mms_strict_evaluator"], "READY_DECK_PENDING")
+            self.assertEqual(fields["richards_mms_strict_candidate_check"], "FAIL")
             self.assertTrue((workdir / "profile_overlay_comparison.csv").exists())
 
     def test_profile_overlay_metrics_compare_numerical_and_reference_profiles(self) -> None:
@@ -662,13 +665,37 @@ class ProfileBenchmarkTests(unittest.TestCase):
         self.assertEqual(warning["profile_overlay_quality_check"], "WARN")
         self.assertEqual(skipped["profile_overlay_quality_check"], "SKIP")
 
+    def test_richards_mms_strict_candidate_uses_tight_overlay_tolerances(self) -> None:
+        passing = evaluate_richards_mms_strict_candidate(
+            {
+                "profile_overlay_comparison": "REFERENCE_OVERLAY",
+                "theta_overlay_rmse_m3_m3": "0.01",
+                "theta_overlay_max_abs_m3_m3": "0.02",
+                "pressure_head_overlay_rmse_m": "0.01",
+                "pressure_head_overlay_max_abs_m": "0.02",
+            }
+        )
+        failing = evaluate_richards_mms_strict_candidate(
+            {
+                "profile_overlay_comparison": "REFERENCE_OVERLAY",
+                "theta_overlay_rmse_m3_m3": "0.01",
+                "theta_overlay_max_abs_m3_m3": "0.02",
+                "pressure_head_overlay_rmse_m": "0.01",
+                "pressure_head_overlay_max_abs_m": "0.2",
+            }
+        )
+
+        self.assertEqual(passing["richards_mms_strict_evaluator"], "READY_DECK_PENDING")
+        self.assertEqual(passing["richards_mms_strict_candidate_check"], "PASS")
+        self.assertEqual(failing["richards_mms_strict_candidate_check"], "FAIL")
+
     def test_profile_benchmark_case_metadata_declares_strict_evaluator_blockers(self) -> None:
         richards = profile_benchmark_case_status_fields("richards_mms")
         heat = profile_benchmark_case_status_fields("heat_conduction_1d")
 
         self.assertEqual(richards["profile_physics_family"], "richards")
         self.assertEqual(richards["profile_carrier_status"], "PROFILE_CARRIER_READY")
-        self.assertEqual(richards["strict_profile_evaluator"], "PENDING")
+        self.assertEqual(richards["strict_profile_evaluator"], "EVALUATOR_READY_DECK_PENDING")
         self.assertEqual(heat["profile_carrier_status"], "REFERENCE_ONLY")
 
 

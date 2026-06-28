@@ -137,9 +137,14 @@ Endpoints:
   `test_diagnostics.json`.
   Для profile-smoke benchmark'ов статус может включать диагностические поля
   `profile_evaluator=reference_overlay`, `profile_overlay_quality_check` и
-  `strict_profile_evaluator=PENDING`, а также `profile_physics_family`,
-  `profile_carrier_status` и blocker будущего strict evaluator. Эти поля не
-  повышают тест до strict analytical verification.
+  `strict_profile_evaluator`, а также `profile_physics_family`,
+  `profile_carrier_status` и blocker будущего strict evaluator. Значение может
+  быть `PENDING` или `EVALUATOR_READY_DECK_PENDING`; эти поля не повышают тест
+  до strict analytical verification.
+  Для `richards_mms` дополнительно может приходить
+  `richards_mms_strict_candidate_check`: это готовый strict-кандидат по
+  RMSE/max-error напора и влажности, но до подключения MMS source-term deck он
+  остается диагностикой, а не suite PASS/FAIL критерием.
 - `GET /api/results/runs/{run_name}/overview` - единый обзор состояния запуска:
   verification-suite, отдельный тест, графики или fallback по файлам результата.
 - `GET /api/results/runs/{run_name}/plots` - список файлов графиков.

@@ -11,6 +11,7 @@ from soilflow_pflotran_modules.physical_models import (
     vg_effective_saturation_from_pressure_head,
 )
 from soilflow_pflotran_modules.profile_benchmark_evaluators import (
+    evaluate_profile_strict_candidate,
     evaluate_reference_overlay_quality,
     profile_evaluator_metadata,
 )
@@ -264,6 +265,7 @@ def profile_status_fields_after_run(test_name: str, workdir: Path) -> dict[str, 
         )
     )
     status_fields.update(evaluate_reference_overlay_quality(status_fields))
+    status_fields.update(evaluate_profile_strict_candidate(test_name, status_fields))
     return status_fields
 
 

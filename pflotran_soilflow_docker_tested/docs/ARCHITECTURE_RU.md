@@ -90,6 +90,10 @@ flowchart LR
   готовности carrier deck'ов и blocker'ов strict evaluator'ов вынесена в
   `profile_benchmark_cases.py`; физические strict-evaluator'ы для них еще не
   подключены.
+- Первый strict-кандидат для `richards_mms` вынесен в
+  `profile_strict_evaluators.py` и считает RMSE/max-error напора и влажности по
+  overlay. Он помечен как `EVALUATOR_READY_DECK_PENDING`, потому что текущий
+  PFLOTRAN input еще остается profile-carrier без MMS source-term.
 - Profile smoke тесты не считаются строгой верификацией: они проверяют
   генерацию PFLOTRAN-профиля и аналитического reference artifact, но не
   физическое совпадение с Theis/Ogata/Terzaghi/heat/Buckley и другими моделями.

@@ -449,10 +449,15 @@ flowchart LR
   `REFERENCE_OVERLAY` profile-smoke benchmark'ов;
 - добавлен `profile_benchmark_cases.py` с физическими семействами, carrier
   readiness и blocker'ами будущих strict evaluator'ов;
+- добавлен `profile_strict_evaluators.py` с первым strict-кандидатом
+  `richards_mms` по RMSE/max-error напора и влажности;
 - `TEST_STATUS.txt` profile benchmark'ов теперь может содержать
-  `profile_evaluator=reference_overlay`, `strict_profile_evaluator=PENDING` и
+  `profile_evaluator=reference_overlay`, `strict_profile_evaluator` и
   `profile_overlay_quality_check`, `profile_physics_family`,
   `profile_carrier_status`;
+- для `richards_mms` значение strict evaluator readiness теперь
+  `EVALUATOR_READY_DECK_PENDING`, потому что evaluator готов, но текущий deck
+  еще не содержит MMS source-term;
 - suite CSV расширен колонками качества overlay и pending strict evaluator;
 - физические strict-evaluator'ы для Theis/Ogata/Terzaghi/heat/Buckley/
   Boussinesq/Richards MMS еще не подключены;
