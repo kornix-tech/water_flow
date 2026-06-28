@@ -89,6 +89,11 @@ curl http://localhost:8080/api/results/runs/_test_linear_darcy/test-status
 curl http://localhost:8080/api/results/runs/_test_linear_darcy/overview
 ```
 
+Для suite-запусков страница `Расчеты` показывает таблицу результатов
+verification-suite: статус каждого теста, уровень проверки, `failure_stage`,
+`strict_readiness_stage`, warnings и solver diagnostics. Таблицу можно
+фильтровать по статусу, failure stage и strict stage.
+
 ## UI route smoke
 
 Для живого web-сервиса есть dependency-free проверка коротких frontend URL:

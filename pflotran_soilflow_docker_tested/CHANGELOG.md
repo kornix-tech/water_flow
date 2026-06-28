@@ -27,6 +27,7 @@
 - Добавлен отдельный research-профиль `CHECK_PROFILE=research ./scripts/check_project.sh` и Makefile-цель `project-check-research` для verification-suite dry/run gate вне основного full-gate.
 - Verification-suite теперь пишет `STRICT_READINESS_PLAN.json` с priority order, `next_stage` и `next_targets` для следующего strict-readiness блока.
 - Backend `/test-suite` теперь отдает `strict_readiness_plan` как структурированное поле, suite plan сохраняет blocker-поля, а `/overview` добавляет в карточку suite следующий strict-блок, первый target и blocker.
+- На странице `Расчеты` добавлена таблица результатов verification-suite с фильтрами по статусу, `failure_stage` и `strict_readiness_stage`.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_evaluators` для диагностической оценки `REFERENCE_OVERLAY` profile-smoke benchmark'ов и явной отметки pending strict evaluator.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_cases` с машинно-читаемой картой profile benchmark'ов, физическими семействами и blocker'ами будущих strict evaluator'ов.
 - Добавлен модуль `soilflow_pflotran_modules.profile_strict_evaluators` с первым strict-кандидатом для `richards_mms` по RMSE/max-error напора и влажности.

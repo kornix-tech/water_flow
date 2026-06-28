@@ -385,7 +385,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:b9fd47bf1d8bd87ef2fe95ace98780a188b17645e09212027969ab9c3bc660dc
+sha256:b1e0e151f91739f24525e82357e966cc41c4c723a1503e03f0afab95574727a5
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -549,9 +549,8 @@ flowchart LR
      `failure_stage=parser`; evaluator exceptions после успешного чтения output
      получают `failure_stage=evaluator`; solver timeout/error получает
      `failure_stage=solver`;
-   - следующий шаг: использовать `failure_stage` во frontend status cards и
-     фильтрах suite results, если UI начнет показывать подробный список
-     результатов suite.
+   - frontend `Расчеты` показывает таблицу suite results и фильтры по статусу,
+     `failure_stage` и `strict_readiness_stage`.
 3. Использовать `strict_readiness_stage` для выбора следующего блока:
    - suite writer теперь создает `STRICT_READINESS_PLAN.json` с `stage_order`,
      `next_stage`, `next_targets`, blocker-полями и списком candidates для

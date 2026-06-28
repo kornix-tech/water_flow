@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { deleteCalculation, downloadRunZip, getCalculation, getRunStatusOverview, listCalculations, listRuns, runCalculation } from "../api/client";
+import { deleteCalculation, downloadRunZip, getCalculation, getRunStatusOverview, getRunTestSuiteStatus, listCalculations, listRuns, runCalculation } from "../api/client";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { ResultFileList } from "../components/ResultFileList";
 import { StatusSummaryPanel } from "../components/StatusSummaryPanel";
+import { TestSuiteResultsPanel } from "../components/TestSuiteResultsPanel";
 import { ROUTES } from "../routes";
-import type { CalculationSummary, RunInfo, RunStatusOverview } from "../types";
+import type { CalculationSummary, RunInfo, RunStatusOverview, TestSuiteStatus } from "../types";
 
 interface ResultsPageProps {
   onNavigate: (path: string) => void;
@@ -19,6 +20,7 @@ export function ResultsPage({ onNavigate }: ResultsPageProps) {
   const [selectedStandaloneRunName, setSelectedStandaloneRunName] = useState<string | null>(null);
   const [statusOverview, setStatusOverview] = useState<RunStatusOverview | null>(null);
   const [statusOverviewError, setStatusOverviewError] = useState("");
+  const [testSuiteStatus, setTestSuiteStatus] = useState<TestSuiteStatus | null>(null);
   const [error, setError] = useState("");
 
   async function refresh() {
@@ -146,6 +148,7 @@ export function ResultsPage({ onNavigate }: ResultsPageProps) {
     if (!selected) {
       setStatusOverview(null);
       setStatusOverviewError("");
+      setTestSuiteStatus(null);
       return;
     }
     let cancelled = false;
@@ -162,10 +165,25 @@ export function ResultsPage({ onNavigate }: ResultsPageProps) {
           setStatusOverviewError(caught instanceof Error ? caught.message : "Не удалось прочитать сводку состояния");
         }
       });
+    if (selected.has_suite_status) {
+      getRunTestSuiteStatus(selected.run_name)
+        .then((suite) => {
+          if (!cancelled) {
+            setTestSuiteStatus(suite);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setTestSuiteStatus(null);
+          }
+        });
+    } else {
+      setTestSuiteStatus(null);
+    }
     return () => {
       cancelled = true;
     };
-  }, [selected?.run_name]);
+  }, [selected?.run_name, selected?.has_suite_status]);
 
   const calculationRunNames = new Set(calculations.map((calculation) => calculation.run_name).filter(Boolean));
   const standaloneRuns = runs.filter((run) => !calculationRunNames.has(run.run_name));
@@ -267,6 +285,7 @@ export function ResultsPage({ onNavigate }: ResultsPageProps) {
                 </dl>
               )}
               <StatusSummaryPanel title="Сводка состояния" items={statusOverview?.items ?? []} error={statusOverviewError} />
+              <TestSuiteResultsPanel suite={testSuiteStatus} />
               <ResultFileList runName={selected.run_name} files={selected.files} />
             </>
           ) : (

@@ -658,6 +658,60 @@ tr.selected {
   font-size: 13px;
 }
 
+.suite-results-panel {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  padding-top: 12px;
+  border-top: 1px solid #e3e8ef;
+}
+
+.suite-result-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.suite-result-filters label {
+  display: grid;
+  gap: 4px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.suite-result-filters select {
+  min-height: 34px;
+  border: 1px solid #cbd4df;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1c2430;
+  padding: 6px 8px;
+}
+
+.suite-results-table-wrap {
+  overflow-x: auto;
+}
+
+.suite-results-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+  font-size: 13px;
+}
+
+.suite-results-table th,
+.suite-results-table td {
+  padding: 8px;
+  border-bottom: 1px solid #e3e8ef;
+  text-align: left;
+  vertical-align: top;
+}
+
+.suite-results-table th {
+  color: #64748b;
+  font-weight: 600;
+}
+
 .status-message-list {
   margin: 0;
   padding-left: 18px;
