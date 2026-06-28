@@ -31,6 +31,7 @@ from app.file_manager import safe_resolve_under, safe_run_name
 from app.job_lifecycle import CALCULATION_STATUS_DRAFT, JOB_STATUS_FAILED, JOB_STATUS_QUEUED
 from app.job_store import JobStore
 from app.models import Job
+from app.services.result_status_artifacts import read_status_artifact_text
 from app.services.run_status_overview_service import read_run_status_overview
 from app.services.test_run_status_service import read_test_run_status
 from app.services.test_suite_summary_service import read_test_suite_status
@@ -82,6 +83,17 @@ class PathSafetyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(HTTPException):
                 safe_resolve_under(Path(directory), "../outside.txt")
+
+    def test_status_artifact_text_cache_invalidates_on_file_change(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "TEST_STATUS.txt"
+            path.write_text("TEST_STATUS=PASS\n", encoding="utf-8")
+
+            self.assertIn("PASS", read_status_artifact_text(path))
+
+            path.write_text("TEST_STATUS=FAIL\nextra=1\n", encoding="utf-8")
+
+            self.assertIn("FAIL", read_status_artifact_text(path))
 
 
 class JobStoreTests(unittest.TestCase):

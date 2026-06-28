@@ -8,6 +8,7 @@ PERF_FILES_PER_RUN="${PERF_FILES_PER_RUN:-30}"
 LIST_MAX_SECONDS="${LIST_MAX_SECONDS:-2.5}"
 DETAIL_MAX_SECONDS="${DETAIL_MAX_SECONDS:-1.5}"
 OVERVIEW_MAX_SECONDS="${OVERVIEW_MAX_SECONDS:-1.5}"
+RESTART_CHECK="${RESTART_CHECK:-1}"
 
 cleanup() {
   WEB_PORT="$WEB_PORT" docker compose exec -T soilflow-web python3 - <<'PY' >/dev/null 2>&1 || true
@@ -56,6 +57,20 @@ for index in range(run_count):
     for file_index in range(files_per_run):
         (nested_dir / f"payload_{file_index:03d}.txt").write_text("x" * 128, encoding="utf-8")
 PY
+
+if [[ "$RESTART_CHECK" == "1" ]]; then
+  WEB_PORT="$WEB_PORT" docker compose restart soilflow-web >/dev/null
+  for attempt in $(seq 1 30); do
+    if curl -fsS "${BASE_URL}/api/health" >/dev/null 2>&1; then
+      break
+    fi
+    if [[ "$attempt" -eq 30 ]]; then
+      echo "API health check failed after restart" >&2
+      exit 1
+    fi
+    sleep 1
+  done
+fi
 
 python3 - "$BASE_URL" "$LIST_MAX_SECONDS" "$DETAIL_MAX_SECONDS" "$OVERVIEW_MAX_SECONDS" <<'PY'
 from __future__ import annotations

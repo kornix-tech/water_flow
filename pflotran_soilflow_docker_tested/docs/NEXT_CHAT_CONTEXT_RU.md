@@ -301,7 +301,7 @@ RunStatusOverview
 Итог последнего запуска:
 
 ```text
-Backend unit tests: 18 tests OK
+Backend unit tests: 20 tests OK
 Core tests: 51 tests OK
 Frontend production build: OK
 API smoke: OK
@@ -380,7 +380,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:1119aea091fa576177151822e0f6ac3dee014cf71c16a3f2dbef9526203e84f3
+sha256:ba28b0392d8038ff2d44df3caf440290ae87e90b948ebab7bc7a7dbafff1dc23
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -404,6 +404,9 @@ docs/NEXT_CHAT_CONTEXT_RU.md
 - зафиксировано, что `/api/results/runs` является быстрым summary endpoint без
   рекурсивного списка файлов каждой run-папки;
 - JSON-only suite artifacts теперь видны в summary/overview как suite status;
+- чтение status artifacts кэшируется по `path + size + mtime_ns`, поэтому
+  повторные overview/status запросы на неизменных файлах уменьшают disk I/O;
+- results performance smoke проверяет контракт после restart web-сервиса;
 - частично записанные suite/status artifacts больше не должны давать 500 при
   наличии пригодного fallback;
 - web smoke examples дополнены curl-командами для новых endpoints.
@@ -450,7 +453,7 @@ flowchart LR
 1. Ввести performance/stability smoke для чтения результатов:
    - уже добавлен `scripts/api_results_performance_smoke.sh`, который измеряет
      `/api/results/runs`, `/overview`, `/test-suite`, `/test-status` на наборе
-     временных run-папок;
+     временных run-папок и проверяет restart-resilience;
    - проверять лимиты времени ответа и размер JSON;
    - фиксировать деградации отдельным скриптом, не смешивая с физикой PFLOTRAN.
 2. Ужесточить filesystem-контракты result endpoints:
@@ -465,9 +468,10 @@ flowchart LR
    - показывать `UNKNOWN/PARTIAL` вместо 500, если расчет еще пишет файлы;
    - разделить ошибки parser-а и ошибки внешнего solver-а в diagnostics.
 4. Проверить restart-resilience:
-   - после `docker compose restart soilflow-web` убедиться, что активные job'ы,
-     SQLite schema, health/ready и список расчетов возвращаются корректно;
-   - добавить smoke или unit-level regression, если покрытие неполное.
+   - для results/status endpoints это уже покрыто
+     `scripts/api_results_performance_smoke.sh`;
+   - следующим шагом добавить отдельный smoke для активных job'ов и SQLite
+     schema после `docker compose restart soilflow-web`.
 
 ### Блок B. Производительность backend/frontend
 
@@ -476,7 +480,8 @@ flowchart LR
 
 1. Оптимизировать список run'ов и overview:
    - профилировать количество `stat/open/read` при `/api/results/runs`;
-   - кэшировать легкие metadata по `mtime`/размеру status-файлов;
+   - кэш чтения status artifacts по `mtime`/размеру уже добавлен;
+   - следующим шагом профилировать необходимость кэша агрегированных overview;
    - читать тяжелые artifacts лениво, только для выбранного run.
 2. Ограничить размер payload'ов:
    - для списков отдавать summary, а не содержимое больших CSV/TEC;

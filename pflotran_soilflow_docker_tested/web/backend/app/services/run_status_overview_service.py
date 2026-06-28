@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .result_status_artifacts import existing_status_artifact, parse_key_value_status
+from .result_status_artifacts import existing_status_artifact, has_status_artifact, parse_key_value_status
 from .test_run_status_service import TEST_STATUS_TEXT, read_test_run_status
 from .test_suite_summary_service import SUITE_STATUS_ARTIFACTS, read_test_suite_status
 
@@ -23,7 +23,7 @@ def _first_present(fields: dict[str, Any], *keys: str) -> Any:
 
 
 def _suite_item(run_name: str, run_dir: Path) -> dict[str, Any] | None:
-    if not any(existing_status_artifact(run_dir, filename) is not None for filename in SUITE_STATUS_ARTIFACTS):
+    if not any(has_status_artifact(run_dir, filename) for filename in SUITE_STATUS_ARTIFACTS):
         return None
     suite = read_test_suite_status(run_name, run_dir)
     summary = suite["summary"]

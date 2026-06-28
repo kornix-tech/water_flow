@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import csv
 import json
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
-from .result_status_artifacts import existing_status_artifact, existing_status_artifact_names, parse_key_value_status
+from .result_status_artifacts import (
+    existing_status_artifact,
+    existing_status_artifact_names,
+    parse_key_value_status,
+    read_status_artifact_text,
+)
 
 SUITE_STATUS_TEXT = "TEST_SUITE_STATUS.txt"
 SUITE_STATUS_JSON = "TEST_SUITE_STATUS.json"
@@ -104,8 +110,7 @@ def _normalize_results(raw_results: Any) -> list[dict[str, Any]]:
 
 
 def _read_json_summary(path: Path) -> tuple[dict[str, str | int], list[dict[str, Any]]]:
-    with path.open(encoding="utf-8") as file_obj:
-        payload = json.load(file_obj)
+    payload = json.loads(read_status_artifact_text(path))
     if not isinstance(payload, dict):
         raise ValueError("TEST_SUITE_STATUS.json must contain an object")
     raw_summary = payload.get("summary", {})
@@ -115,8 +120,7 @@ def _read_json_summary(path: Path) -> tuple[dict[str, str | int], list[dict[str,
 
 
 def _read_csv_results(path: Path) -> list[dict[str, Any]]:
-    with path.open(newline="", encoding="utf-8") as file_obj:
-        return _normalize_results(list(csv.DictReader(file_obj)))
+    return _normalize_results(list(csv.DictReader(StringIO(read_status_artifact_text(path)))))
 
 
 def _read_text_summary(path: Path) -> tuple[dict[str, str | int], list[dict[str, Any]]]:

@@ -5,7 +5,12 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .result_status_artifacts import existing_status_artifact, existing_status_artifact_names, parse_key_value_status
+from .result_status_artifacts import (
+    existing_status_artifact,
+    existing_status_artifact_names,
+    parse_key_value_status,
+    read_status_artifact_text,
+)
 
 TEST_STATUS_TEXT = "TEST_STATUS.txt"
 TEST_DIAGNOSTICS_JSON = "test_diagnostics.json"
@@ -39,8 +44,7 @@ def _read_diagnostics(path: Path | None) -> dict[str, Any]:
     if path is None:
         return {}
     try:
-        with path.open(encoding="utf-8") as file_obj:
-            payload = json.load(file_obj)
+        payload = json.loads(read_status_artifact_text(path))
         if not isinstance(payload, dict):
             raise ValueError("test_diagnostics.json must contain an object")
         return payload

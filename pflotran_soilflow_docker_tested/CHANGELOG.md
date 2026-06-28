@@ -79,9 +79,15 @@
   run.
 - `scripts/check_project.sh` теперь включает results performance smoke как
   отдельный gate после API/workflow проверок и перед UI route smoke.
+- Results performance smoke теперь делает restart web-сервиса после создания
+  временных run-папок и проверяет, что summary/detail/status endpoints
+  сохраняют контракт после restart.
 - JSON-only suite status теперь определяется в summary/overview так же, как
   TXT suite status: `has_suite_status=true`, а `/overview` показывает карточку
   `test-suite`.
+- Чтение TXT/JSON/CSV status artifacts теперь использует общий кэш по
+  `path + size + mtime_ns`, чтобы повторные overview/status запросы не
+  перечитывали неизменные artifacts с диска.
 - Чтение test-suite/test-status стало устойчивее к частично записанным
   artifacts: битый `TEST_SUITE_STATUS.json` откатывается к TXT/CSV, а битый
   `test_diagnostics.json` помечается как `PARTIAL` без потери основного статуса.
