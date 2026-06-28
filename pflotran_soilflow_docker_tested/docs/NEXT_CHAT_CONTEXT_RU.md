@@ -113,6 +113,8 @@ GET /api/results/runs/{run_name}/test-status
 - при частично записанном или поврежденном `test_diagnostics.json` сохранять
   основной статус из `TEST_STATUS.txt`, а diagnostics помечать
   `artifact_readiness=PARTIAL`.
+- если `TEST_STATUS.txt` уже существует, но ключ `TEST_STATUS` еще не записан,
+  endpoint возвращает `status=UNKNOWN` и `artifact_readiness=PARTIAL`.
 
 Пример проверенного live endpoint:
 
@@ -287,26 +289,28 @@ RunStatusOverview
 Состав gate:
 
 ```text
-[1/9] Python compile
-[2/9] Backend unit tests
-[3/9] Core modular tests
-[4/9] Frontend production build
-[5/9] Cleanup generated frontend build
-[6/9] Restart web service
-[7/9] API contract and workflow checks
-[8/9] Results performance smoke
-[9/9] Frontend route smoke
+[1/10] Python compile
+[2/10] Backend unit tests
+[3/10] Core modular tests
+[4/10] Frontend production build
+[5/10] Cleanup generated frontend build
+[6/10] Restart web service
+[7/10] API contract and workflow checks
+[8/10] Results performance smoke
+[9/10] Restart resilience smoke
+[10/10] Frontend route smoke
 ```
 
 Итог последнего запуска:
 
 ```text
-Backend unit tests: 20 tests OK
+Backend unit tests: 21 tests OK
 Core tests: 51 tests OK
 Frontend production build: OK
 API smoke: OK
 tabular API workflow smoke: OK
 results performance smoke: OK
+restart resilience smoke: OK
 UI route smoke: OK
 project checks passed on http://localhost:18080
 ```
@@ -322,6 +326,7 @@ docker run --rm -v /home/zenbook/SF/pflotran_soilflow_docker_tested:/app -w /app
 curl -fsS http://localhost:18080/api/health/ready
 curl -fsS http://localhost:18080/api/results/runs/_test_linear_darcy/overview
 WEB_PORT=18080 ./scripts/api_results_performance_smoke.sh
+WEB_PORT=18080 ./scripts/api_restart_resilience_smoke.sh
 python3 -m compileall -q scripts tests web/backend/app
 git diff --check
 ```
@@ -380,7 +385,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:ba28b0392d8038ff2d44df3caf440290ae87e90b948ebab7bc7a7dbafff1dc23
+sha256:3dae62aea89f2a5959a15c56df51dc421125b6c6c32cbe7181d8553888013ec1
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -396,9 +401,11 @@ docs/NEXT_CHAT_CONTEXT_RU.md
 Смысл изменений:
 
 - добавлены `/test-suite`, `/test-status`, `/overview`;
-- добавлен `scripts/ui_route_smoke.sh` и обязательный `[9/9] Frontend route smoke` в `scripts/check_project.sh`;
+- добавлен `scripts/ui_route_smoke.sh` и обязательный `[10/10] Frontend route smoke` в `scripts/check_project.sh`;
 - добавлен `scripts/api_results_performance_smoke.sh` и обязательный
   `[8/9] Results performance smoke` в `scripts/check_project.sh`;
+- добавлен `scripts/api_restart_resilience_smoke.sh` и обязательный
+  `[9/10] Restart resilience smoke` в `scripts/check_project.sh`;
 - зафиксировано, что frontend больше не парсит status TXT напрямую;
 - описан общий reader status-сводок;
 - зафиксировано, что `/api/results/runs` является быстрым summary endpoint без
@@ -407,6 +414,9 @@ docs/NEXT_CHAT_CONTEXT_RU.md
 - чтение status artifacts кэшируется по `path + size + mtime_ns`, поэтому
   повторные overview/status запросы на неизменных файлах уменьшают disk I/O;
 - results performance smoke проверяет контракт после restart web-сервиса;
+- restart resilience smoke проверяет перевод active job в `failed`, readiness и
+  SQLite schema version после restart;
+- `TEST_STATUS.txt` без ключа `TEST_STATUS` получает явный partial marker;
 - частично записанные suite/status artifacts больше не должны давать 500 при
   наличии пригодного fallback;
 - web smoke examples дополнены curl-командами для новых endpoints.
@@ -463,15 +473,14 @@ flowchart LR
    - не позволять frontend/API читать произвольные файлы вне run-директории.
 3. Сделать чтение status/artifacts устойчивым:
    - уже добавлен graceful fallback для поврежденных `TEST_SUITE_STATUS.json`,
-     `TEST_SUITE_RESULTS.csv` и `test_diagnostics.json`;
-   - следующим шагом добавить явную политику для поврежденных `TEST_STATUS.txt`;
+     `TEST_SUITE_RESULTS.csv`, `test_diagnostics.json` и частично записанного
+     `TEST_STATUS.txt` без ключа `TEST_STATUS`;
    - показывать `UNKNOWN/PARTIAL` вместо 500, если расчет еще пишет файлы;
    - разделить ошибки parser-а и ошибки внешнего solver-а в diagnostics.
 4. Проверить restart-resilience:
-   - для results/status endpoints это уже покрыто
-     `scripts/api_results_performance_smoke.sh`;
-   - следующим шагом добавить отдельный smoke для активных job'ов и SQLite
-     schema после `docker compose restart soilflow-web`.
+   - results/status endpoints покрыты `scripts/api_results_performance_smoke.sh`;
+   - active job interruption, readiness и SQLite schema после restart покрыты
+     `scripts/api_restart_resilience_smoke.sh`.
 
 ### Блок B. Производительность backend/frontend
 

@@ -376,6 +376,20 @@ class TestRunStatusServiceTests(unittest.TestCase):
             self.assertEqual(status["status"], "GENERATED_ONLY")
             self.assertEqual(status["messages"], ["PFLOTRAN executable was not found"])
 
+    def test_read_test_run_status_marks_partial_when_status_key_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            (run_dir / "TEST_STATUS.txt").write_text(
+                "test_id=_test_partial\nwriter has not flushed status yet\n",
+                encoding="utf-8",
+            )
+
+            status = read_test_run_status("_test_partial", run_dir)
+
+            self.assertEqual(status["status"], "UNKNOWN")
+            self.assertEqual(status["fields"]["artifact_readiness"], "PARTIAL")
+            self.assertEqual(status["messages"], ["writer has not flushed status yet"])
+
     def test_read_test_run_status_keeps_status_when_diagnostics_json_is_partial(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             run_dir = Path(directory)

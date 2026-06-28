@@ -64,6 +64,11 @@ def read_test_run_status(run_name: str, run_dir: Path) -> dict[str, Any]:
     raw_fields, messages = parse_key_value_status(status_path)
     fields = _coerce_fields(raw_fields)
     status = str(fields.get("TEST_STATUS", "UNKNOWN"))
+    if "TEST_STATUS" not in fields:
+        # TEST_STATUS.txt может быть прочитан до завершения записи. Вместо 500
+        # отдаем явное частичное состояние, сохраняя уже доступные поля/сообщения.
+        fields["artifact_readiness"] = "PARTIAL"
+        fields["status_parse_warning"] = "TEST_STATUS key is missing"
     test_id_value = fields.get("test_id")
     return {
         "run_name": run_name,

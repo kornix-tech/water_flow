@@ -21,6 +21,7 @@
 - Добавлен API `/api/results/runs/{run_name}/overview` и общий frontend-компонент карточек состояния для страниц `Статус` и `Расчеты`.
 - Добавлен UI route smoke `scripts/ui_route_smoke.sh` и Makefile-цель `ui-smoke` для проверки коротких frontend URL и SPA/API fallback-контракта живого сервиса.
 - Добавлен `scripts/api_results_performance_smoke.sh`: живой performance/stability smoke для `/api/results/runs`, `/overview`, `/test-suite` и `/test-status` на временных run-папках с большим числом файлов.
+- Добавлен `scripts/api_restart_resilience_smoke.sh`: live smoke для проверки restart-поведения активных job'ов, SQLite schema version и базовых API после `docker compose restart soilflow-web`.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_evaluators` для диагностической оценки `REFERENCE_OVERLAY` profile-smoke benchmark'ов и явной отметки pending strict evaluator.
 - Добавлен модуль `soilflow_pflotran_modules.profile_benchmark_cases` с машинно-читаемой картой profile benchmark'ов, физическими семействами и blocker'ами будущих strict evaluator'ов.
 - Добавлен модуль `soilflow_pflotran_modules.profile_strict_evaluators` с первым strict-кандидатом для `richards_mms` по RMSE/max-error напора и влажности.
@@ -82,6 +83,8 @@
 - Results performance smoke теперь делает restart web-сервиса после создания
   временных run-папок и проверяет, что summary/detail/status endpoints
   сохраняют контракт после restart.
+- `scripts/check_project.sh` теперь включает restart resilience smoke как
+  отдельный gate после results performance smoke.
 - JSON-only suite status теперь определяется в summary/overview так же, как
   TXT suite status: `has_suite_status=true`, а `/overview` показывает карточку
   `test-suite`.
@@ -91,6 +94,9 @@
 - Чтение test-suite/test-status стало устойчивее к частично записанным
   artifacts: битый `TEST_SUITE_STATUS.json` откатывается к TXT/CSV, а битый
   `test_diagnostics.json` помечается как `PARTIAL` без потери основного статуса.
+- `TEST_STATUS.txt` без ключа `TEST_STATUS` теперь возвращает
+  `status=UNKNOWN` и `artifact_readiness=PARTIAL`, а не неявно выглядит как
+  полноценный статус.
 - В интерфейсе `Исходные данные` табличная кривая стала разрешенной моделью водоудерживания и влагопроводности для проверенных пар `van_genuchten + tabular`, `brooks_corey + tabular` и `tabular + tabular`.
 - Сообщение об ошибке failed-задания теперь извлекает предметную строку `ERROR`/`Traceback` из job log, если она есть.
 - JSON-снимок расчета, передаваемый в CLI при запуске расчета или визуализации, теперь включает `soil_curve_tables` сохраненного расчета.

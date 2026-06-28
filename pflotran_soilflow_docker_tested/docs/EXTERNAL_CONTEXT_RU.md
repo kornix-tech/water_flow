@@ -41,6 +41,7 @@ PFLOTRAN: /opt/pflotran/src/pflotran/pflotran
 9. Страница `Тесты` содержит workflow `Табличная почва`: он создает расчет в SQLite, сохраняет демо-кривые Pc(S)/kr(S), запускает PFLOTRAN и затем строит графики.
 10. Полный API-контур табличной почвы закреплен в `scripts/api_tabular_workflow_smoke.sh` и включен в `scripts/check_project.sh`; smoke удаляет созданный расчет, если не задано `KEEP_TABULAR_API_SMOKE=1`.
 11. Performance/stability контур results API закреплен в `scripts/api_results_performance_smoke.sh`: smoke создает временные run-папки, делает restart web-сервиса, проверяет summary/detail/status endpoints и очищает временные данные.
+12. Restart-resilience контур закреплен в `scripts/api_restart_resilience_smoke.sh`: smoke создает временный queued job напрямую в SQLite, перезапускает web-сервис, проверяет перевод job в `failed`, readiness/schema version и базовые API, затем очищает временную запись.
 
 ## 3. Карта каталогов
 
@@ -660,7 +661,8 @@ scripts/__pycache__/
 10. Suite summary теперь пишется в `TEST_SUITE_STATUS.txt`, `TEST_SUITE_STATUS.json` и `TEST_SUITE_RESULTS.csv`; backend отдает его через `GET /api/results/runs/{run_name}/test-suite`, отдельные `TEST_STATUS.txt` доступны через `GET /api/results/runs/{run_name}/test-status`, а единая карточка состояния запуска собирается через `GET /api/results/runs/{run_name}/overview`. Suite summary агрегирует strict-readiness stage counts, чтобы видеть текущий класс blocker'ов profile benchmark'ов. Страницы `Статус` и `Расчеты` используют общий frontend-компонент карточек состояния без парсинга status-файлов во frontend. Частично записанные `TEST_SUITE_STATUS.json`, `TEST_SUITE_RESULTS.csv` и `test_diagnostics.json` не должны ломать API: backend возвращает пригодный TXT/CSV fallback или partial diagnostics marker.
 11. JSON-only suite artifacts считаются полноценным suite status для `/api/results/runs` и `/overview`; это важно для частично записанных или минимальных suite-директорий, где TXT artifact может отсутствовать.
 12. Чтение TXT/JSON/CSV status artifacts кэшируется по `path + size + mtime_ns`, чтобы повторные overview/status запросы не перечитывали неизменные файлы и при этом инвалидировались при дозаписи artifacts.
-13. Strict/partial Richards verification слой, profile-smoke запуск и suite-router `_test` вынесены из `soilflow_pflotran.py` в `richards_test_cases.py`, `richards_test_evaluators.py`, `richards_test_runner.py`, `profile_test_runner.py` и `verification_runner.py`; CLI-фасад должен оставаться тонким маршрутизатором, а не местом новой физики тестов.
+13. `TEST_STATUS.txt` без ключа `TEST_STATUS` считается частично записанным artifact: API возвращает `status=UNKNOWN` и `artifact_readiness=PARTIAL`.
+14. Strict/partial Richards verification слой, profile-smoke запуск и suite-router `_test` вынесены из `soilflow_pflotran.py` в `richards_test_cases.py`, `richards_test_evaluators.py`, `richards_test_runner.py`, `profile_test_runner.py` и `verification_runner.py`; CLI-фасад должен оставаться тонким маршрутизатором, а не местом новой физики тестов.
 
 ## 15. Что важно сохранить в следующих итерациях
 
@@ -684,8 +686,9 @@ scripts/__pycache__/
      artifacts без 500; первый инкремент уже покрывает suite JSON/CSV и
      diagnostics JSON fallback;
    - restart-resilience для results/status endpoints уже проверяет
-     `scripts/api_results_performance_smoke.sh`; следующим шагом покрыть
-     активные job'ы и SQLite schema после restart.
+     `scripts/api_results_performance_smoke.sh`;
+   - active job interruption, readiness и SQLite schema после restart проверяет
+     `scripts/api_restart_resilience_smoke.sh`.
 2. Производительность backend:
    - профилировать лишние `stat/open/read` при overview и выбранных run'ах;
    - `/api/results/runs` уже переведен в summary-режим без рекурсивного

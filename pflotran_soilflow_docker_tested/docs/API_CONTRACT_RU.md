@@ -144,6 +144,9 @@ Endpoints:
 - `GET /api/results/runs/{run_name}/test-status` - типизированная JSON-сводка
   отдельного тестового запуска из `TEST_STATUS.txt` и, если есть,
   `test_diagnostics.json`.
+  Если `TEST_STATUS.txt` прочитан до записи ключа `TEST_STATUS`, backend
+  возвращает `status=UNKNOWN`, добавляет `artifact_readiness=PARTIAL` в поля
+  статуса и сохраняет уже доступные строки как `messages`.
   Для profile-smoke benchmark'ов статус может включать диагностические поля
   `profile_evaluator=reference_overlay`, `profile_overlay_quality_check` и
   `strict_profile_evaluator`, а также `profile_physics_family`,
@@ -181,6 +184,11 @@ Endpoints:
   внутри папки запуска.
 - `GET /api/files/download-zip/{run_id}` - ZIP-архив папки запуска с лимитами на
   размер и число файлов.
+
+`scripts/api_restart_resilience_smoke.sh` проверяет, что после
+`docker compose restart soilflow-web` активные `queued/running` jobs
+переводятся в `failed`, readiness остается `ready`, SQLite schema version
+остается актуальной, а базовые API продолжают отвечать.
 
 Read-only smoke `scripts/api_smoke.sh` проверяет `/overview` для первого
 доступного запуска со status/visualization-артефактами, а если таких нет - для
