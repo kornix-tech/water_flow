@@ -410,40 +410,78 @@ flowchart LR
 
 ## 12. Рекомендуемый следующий план
 
-### Блок A. API smoke для overview
+### Блок A. Устойчивость runtime и API
 
-Выполнено в текущем smoke-этапе:
+Цель: сделать сервис предсказуемым при больших `output/runs`, долгих расчетах,
+рестартах контейнера и частичных artifacts.
 
-- `scripts/api_smoke.sh` выбирает первый run с `has_test_status`,
-  `has_suite_status` или `has_visualization`;
-- если status/visualization run отсутствует, проверяет `/overview` для первой
-  обычной run-папки;
-- если run-папок нет, пропускает overview-проверку с явным сообщением;
-- проверяет базовую форму DTO: `run_name`, непустой `items`, обязательные поля
-  `kind/title/status` у каждой карточки.
+1. Ввести performance/stability smoke для чтения результатов:
+   - измерять `/api/results/runs`, `/overview`, `/test-suite`, `/test-status`
+     на репозитории с большим числом run-папок;
+   - проверять лимиты времени ответа и размер JSON;
+   - фиксировать деградации отдельным скриптом, не смешивая с физикой PFLOTRAN.
+2. Ужесточить filesystem-контракты result endpoints:
+   - централизовать safe path helpers для всех чтений artifacts;
+   - добавить unit-тесты на traversal, отсутствующие файлы, битые JSON/CSV и
+     частично записанные run-директории;
+   - не позволять frontend/API читать произвольные файлы вне run-директории.
+3. Сделать чтение status/artifacts устойчивым:
+   - добавить graceful fallback для поврежденных `TEST_STATUS.txt`,
+     `TEST_SUITE_STATUS.json`, `TEST_SUITE_RESULTS.csv`;
+   - показывать `UNKNOWN/PARTIAL` вместо 500, если расчет еще пишет файлы;
+   - разделить ошибки parser-а и ошибки внешнего solver-а в diagnostics.
+4. Проверить restart-resilience:
+   - после `docker compose restart soilflow-web` убедиться, что активные job'ы,
+     SQLite schema, health/ready и список расчетов возвращаются корректно;
+   - добавить smoke или unit-level regression, если покрытие неполное.
 
-### Блок B. UI route smoke
+### Блок B. Производительность backend/frontend
 
-Выполнено в текущем UI smoke-этапе:
+Цель: убрать лишнее полное сканирование файлов и тяжелые повторные вычисления,
+оставив поведение API совместимым.
 
-- добавлен `scripts/ui_route_smoke.sh`;
-- добавлена Makefile-цель `ui-smoke`;
-- `scripts/check_project.sh` расширен до `[1/8]...[8/8]` и запускает UI route
-  smoke после API/workflow проверок;
-- smoke проверяет `/`, `/ishodnye`, `/status`, `/testy`, `/raschety`,
-  `/grafiki`, `/sistema`, основные JS/CSS assets и JSON 404 для неизвестного
-  `/api/...` маршрута.
+1. Оптимизировать список run'ов и overview:
+   - профилировать количество `stat/open/read` при `/api/results/runs`;
+   - кэшировать легкие metadata по `mtime`/размеру status-файлов;
+   - читать тяжелые artifacts лениво, только для выбранного run.
+2. Ограничить размер payload'ов:
+   - для списков отдавать summary, а не содержимое больших CSV/TEC;
+   - для графиков и profile overlay ввести понятные лимиты/пагинацию или
+     downsample, если файл большой;
+   - зафиксировать это в API contract и тестах.
+3. Ускорить verification artifacts:
+   - не пересчитывать аналитические profile rows несколько раз в одном run;
+   - вынести повторяющиеся time/profile grids в локальные helpers;
+   - добавить regression-тесты на shape/содержимое, чтобы оптимизация не
+     изменила физический контракт.
+4. Frontend:
+   - не запрашивать тяжелые данные до выбора конкретного run;
+   - показывать skeleton/partial state вместо блокировки страницы;
+   - сохранить русские короткие URL и текущий визуальный язык.
 
-Более глубокий browser smoke для `/raschety` можно добавить отдельно:
+### Блок C. Производительность и устойчивость verification-suite
 
-- открыть `http://localhost:18080/raschety`;
-- проверить заголовок `Расчеты`;
-- если есть `_test_suite` или `_test_linear_darcy`, выбрать run и проверить `Сводка состояния`;
-- не делать это обязательным в shell CI, если нет Playwright зависимости.
+Цель: сделать suite полезным как быстрый gate и как расширенный физический
+прогон, не заставляя каждый раз запускать самый тяжелый сценарий.
 
-### Блок C. Следующий архитектурный шаг
+1. Разделить проверки по профилям запуска:
+   - fast gate: compile, unit, modular smoke, API/UI route smoke;
+   - full gate: текущий `./scripts/check_project.sh` плюс Docker rebuild;
+   - research gate: долгие profile/DOE/solver-heavy сценарии отдельно.
+2. Добавить timeout/diagnostics policy:
+   - явные timeout'ы на внешние solver-запуски;
+   - сохранение last stdout/stderr/log tail в status;
+   - отчет, какой этап упал: generation, solver, parser, evaluator.
+3. Использовать `strict_readiness_stage` для выбора следующего блока:
+   - сначала закрывать `DECK_ADAPTER_PENDING` для `richards_mms`;
+   - затем `CASE_BUILDER_PENDING` для heat/transport/groundwater;
+   - затем `STRICT_EVALUATOR_PENDING` для infiltration/profile carrier.
+4. Не повышать `profile_smoke` до strict gate без физического deck/evaluator и
+   явного `strict_candidate_can_gate_suite=true`.
 
-После UI smoke был выполнен следующий архитектурный шаг:
+### Блок D. Следующие физические модели
+
+Опорный уже выполненный архитектурный слой:
 
 - добавлен `profile_benchmark_evaluators.py` для диагностической оценки
   `REFERENCE_OVERLAY` profile-smoke benchmark'ов;

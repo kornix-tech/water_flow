@@ -669,12 +669,42 @@ scripts/__pycache__/
 
 ## 16. Рекомендуемый следующий план разработки
 
-1. Для релизного состояния выполнить полную пересборку Docker image и сверить ее с hot-copy workflow.
-2. Новые семейства тестов/постановок добавлять отдельными case/evaluator/runner-модулями, не возвращая orchestration и физику тестов в `soilflow_pflotran.py` или центральный `verification_runner.py`.
-3. Довести расширенные profile carrier тесты до строгих физических deck'ов PFLOTRAN для transport/heat/two-phase/groundwater задач, подключая их через `profile_benchmarks.py` и отдельные evaluator-модули.
-4. При замене solver-а подключать новый adapter рядом с `solver_runner.py` и parser-adapter рядом с `result_diagnostics.py`, возвращая `result_contract.py`; при замене испарения подключать новую реализацию через `surface_balance.py`/forcing contract.
-5. Для дренажной задачи вынести исследовательские сценарии в отдельный воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`, `УГВ`, `C`, `G`, `Z`.
-6. Отдельно решить, остается ли регулируемый колодец эквивалентным sink или нужен явный модуль hydraulic network.
+1. Устойчивость API/result layer:
+   - добавить performance/stability smoke для `/api/results/runs`,
+     `/overview`, `/test-suite`, `/test-status` на большом числе run-папок;
+   - централизовать safe path helpers для result endpoints;
+   - покрыть отсутствующие/битые/частично записанные status artifacts без 500;
+   - проверить restart-resilience после `docker compose restart soilflow-web`.
+2. Производительность backend:
+   - профилировать лишние `stat/open/read` при списке run'ов и overview;
+   - кэшировать легкие metadata по `mtime`/размеру status-файлов;
+   - читать тяжелые CSV/TEC/overlay artifacts лениво только для выбранного run;
+   - ограничить payload'ы списков и закрепить лимиты в API contract.
+3. Производительность frontend:
+   - не запрашивать тяжелые graph/profile данные до выбора конкретного run;
+   - показывать partial/skeleton state для долгих запросов;
+   - сохранить короткие русские URL и существующий визуальный язык.
+4. Verification-suite:
+   - разделить fast/full/research gates;
+   - добавить timeout/diagnostics policy для внешнего solver-а;
+   - агрегировать и использовать `strict_readiness_stage` при выборе следующего
+     инженерного блока;
+   - не повышать `profile_smoke` до strict gate без физического deck/evaluator.
+5. Новые семейства тестов/постановок добавлять отдельными
+   case/evaluator/runner-модулями, не возвращая orchestration и физику тестов в
+   `soilflow_pflotran.py` или центральный `verification_runner.py`.
+6. Довести расширенные profile carrier тесты до строгих физических deck'ов
+   PFLOTRAN для transport/heat/two-phase/groundwater задач, подключая их через
+   `profile_benchmarks.py` и отдельные evaluator-модули.
+7. При замене solver-а подключать новый adapter рядом с `solver_runner.py` и
+   parser-adapter рядом с `result_diagnostics.py`, возвращая `result_contract.py`;
+   при замене испарения подключать новую реализацию через
+   `surface_balance.py`/forcing contract.
+8. Для дренажной задачи вынести исследовательские сценарии в отдельный
+   воспроизводимый runner с параметрическим DOE и сводными картами `Qdrain`,
+   `УГВ`, `C`, `G`, `Z`.
+9. Отдельно решить, остается ли регулируемый колодец эквивалентным sink или
+   нужен явный модуль hydraulic network.
 
 ## 17. Быстрые команды для нового чата
 
