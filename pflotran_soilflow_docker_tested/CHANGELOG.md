@@ -30,6 +30,7 @@
 - Profile status для `richards_mms` теперь проверяет согласованность MMS adapter artifacts и добавляет `richards_mms_adapter_artifact_check`.
 - Suite CSV теперь включает `richards_mms_adapter_artifact_check` для машинного контроля готовности adapter artifacts.
 - Для каждого profile benchmark теперь пишется `profile_strict_plan.json` с readiness stage, blocker'ом и следующим шагом подключения strict evaluator-а.
+- Suite summary теперь агрегирует strict-readiness stages: strict gate ready, deck-adapter pending, case-builder pending и strict-evaluator pending.
 - Добавлены reference overlay метрики для profile-smoke benchmark'ов: RMSE/max-error по объемной влажности и напору относительно `analytical_profiles.csv`.
 - Для profile-smoke benchmark'ов теперь записывается `profile_overlay_comparison.csv` с построчным сравнением `PFLOTRAN vs analytical`.
 - Добавлена архитектурная схема `docs/ARCHITECTURE_RU.md` с текущими потоками данных и заменяемыми adapter-границами.
@@ -86,6 +87,7 @@
 - Blocker `richards_mms` уточнен до уровня deck adapter: matrix/manifest artifacts готовы, но текущий PFLOTRAN input еще остается uniform-source candidate.
 - `analytical_test_summary.txt` для `richards_mms` теперь явно публикует readiness MMS adapter artifacts и pending-статус PFLOTRAN deck adapter-а.
 - Profile status, suite CSV и `profile_case_manifest.json` теперь публикуют `strict_readiness_stage`.
+- `TEST_SUITE_STATUS.txt`/JSON теперь показывают stage counts, чтобы следующий инженерный блок выбирать по текущим blocker'ам, а не вручную по отдельным run-папкам.
 - `scripts/check_project.sh` теперь включает полный расчетный smoke для табличной почвы через публичный API.
 - Стандартный PFLOTRAN deck writer вынесен из `soilflow_pflotran.py`; основной скрипт оставлен совместимым CLI-фасадом и отдельно маршрутизирует `floodplain_controlled_drainage`.
 - Парсинг результатов PFLOTRAN, solver diagnostics и запись `TEST_STATUS.txt` вынесены из `soilflow_pflotran.py` в модуль с unit-тестами.

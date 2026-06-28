@@ -47,11 +47,26 @@ def accepted_suite_statuses(dry_run: bool = False) -> set[str]:
     return accepted
 
 
-def suite_status_summary(results: list[TestResultLike], dry_run: bool = False) -> dict[str, int | str]:
+def strict_readiness_stage_counts(results: list[TestResultLike]) -> dict[str, int]:
+    stages = {
+        "STRICT_GATE_READY": 0,
+        "DECK_ADAPTER_PENDING": 0,
+        "CASE_BUILDER_PENDING": 0,
+        "STRICT_EVALUATOR_PENDING": 0,
+    }
+    for result in results:
+        stage = str(result.metrics.get("strict_readiness_stage", ""))
+        if stage in stages:
+            stages[stage] += 1
+    return stages
+
+
+def suite_status_summary(results: list[TestResultLike], dry_run: bool = False) -> dict[str, int | str | dict[str, int]]:
     accepted = accepted_suite_statuses(dry_run=dry_run)
     failed = [result for result in results if result.status not in accepted]
     warned = [result for result in results if result.status == "PASS_WITH_WARNINGS"]
     skipped = [result for result in results if result.status == "SKIP"]
+    strict_stage_counts = strict_readiness_stage_counts(results)
     suite_status = (
         "DRY_RUN"
         if dry_run
@@ -88,6 +103,11 @@ def suite_status_summary(results: list[TestResultLike], dry_run: bool = False) -
             for result in results
             if result.metrics.get("verification_level") == "profile_smoke" and result.status in accepted
         ),
+        "strict_readiness_stage_counts": strict_stage_counts,
+        "strict_gate_ready_total": strict_stage_counts["STRICT_GATE_READY"],
+        "strict_deck_adapter_pending_total": strict_stage_counts["DECK_ADAPTER_PENDING"],
+        "strict_case_builder_pending_total": strict_stage_counts["CASE_BUILDER_PENDING"],
+        "strict_evaluator_pending_total": strict_stage_counts["STRICT_EVALUATOR_PENDING"],
         "warnings_total": sum(int(result.metrics.get("warning_count", 0)) for result in results),
         "unexpected_warnings_total": sum(
             int(result.metrics.get("unexpected_warning_count", 0)) for result in results
@@ -135,6 +155,10 @@ def suite_status_lines(results: list[TestResultLike], dry_run: bool = False) -> 
         f"partial_balance_passed={summary['partial_balance_passed']}",
         f"profile_smoke_total={summary['profile_smoke_total']}",
         f"profile_smoke_ready={summary['profile_smoke_ready']}",
+        f"strict_gate_ready_total={summary['strict_gate_ready_total']}",
+        f"strict_deck_adapter_pending_total={summary['strict_deck_adapter_pending_total']}",
+        f"strict_case_builder_pending_total={summary['strict_case_builder_pending_total']}",
+        f"strict_evaluator_pending_total={summary['strict_evaluator_pending_total']}",
         "",
     ]
     for result in results:

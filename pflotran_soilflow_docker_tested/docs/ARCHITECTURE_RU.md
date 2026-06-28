@@ -93,7 +93,9 @@ flowchart LR
   Каждый profile benchmark пишет `profile_case_manifest.json` и
   `profile_strict_plan.json`, чтобы тип deck'а, readiness stage и флаг
   `strict_candidate_can_gate_suite` были доступны машинно и не терялись между
-  генерацией artifacts, API-статусом и suite summary.
+  генерацией artifacts, API-статусом и suite summary. Suite summary агрегирует
+  readiness stage counts, чтобы следующий инженерный блок выбирался по
+  текущему blocker-классу.
 - Первый strict-кандидат для `richards_mms` вынесен в
   `profile_strict_evaluators.py` и считает RMSE/max-error напора и влажности по
   overlay. `richards_mms` уже генерирует uniform storage `SOURCE_SINK` candidate

@@ -476,6 +476,9 @@ flowchart LR
 - `strict_candidate_can_gate_suite=false` сохраняет strict-кандидат
   диагностическим до замены carrier deck'а физической MMS постановкой;
 - suite CSV расширен колонками качества overlay и pending strict evaluator;
+- suite summary агрегирует strict-readiness stages в счетчики
+  `strict_gate_ready_total`, `strict_deck_adapter_pending_total`,
+  `strict_case_builder_pending_total`, `strict_evaluator_pending_total`;
 - физические strict-evaluator'ы для Theis/Ogata/Terzaghi/heat/Buckley/
   Boussinesq/Richards MMS еще не подключены;
 - полный Docker rebuild gate уже был выполнен после `d955c6b` и повторяется

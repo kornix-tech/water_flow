@@ -534,8 +534,12 @@ class TestEvaluationTests(unittest.TestCase):
 
             write_suite_status_file([result], suite_dir, dry_run=False)
 
-            self.assertIn("TEST_SUITE_STATUS=PASS_WITH_WARNINGS", (suite_dir / "TEST_SUITE_STATUS.txt").read_text(encoding="utf-8"))
-            self.assertIn('"profile_smoke_ready": 1', (suite_dir / "TEST_SUITE_STATUS.json").read_text(encoding="utf-8"))
+            status_text = (suite_dir / "TEST_SUITE_STATUS.txt").read_text(encoding="utf-8")
+            status_json = (suite_dir / "TEST_SUITE_STATUS.json").read_text(encoding="utf-8")
+            self.assertIn("TEST_SUITE_STATUS=PASS_WITH_WARNINGS", status_text)
+            self.assertIn("strict_deck_adapter_pending_total=1", status_text)
+            self.assertIn('"profile_smoke_ready": 1', status_json)
+            self.assertIn('"DECK_ADAPTER_PENDING": 1', status_json)
             csv_text = (suite_dir / "TEST_SUITE_RESULTS.csv").read_text(encoding="utf-8")
             self.assertIn("profile_overlay_comparison", csv_text)
             self.assertIn("profile_overlay_quality_check", csv_text)

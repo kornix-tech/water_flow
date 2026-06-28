@@ -131,7 +131,10 @@ Endpoints:
 - `GET /api/results/runs/{run_name}/status` - текстовый статус расчета/теста.
 - `GET /api/results/runs/{run_name}/test-suite` - типизированная JSON-сводка
   verification-suite из `TEST_SUITE_STATUS.json` с fallback на
-  `TEST_SUITE_STATUS.txt`/`TEST_SUITE_RESULTS.csv`.
+  `TEST_SUITE_STATUS.txt`/`TEST_SUITE_RESULTS.csv`. Suite summary агрегирует
+  `strict_readiness_stage` в счетчики `strict_gate_ready_total`,
+  `strict_deck_adapter_pending_total`, `strict_case_builder_pending_total` и
+  `strict_evaluator_pending_total`.
 - `GET /api/results/runs/{run_name}/test-status` - типизированная JSON-сводка
   отдельного тестового запуска из `TEST_STATUS.txt` и, если есть,
   `test_diagnostics.json`.
