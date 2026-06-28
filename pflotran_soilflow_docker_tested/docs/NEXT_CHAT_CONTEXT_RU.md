@@ -385,7 +385,7 @@ WEB_PORT=18080 docker compose up -d --force-recreate soilflow-web
 Последний подтвержденный image/container id после rebuild:
 
 ```text
-sha256:77713fec429d744c0e51b1570be7c2028239c69a8ea62e8a7764388a7d016c0a
+sha256:358f22ab54c05ba2c3858d0721cc68f2f80e9cfc023ca88ae2fa238d9ff54b4b
 ```
 
 ## 9. Документация, обновленная в этом этапе
@@ -545,10 +545,13 @@ flowchart LR
    - generation exceptions больше не обрывают весь suite: отдельный тест
      получает `UNKNOWN` и `failure_stage=generation`, после чего suite summary
      все равно записывается;
-   - evaluator/parser exceptions получают `failure_stage=evaluator`; solver
-     timeout/error получает `failure_stage=solver`;
-   - следующий шаг: при необходимости отделить parser в отдельный
-     `failure_stage=parser` там, где evaluator сейчас ловит parse errors.
+   - parser exceptions по TECPLOT/profile artifacts получают
+     `failure_stage=parser`; evaluator exceptions после успешного чтения output
+     получают `failure_stage=evaluator`; solver timeout/error получает
+     `failure_stage=solver`;
+   - следующий шаг: использовать `failure_stage` во frontend status cards и
+     фильтрах suite results, если UI начнет показывать подробный список
+     результатов suite.
 3. Использовать `strict_readiness_stage` для выбора следующего блока:
    - сначала закрывать `DECK_ADAPTER_PENDING` для `richards_mms`;
    - затем `CASE_BUILDER_PENDING` для heat/transport/groundwater;

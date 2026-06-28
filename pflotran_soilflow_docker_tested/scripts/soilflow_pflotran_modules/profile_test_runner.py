@@ -26,6 +26,7 @@ from soilflow_pflotran_modules.test_artifacts import write_curve_svg, write_rows
 from soilflow_pflotran_modules.test_evaluation import base_result_metrics, failure_metrics, write_unknown_status
 from soilflow_pflotran_modules.test_registry import PFLOTRAN_PROFILE_TESTS
 from soilflow_pflotran_modules.test_solver_execution import execute_test_solver
+from soilflow_pflotran_modules.result_diagnostics import ResultParserError
 
 
 def generate_profile_test_files(test_name: str, workdir: Path) -> None:
@@ -74,6 +75,10 @@ def evaluate_profile_benchmark_result(test_name: str, workdir: Path) -> TestResu
         result = evaluate_profile_benchmark_after_run(test_name, workdir, TestResult)
         print(f"[TEST] {result.status}: _test_{test_name} PFLOTRAN profile benchmark")
         return result
+    except ResultParserError as exc:
+        reason = write_unknown_status(workdir / "TEST_STATUS.txt", exc, stage="parser")
+        print(f"[TEST] UNKNOWN _test_{test_name}: {exc}", file=sys.stderr)
+        return TestResult(f"_test_{test_name}", "UNKNOWN", workdir, failure_metrics(test_name, "parser", reason))
     except Exception as exc:
         reason = write_unknown_status(workdir / "TEST_STATUS.txt", exc, stage="evaluator")
         print(f"[TEST] UNKNOWN _test_{test_name}: {exc}", file=sys.stderr)

@@ -9,6 +9,10 @@ from typing import Any, Iterable
 UNEXPECTED_WARNING_FAIL_PATTERNS = ("failed", "invalid", "not recognized", "ignored card", "missing")
 
 
+class ResultParserError(ValueError):
+    """Ошибка разбора расчетных artifacts, отделенная от evaluator-логики."""
+
+
 def _parse_tec_variables(line: str) -> list[str]:
     quoted = re.findall(r'"([^"]+)"', line)
     if quoted:
@@ -68,10 +72,10 @@ def _find_column(variables: list[str], aliases: Iterable[str]) -> int | None:
 def load_numerical_pressure_profile(workdir: Path) -> tuple[Path, list[tuple[float, float]]]:
     tec = find_final_tec_file(workdir)
     if tec is None:
-        raise FileNotFoundError("Не найден TECPLOT/DAT output PFLOTRAN (*.tec, *.dat, *.plt)")
+        raise ResultParserError("Не найден TECPLOT/DAT output PFLOTRAN (*.tec, *.dat, *.plt)")
     variables, rows = parse_tecpotran_tec(tec)
     if not rows:
-        raise ValueError(f"Файл {tec.name} не содержит числовых строк")
+        raise ResultParserError(f"Файл {tec.name} не содержит числовых строк")
 
     z_col = _find_column(variables, ["z [", "z", "z coordinate", "coordinate z"])
     p_col = _find_column(variables, ["liquid pressure", "pressure [pa]", "pressure"])
@@ -86,7 +90,7 @@ def load_numerical_pressure_profile(workdir: Path) -> tuple[Path, list[tuple[flo
                 p_col = column_index
                 break
     if p_col is None:
-        raise ValueError(f"Не удалось найти колонку давления в {tec.name}. Variables: {variables}")
+        raise ResultParserError(f"Не удалось найти колонку давления в {tec.name}. Variables: {variables}")
 
     profile = []
     for row in rows:
@@ -94,7 +98,7 @@ def load_numerical_pressure_profile(workdir: Path) -> tuple[Path, list[tuple[flo
             continue
         profile.append((float(row[z_col]), float(row[p_col])))
     if not profile:
-        raise ValueError(f"Не удалось извлечь профиль z/pressure из {tec.name}")
+        raise ResultParserError(f"Не удалось извлечь профиль z/pressure из {tec.name}")
 
     by_z: dict[float, list[float]] = {}
     for z_m, pressure_pa in profile:
@@ -107,10 +111,10 @@ def load_numerical_pressure_profile(workdir: Path) -> tuple[Path, list[tuple[flo
 def load_tecpotran_records(workdir: Path) -> tuple[Path, list[dict[str, float]]]:
     tec = find_final_tec_file(workdir)
     if tec is None:
-        raise FileNotFoundError("Не найден TECPLOT/DAT output PFLOTRAN (*.tec, *.dat, *.plt)")
+        raise ResultParserError("Не найден TECPLOT/DAT output PFLOTRAN (*.tec, *.dat, *.plt)")
     variables, rows = parse_tecpotran_tec(tec)
     if not rows:
-        raise ValueError(f"Файл {tec.name} не содержит числовых строк")
+        raise ResultParserError(f"Файл {tec.name} не содержит числовых строк")
     records: list[dict[str, float]] = []
     for row in rows:
         record: dict[str, float] = {}
@@ -128,7 +132,7 @@ def record_value(record: dict[str, float], aliases: Iterable[str]) -> float:
         for key, value in normalized.items():
             if lowered_alias in key:
                 return value
-    raise KeyError(f"Не найдена колонка PFLOTRAN output: {list(aliases)}")
+    raise ResultParserError(f"Не найдена колонка PFLOTRAN output: {list(aliases)}")
 
 
 def records_to_z_pressure_saturation(records: list[dict[str, float]]) -> list[dict[str, float]]:
@@ -160,7 +164,7 @@ def records_to_z_pressure_saturation(records: list[dict[str, float]]) -> list[di
 def compute_saturation_bounds(records: list[dict[str, float]]) -> tuple[float, float]:
     values = [row["saturation"] for row in records if "saturation" in row]
     if not values:
-        raise ValueError("В PFLOTRAN output не найдена колонка Liquid Saturation.")
+        raise ResultParserError("В PFLOTRAN output не найдена колонка Liquid Saturation.")
     return min(values), max(values)
 
 

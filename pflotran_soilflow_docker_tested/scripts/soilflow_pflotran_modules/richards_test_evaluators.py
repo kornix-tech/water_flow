@@ -9,6 +9,7 @@ from typing import Any
 
 from soilflow_pflotran_modules.physical_models import model_pair_label
 from soilflow_pflotran_modules.result_diagnostics import (
+    ResultParserError,
     classify_pflotran_warnings,
     compute_saturation_bounds,
     direct_flux_output_probe,
@@ -249,6 +250,12 @@ def evaluate_test_after_run(test: LinearDarcyTest, workdir: Path) -> TestResult:
         )
         print(f"[TEST] {status}: max_abs={max_abs:.6g} Pa, max_rel={max_rel:.6g}, points={n}")
         return TestResult("_test_linear_darcy", status, workdir, diagnostics)
+    except ResultParserError as exc:
+        reason = write_unknown_status(status_path, exc, stage="parser")
+        with status_path.open("a", encoding="utf-8") as file_obj:
+            file_obj.write("PFLOTRAN output was not parsed; generated analytical_solution.csv is still available.\n")
+        print(f"[TEST] UNKNOWN: {exc}", file=sys.stderr)
+        return TestResult("_test_linear_darcy", "UNKNOWN", workdir, failure_metrics("linear_darcy", "parser", reason))
     except Exception as exc:
         reason = write_unknown_status(status_path, exc, stage="evaluator")
         with status_path.open("a", encoding="utf-8") as file_obj:
@@ -482,6 +489,15 @@ def evaluate_vg_test_after_run(test: VGRichardsTest, workdir: Path) -> TestResul
         write_unified_status(status_path, status_fields)
         print(f"[TEST] {status}: {test.test_id} max_abs={max_pressure:.6g} Pa, max_sat={max_saturation:.6g}")
         return TestResult(test.test_id, status, workdir, metrics)
+    except ResultParserError as exc:
+        reason = write_unknown_status(status_path, exc, stage="parser")
+        print(f"[TEST] UNKNOWN {test.test_id}: {exc}", file=sys.stderr)
+        return TestResult(
+            test.test_id,
+            "UNKNOWN",
+            workdir,
+            failure_metrics(test.test_id.removeprefix("_test_"), "parser", reason),
+        )
     except Exception as exc:
         reason = write_unknown_status(status_path, exc, stage="evaluator")
         print(f"[TEST] UNKNOWN {test.test_id}: {exc}", file=sys.stderr)
@@ -497,7 +513,7 @@ def evaluate_transient_storage_after_run(test: TransientStorageTest, workdir: Pa
     try:
         snapshots = load_transient_snapshots(workdir)
         if not snapshots:
-            raise ValueError("Не найдены transient TECPLOT snapshots PFLOTRAN")
+            raise ResultParserError("Не найдены transient TECPLOT snapshots PFLOTRAN")
         rows: list[dict[str, float]] = []
         max_p_err = 0.0
         max_s_err = 0.0
@@ -668,6 +684,15 @@ def evaluate_transient_storage_after_run(test: TransientStorageTest, workdir: Pa
         )
         print(f"[TEST] {status}: {test.test_id} max_abs={max_p_err:.6g} Pa, max_sat={max_s_err:.6g}")
         return TestResult(test.test_id, status, workdir, metrics)
+    except ResultParserError as exc:
+        reason = write_unknown_status(status_path, exc, stage="parser")
+        print(f"[TEST] UNKNOWN {test.test_id}: {exc}", file=sys.stderr)
+        return TestResult(
+            test.test_id,
+            "UNKNOWN",
+            workdir,
+            failure_metrics(test.test_id.removeprefix("_test_"), "parser", reason),
+        )
     except Exception as exc:
         reason = write_unknown_status(status_path, exc, stage="evaluator")
         print(f"[TEST] UNKNOWN {test.test_id}: {exc}", file=sys.stderr)

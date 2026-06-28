@@ -196,6 +196,7 @@
 - Строковые статусы заданий и расчетов вынесены в общий backend-модуль `job_lifecycle.py`.
 - CLI PFLOTRAN runner теперь поддерживает `--solver-timeout-seconds`/`SOILFLOW_SOLVER_TIMEOUT_SECONDS`; verification-suite пишет `PFLOTRAN_TIMEOUT` и timeout marker в log вместо зависания внешнего solver-а.
 - Verification-suite теперь сохраняет `failure_stage=generation|solver|evaluator` в `TEST_STATUS.txt`, JSON/CSV suite artifacts и API-сводке, чтобы отличать сбой генерации, solver-а и evaluator/parser слоя.
+- Parser errors TECPLOT/profile artifacts выделены в отдельный `failure_stage=parser`; evaluator stage теперь остается для ошибок физической оценки после успешного чтения solver output.
 - Backend `CommandRunner` возвращает exit code `124` и пишет timeout marker в job log при превышении `SOILFLOW_JOB_TIMEOUT_SECONDS`.
 - `.gitignore` расширен для SQLite WAL/SHM, frontend dist, Vite temp, локальных архивов, uploads/tmp и generated visualization artifacts.
 - Нумерация новых расчетов теперь опирается на SQLite AUTOINCREMENT и не переиспользует номер удаленного последнего расчета.

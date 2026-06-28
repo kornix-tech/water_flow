@@ -48,6 +48,7 @@ from soilflow_pflotran_modules.profile_strict_evaluators import evaluate_richard
 from soilflow_pflotran_modules.profile_test_runner import generate_profile_test_files
 from soilflow_pflotran_modules.result_contract import profile_rows_to_contract
 from soilflow_pflotran_modules.result_diagnostics import (
+    ResultParserError,
     classify_pflotran_warnings,
     direct_flux_output_probe,
     fit_line_slope,
@@ -65,7 +66,7 @@ from soilflow_pflotran_modules.richards_test_cases import (
     transient_rate_m3_day,
     write_analytical_solution,
 )
-from soilflow_pflotran_modules.richards_test_evaluators import write_test_comparison, write_test_svg
+from soilflow_pflotran_modules.richards_test_evaluators import evaluate_test_after_run, write_test_comparison, write_test_svg
 from soilflow_pflotran_modules.richards_mms_case import (
     RichardsMmsCase,
     generate_richards_mms_source_term_input,
@@ -864,6 +865,23 @@ class ResultDiagnosticsTests(unittest.TestCase):
             self.assertEqual(len(converted), 2)
             self.assertAlmostEqual(converted[0]["pressure_pa"], 102000.0)
             self.assertAlmostEqual(converted[0]["saturation"], 0.92)
+
+    def test_missing_tecpotran_output_raises_parser_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with self.assertRaises(ResultParserError):
+                load_tecpotran_records(Path(tmpdir))
+
+    def test_evaluator_parser_error_records_parser_stage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = Path(tmpdir)
+            test = build_linear_darcy_test({})
+
+            result = evaluate_test_after_run(test, workdir)
+            status_text = (workdir / "TEST_STATUS.txt").read_text(encoding="utf-8")
+
+            self.assertEqual(result.status, "UNKNOWN")
+            self.assertEqual(result.metrics["failure_stage"], "parser")
+            self.assertIn("failure_stage=parser", status_text)
 
     def test_solver_warning_and_status_helpers(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

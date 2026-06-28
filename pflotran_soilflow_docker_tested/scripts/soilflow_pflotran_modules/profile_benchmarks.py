@@ -16,6 +16,7 @@ from soilflow_pflotran_modules.profile_benchmark_evaluators import (
     profile_evaluator_metadata,
 )
 from soilflow_pflotran_modules.result_diagnostics import (
+    ResultParserError,
     find_final_tec_file,
     load_tecpotran_records,
     records_to_z_pressure_saturation,
@@ -231,7 +232,7 @@ def write_profile_overlay_comparison(
 def profile_status_fields_after_run(test_name: str, workdir: Path) -> dict[str, object]:
     tec_files = sorted(p for p in workdir.glob("pflotran-[0-9]*.tec") if p.is_file() and "-vel-" not in p.name)
     if not tec_files:
-        raise FileNotFoundError("PFLOTRAN не записал TECPLOT snapshot-файлы")
+        raise ResultParserError("PFLOTRAN не записал TECPLOT snapshot-файлы")
     _, records = load_tecpotran_records(workdir)
     converted = records_to_z_pressure_saturation(records)
     pressure_values = [row["pressure_pa"] for row in converted]
