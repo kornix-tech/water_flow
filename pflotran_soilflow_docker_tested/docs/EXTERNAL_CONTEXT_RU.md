@@ -70,7 +70,7 @@ pflotran_soilflow_docker_tested/
     job_manager.py                   очередь и запуск фоновых subprocess
     file_manager.py                  безопасная работа с путями и zip
     routers/                         API endpoints, включая /api/soil-curves
-    services/                        CLI, JSON-снимки, архивы, логи, runner
+    services/                        CLI, JSON-снимки, архивы, логи, runner, readers status-сводок тестов
 
   web/frontend/src/
     App.tsx                          SPA router
@@ -640,7 +640,7 @@ scripts/__pycache__/
 7. Табличные экспериментальные кривые уже хранятся в SQLite, редактируются через frontend, проходят UI-валидацию/предпросмотр и попадают в временный JSON-снимок расчета как `soil_curve_tables`; табличное водоудерживание передается в PFLOTRAN через `LOOKUP_TABLE`, табличная влагопроводность - через `PCHIP_LIQ`.
 8. Пара `Голованов-Аверьянов` обозначена как предметная цель, но не доведена до проверенной PFLOTRAN-реализации.
 9. Профильные benchmark artifacts, TECPLOT-ready status, diagnostic `REFERENCE_OVERLAY` метрики и `profile_overlay_comparison.csv` вынесены в `soilflow_pflotran_modules.profile_benchmarks`; strict-evaluator'ы для Theis/Ogata/Terzaghi/heat/Buckley/Boussinesq/Richards MMS еще не подключены.
-10. Suite summary теперь пишется в `TEST_SUITE_STATUS.txt`, `TEST_SUITE_STATUS.json` и `TEST_SUITE_RESULTS.csv`; JSON/CSV предназначены для последующего анализа и web/API-интеграции без парсинга текстового status-файла.
+10. Suite summary теперь пишется в `TEST_SUITE_STATUS.txt`, `TEST_SUITE_STATUS.json` и `TEST_SUITE_RESULTS.csv`; backend отдает его через `GET /api/results/runs/{run_name}/test-suite`, отдельные `TEST_STATUS.txt` доступны через `GET /api/results/runs/{run_name}/test-status`, а единая карточка состояния запуска собирается через `GET /api/results/runs/{run_name}/overview`. Страницы `Статус` и `Расчеты` используют общий frontend-компонент карточек состояния без парсинга status-файлов во frontend.
 11. Strict/partial Richards verification слой, profile-smoke запуск и suite-router `_test` вынесены из `soilflow_pflotran.py` в `richards_test_cases.py`, `richards_test_evaluators.py`, `richards_test_runner.py`, `profile_test_runner.py` и `verification_runner.py`; CLI-фасад должен оставаться тонким маршрутизатором, а не местом новой физики тестов.
 
 ## 15. Что важно сохранить в следующих итерациях

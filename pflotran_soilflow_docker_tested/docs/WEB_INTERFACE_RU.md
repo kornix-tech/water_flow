@@ -84,6 +84,9 @@ curl http://localhost:8080/api/system/info
 curl -X POST http://localhost:8080/api/jobs/run-test-suite
 curl http://localhost:8080/api/jobs
 curl http://localhost:8080/api/results/runs
+curl http://localhost:8080/api/results/runs/_test_suite/test-suite
+curl http://localhost:8080/api/results/runs/_test_linear_darcy/test-status
+curl http://localhost:8080/api/results/runs/_test_linear_darcy/overview
 ```
 
 ## Backup

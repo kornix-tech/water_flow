@@ -5,10 +5,13 @@ import type {
   InputWorkbook,
   JobCreated,
   JobRead,
+  RunStatusOverview,
   RunInfo,
   SoilCurveTable,
   SoilCurveTableCreate,
-  SystemInfo
+  SystemInfo,
+  TestRunStatus,
+  TestSuiteStatus
 } from "../types";
 
 const API_BASE = "/api";
@@ -195,6 +198,18 @@ export async function listRuns(): Promise<RunInfo[]> {
 
 export async function getRunFiles(runName: string): Promise<string[]> {
   return request<string[]>(`/results/runs/${runName}/plots`);
+}
+
+export async function getRunTestSuiteStatus(runName: string): Promise<TestSuiteStatus> {
+  return request<TestSuiteStatus>(`/results/runs/${encodeURIComponent(runName)}/test-suite`);
+}
+
+export async function getRunTestStatus(runName: string): Promise<TestRunStatus> {
+  return request<TestRunStatus>(`/results/runs/${encodeURIComponent(runName)}/test-status`);
+}
+
+export async function getRunStatusOverview(runName: string): Promise<RunStatusOverview> {
+  return request<RunStatusOverview>(`/results/runs/${encodeURIComponent(runName)}/overview`);
 }
 
 export function downloadRunZip(runName: string): Promise<void> {

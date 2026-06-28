@@ -73,6 +73,55 @@ class RunInfo(BaseModel):
     files: list[str]
 
 
+class TestSuiteResult(BaseModel):
+    test_id: str
+    status: str
+    verification_level: str | None = None
+    output_dir: str | None = None
+    metrics: dict[str, Any] = Field(default_factory=dict)
+
+
+class TestSuiteStatus(BaseModel):
+    run_name: str
+    status: str
+    summary: dict[str, str | int]
+    results: list[TestSuiteResult]
+    source: str
+    files: list[str]
+
+
+class TestRunStatus(BaseModel):
+    run_name: str
+    status: str
+    test_id: str | None = None
+    fields: dict[str, str | int | float | bool]
+    messages: list[str] = Field(default_factory=list)
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
+    source: str
+    files: list[str]
+
+
+class StatusSummaryMetric(BaseModel):
+    label: str
+    value: str
+
+
+class StatusSummaryItem(BaseModel):
+    kind: str
+    title: str
+    status: str
+    subtitle: str | None = None
+    metrics: list[StatusSummaryMetric] = Field(default_factory=list)
+    source: str | None = None
+    files: list[str] = Field(default_factory=list)
+    messages: list[str] = Field(default_factory=list)
+
+
+class RunStatusOverview(BaseModel):
+    run_name: str
+    items: list[StatusSummaryItem]
+
+
 class FileInfo(BaseModel):
     path: str
     name: str

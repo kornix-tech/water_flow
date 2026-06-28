@@ -562,6 +562,14 @@ tr.selected {
   gap: 6px;
 }
 
+.run-list-heading {
+  margin-top: 10px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .run-list button {
   width: 100%;
   min-height: 42px;
@@ -604,6 +612,166 @@ tr.selected {
 .file-button:hover {
   color: #1f6feb;
   border-color: transparent;
+}
+
+.suite-summary {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  padding-top: 12px;
+  border-top: 1px solid #e3e8ef;
+}
+
+.suite-summary-header {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.suite-summary-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.suite-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 12px;
+}
+
+.suite-metrics div {
+  display: grid;
+  gap: 2px;
+}
+
+.suite-metrics span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.suite-metrics strong {
+  font-size: 15px;
+}
+
+.suite-results {
+  font-size: 13px;
+}
+
+.status-message-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.status-summary-panel {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  padding-top: 12px;
+  border-top: 1px solid #e3e8ef;
+}
+
+.status-summary-panel h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.status-card-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.status-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #d8e0e8;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.status-card-header {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.status-card-header h4 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.status-card-header p {
+  margin: 3px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 0 9px;
+  background: #e5e7eb;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.status-pill-pass,
+.status-pill-success,
+.status-pill-ready {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-pill-pass-with-warnings,
+.status-pill-pass-with-skips,
+.status-pill-dry-run,
+.status-pill-generated,
+.status-pill-generated-only,
+.status-pill-queued,
+.status-pill-running {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-pill-fail,
+.status-pill-failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px 12px;
+}
+
+.status-card-metrics div {
+  display: grid;
+  gap: 2px;
+}
+
+.status-card-metrics span,
+.status-card-footer {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.status-card-metrics strong {
+  font-size: 14px;
+}
+
+.status-card-footer {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .field {

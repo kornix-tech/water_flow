@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { deleteCalculation, downloadRunZip, getCalculation, listCalculations, listRuns, runCalculation } from "../api/client";
+import { deleteCalculation, downloadRunZip, getCalculation, getRunStatusOverview, listCalculations, listRuns, runCalculation } from "../api/client";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { ResultFileList } from "../components/ResultFileList";
+import { StatusSummaryPanel } from "../components/StatusSummaryPanel";
 import { ROUTES } from "../routes";
-import type { CalculationSummary, RunInfo } from "../types";
+import type { CalculationSummary, RunInfo, RunStatusOverview } from "../types";
 
 interface ResultsPageProps {
   onNavigate: (path: string) => void;
@@ -15,6 +16,9 @@ export function ResultsPage({ onNavigate }: ResultsPageProps) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<RunInfo | null>(null);
   const [selectedCalculation, setSelectedCalculation] = useState<CalculationSummary | null>(null);
+  const [selectedStandaloneRunName, setSelectedStandaloneRunName] = useState<string | null>(null);
+  const [statusOverview, setStatusOverview] = useState<RunStatusOverview | null>(null);
+  const [statusOverviewError, setStatusOverviewError] = useState("");
   const [error, setError] = useState("");
 
   async function refresh() {
@@ -22,6 +26,16 @@ export function ResultsPage({ onNavigate }: ResultsPageProps) {
       const [next, calculationList] = await Promise.all([listRuns(), listCalculations(query)]);
       setRuns(next);
       setCalculations(calculationList);
+      const standaloneRun = selectedStandaloneRunName ? next.find((run) => run.run_name === selectedStandaloneRunName) ?? null : null;
+      if (standaloneRun) {
+        setSelectedCalculation(null);
+        setSelected(standaloneRun);
+        setError("");
+        return;
+      }
+      if (selectedStandaloneRunName) {
+        setSelectedStandaloneRunName(null);
+      }
       const nextCalculation = calculationList.find((calculation) => calculation.id === selectedCalculation?.id) ?? calculationList[0] ?? null;
       setSelectedCalculation(nextCalculation);
       setSelected((current) => {
@@ -48,6 +62,7 @@ export function ResultsPage({ onNavigate }: ResultsPageProps) {
   }
 
   async function selectCalculation(calculation: CalculationSummary) {
+    setSelectedStandaloneRunName(null);
     setSelectedCalculation(calculation);
     if (calculation.run_name) {
       setSelected(runs.find((run) => run.run_name === calculation.run_name) ?? null);
@@ -60,6 +75,12 @@ export function ResultsPage({ onNavigate }: ResultsPageProps) {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Не удалось открыть расчет");
     }
+  }
+
+  function selectStandaloneRun(run: RunInfo) {
+    setSelectedStandaloneRunName(run.run_name);
+    setSelectedCalculation(null);
+    setSelected(run);
   }
 
   function openCalculationGraphs(calculation: CalculationSummary) {
@@ -119,7 +140,35 @@ export function ResultsPage({ onNavigate }: ResultsPageProps) {
     refresh();
     const timer = window.setInterval(refresh, 2000);
     return () => window.clearInterval(timer);
-  }, [query, selectedCalculation?.id]);
+  }, [query, selectedCalculation?.id, selectedStandaloneRunName]);
+
+  useEffect(() => {
+    if (!selected) {
+      setStatusOverview(null);
+      setStatusOverviewError("");
+      return;
+    }
+    let cancelled = false;
+    getRunStatusOverview(selected.run_name)
+      .then((overview) => {
+        if (!cancelled) {
+          setStatusOverview(overview);
+          setStatusOverviewError("");
+        }
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setStatusOverview(null);
+          setStatusOverviewError(caught instanceof Error ? caught.message : "Не удалось прочитать сводку состояния");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.run_name]);
+
+  const calculationRunNames = new Set(calculations.map((calculation) => calculation.run_name).filter(Boolean));
+  const standaloneRuns = runs.filter((run) => !calculationRunNames.has(run.run_name));
 
   return (
     <section>
@@ -151,10 +200,30 @@ export function ResultsPage({ onNavigate }: ResultsPageProps) {
           <ul className="run-list">
             {calculations.map((calculation) => (
               <li key={calculation.id}>
-                <button type="button" className={selectedCalculation?.id === calculation.id ? "selected-button" : ""} onClick={() => openCalculationGraphs(calculation)}>
+                <button
+                  type="button"
+                  className={selectedCalculation?.id === calculation.id ? "selected-button" : ""}
+                  data-calculation-id={calculation.id}
+                  onClick={() => openCalculationGraphs(calculation)}
+                >
                   <span>{calculation.title}</span>
                   <small>{new Date(calculation.created_at).toLocaleString()}</small>
                   <small>{calculation.has_results ? "результаты готовы" : "без результатов"}</small>
+                </button>
+              </li>
+            ))}
+            {standaloneRuns.length > 0 && <li className="run-list-heading">Тестовые запуски</li>}
+            {standaloneRuns.map((run) => (
+              <li key={run.run_name}>
+                <button
+                  type="button"
+                  className={!selectedCalculation && selected?.run_name === run.run_name ? "selected-button" : ""}
+                  data-run-name={run.run_name}
+                  onClick={() => selectStandaloneRun(run)}
+                >
+                  <span>{run.run_name}</span>
+                  <small>{run.has_suite_status ? "сводка тестов" : "папка результата"}</small>
+                  <small>{run.has_visualization ? "графики готовы" : "без графиков"}</small>
                 </button>
               </li>
             ))}
@@ -166,15 +235,24 @@ export function ResultsPage({ onNavigate }: ResultsPageProps) {
               <div className="panel-header">
                 <h2>{selectedCalculation ? selectedCalculation.title : selected.run_name}</h2>
                 <div className="toolbar compact-toolbar">
-                  <button type="button" onClick={openSelectedCalculationInputs} disabled={!selectedCalculation}>
-                    Открыть исходные данные
-                  </button>
-                  <button type="button" onClick={startSelectedCalculation} disabled={!selectedCalculation}>
-                    Запустить заново
-                  </button>
-                  <button type="button" onClick={deleteSelectedCalculation} disabled={!selectedCalculation}>
-                    Удалить
-                  </button>
+                  {selectedCalculation && (
+                    <>
+                      <button type="button" onClick={openSelectedCalculationInputs}>
+                        Открыть исходные данные
+                      </button>
+                      <button type="button" onClick={startSelectedCalculation}>
+                        Запустить заново
+                      </button>
+                      <button type="button" onClick={deleteSelectedCalculation}>
+                        Удалить
+                      </button>
+                    </>
+                  )}
+                  {selected.has_visualization && (
+                    <button type="button" onClick={() => onNavigate(`${ROUTES.visualization}?run=${encodeURIComponent(selected.run_name)}`)}>
+                      Открыть графики
+                    </button>
+                  )}
                   <button type="button" onClick={() => downloadZip(selected.run_name)}>
                     Скачать ZIP
                   </button>
@@ -188,6 +266,7 @@ export function ResultsPage({ onNavigate }: ResultsPageProps) {
                   <dd>{selectedCalculation.status}</dd>
                 </dl>
               )}
+              <StatusSummaryPanel title="Сводка состояния" items={statusOverview?.items ?? []} error={statusOverviewError} />
               <ResultFileList runName={selected.run_name} files={selected.files} />
             </>
           ) : (

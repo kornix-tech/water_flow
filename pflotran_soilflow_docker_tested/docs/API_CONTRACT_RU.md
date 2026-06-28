@@ -124,6 +124,14 @@ Endpoints:
 - `GET /api/results/runs` - список папок результатов.
 - `GET /api/results/runs/{run_name}` - сведения о конкретном запуске.
 - `GET /api/results/runs/{run_name}/status` - текстовый статус расчета/теста.
+- `GET /api/results/runs/{run_name}/test-suite` - типизированная JSON-сводка
+  verification-suite из `TEST_SUITE_STATUS.json` с fallback на
+  `TEST_SUITE_STATUS.txt`/`TEST_SUITE_RESULTS.csv`.
+- `GET /api/results/runs/{run_name}/test-status` - типизированная JSON-сводка
+  отдельного тестового запуска из `TEST_STATUS.txt` и, если есть,
+  `test_diagnostics.json`.
+- `GET /api/results/runs/{run_name}/overview` - единый обзор состояния запуска:
+  verification-suite, отдельный тест, графики или fallback по файлам результата.
 - `GET /api/results/runs/{run_name}/plots` - список файлов графиков.
 - `GET /api/results/runs/{run_name}/file/{file_path}` - безопасное чтение файла
   внутри папки запуска.

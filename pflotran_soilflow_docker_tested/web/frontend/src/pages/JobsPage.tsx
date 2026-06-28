@@ -3,9 +3,35 @@ import { cancelJob, getJobLog, listJobs } from "../api/client";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { JobStatusBadge } from "../components/JobStatusBadge";
 import { LogViewer } from "../components/LogViewer";
+import { StatusSummaryPanel } from "../components/StatusSummaryPanel";
 import { jobTimingLabel } from "../jobTiming";
 import { jobKindLabel } from "../labels";
-import type { JobRead } from "../types";
+import type { JobRead, StatusSummaryItem } from "../types";
+
+function selectedJobSummary(job: JobRead | null, jobs: JobRead[]): StatusSummaryItem[] {
+  if (!job) {
+    return [];
+  }
+  return [
+    {
+      kind: "job",
+      title: "Задание",
+      status: job.status,
+      subtitle: job.run_name ?? job.id,
+      source: "SQLite jobs",
+      files: job.log_path ? [job.log_path] : [],
+      messages: job.error_message ? [job.error_message] : [],
+      metrics: [
+        { label: "Тип", value: jobKindLabel(job.kind) },
+        { label: "Оценка", value: jobTimingLabel(job, jobs) },
+        { label: "Создано", value: new Date(job.created_at).toLocaleString() },
+        { label: "Старт", value: job.started_at ? new Date(job.started_at).toLocaleString() : "-" },
+        { label: "Финиш", value: job.finished_at ? new Date(job.finished_at).toLocaleString() : "-" },
+        { label: "Код выхода", value: job.exit_code === null ? "-" : String(job.exit_code) },
+      ],
+    },
+  ];
+}
 
 export function JobsPage() {
   const [jobs, setJobs] = useState<JobRead[]>([]);
@@ -100,14 +126,7 @@ export function JobsPage() {
               Отменить
             </button>
           </div>
-          {selected && (
-            <dl className="kv compact">
-              <dt>Задание</dt>
-              <dd className="mono">{selected.id}</dd>
-              <dt>Код</dt>
-              <dd>{selected.exit_code ?? "-"}</dd>
-            </dl>
-          )}
+          <StatusSummaryPanel title="Сводка состояния" items={selectedJobSummary(selected, jobs)} emptyText="Выберите задание слева." />
           <LogViewer text={log} />
         </div>
       </div>

@@ -17,6 +17,8 @@
 - Добавлены модули `soilflow_pflotran_modules.richards_test_runner` и `profile_test_runner`, чтобы запуск strict/partial и profile-smoke тестов был отделен от центрального suite-router.
 - Добавлен модуль `soilflow_pflotran_modules.test_solver_execution` для общего native/WSL PFLOTRAN запуска внутри verification runners.
 - Добавлен модуль `soilflow_pflotran_modules.test_suite_artifacts` для записи suite summary в TXT/JSON/CSV.
+- Добавлены API `/api/results/runs/{run_name}/test-suite` и `/api/results/runs/{run_name}/test-status`, а также блоки сводки на странице `Расчеты` для чтения verification-suite и отдельных тестов без парсинга текстовых status-файлов во frontend.
+- Добавлен API `/api/results/runs/{run_name}/overview` и общий frontend-компонент карточек состояния для страниц `Статус` и `Расчеты`.
 - Добавлены reference overlay метрики для profile-smoke benchmark'ов: RMSE/max-error по объемной влажности и напору относительно `analytical_profiles.csv`.
 - Для profile-smoke benchmark'ов теперь записывается `profile_overlay_comparison.csv` с построчным сравнением `PFLOTRAN vs analytical`.
 - Добавлена архитектурная схема `docs/ARCHITECTURE_RU.md` с текущими потоками данных и заменяемыми adapter-границами.

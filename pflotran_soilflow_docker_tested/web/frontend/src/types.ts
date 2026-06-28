@@ -49,6 +49,55 @@ export interface RunInfo {
   files: string[];
 }
 
+export interface TestSuiteResult {
+  test_id: string;
+  status: string;
+  verification_level: string | null;
+  output_dir: string | null;
+  metrics: Record<string, string | number | boolean | null>;
+}
+
+export interface TestSuiteStatus {
+  run_name: string;
+  status: string;
+  summary: Record<string, string | number>;
+  results: TestSuiteResult[];
+  source: string;
+  files: string[];
+}
+
+export interface TestRunStatus {
+  run_name: string;
+  status: string;
+  test_id: string | null;
+  fields: Record<string, string | number | boolean>;
+  messages: string[];
+  diagnostics: Record<string, unknown>;
+  source: string;
+  files: string[];
+}
+
+export interface StatusSummaryMetric {
+  label: string;
+  value: string;
+}
+
+export interface StatusSummaryItem {
+  kind: string;
+  title: string;
+  status: string;
+  subtitle: string | null;
+  metrics: StatusSummaryMetric[];
+  source: string | null;
+  files: string[];
+  messages: string[];
+}
+
+export interface RunStatusOverview {
+  run_name: string;
+  items: StatusSummaryItem[];
+}
+
 export interface InputField {
   sheet: string;
   row: number;

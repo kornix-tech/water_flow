@@ -31,6 +31,9 @@ from app.file_manager import safe_resolve_under, safe_run_name
 from app.job_lifecycle import CALCULATION_STATUS_DRAFT, JOB_STATUS_FAILED, JOB_STATUS_QUEUED
 from app.job_store import JobStore
 from app.models import Job
+from app.services.run_status_overview_service import read_run_status_overview
+from app.services.test_run_status_service import read_test_run_status
+from app.services.test_suite_summary_service import read_test_suite_status
 
 
 def _utcnow() -> datetime:
@@ -224,6 +227,168 @@ class JobStoreTests(unittest.TestCase):
             self.assertEqual(marked_count, 1)
             self.assertEqual(store.get(job.id).status, JOB_STATUS_FAILED)
             self.assertEqual(store.get_calculation(calculation.id).status, JOB_STATUS_FAILED)
+
+
+class TestSuiteSummaryServiceTests(unittest.TestCase):
+    def test_read_test_suite_status_prefers_json_and_normalizes_metrics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            (run_dir / "TEST_SUITE_STATUS.json").write_text(
+                """
+                {
+                  "summary": {
+                    "TEST_SUITE_STATUS": "PASS_WITH_WARNINGS",
+                    "tests_total": "2",
+                    "tests_failed": 0
+                  },
+                  "results": [
+                    {
+                      "test_id": "_test_linear_darcy",
+                      "status": "PASS",
+                      "verification_level": "strict_analytical",
+                      "warning_count": "0"
+                    }
+                  ]
+                }
+                """,
+                encoding="utf-8",
+            )
+
+            suite = read_test_suite_status("_test_suite", run_dir)
+
+            self.assertEqual(suite["status"], "PASS_WITH_WARNINGS")
+            self.assertEqual(suite["summary"]["tests_total"], 2)
+            self.assertEqual(suite["results"][0]["metrics"]["warning_count"], 0)
+            self.assertEqual(suite["source"], "TEST_SUITE_STATUS.json")
+
+    def test_read_test_suite_status_uses_csv_rows_with_text_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            (run_dir / "TEST_SUITE_STATUS.txt").write_text(
+                "\n".join(
+                    [
+                        "TEST_SUITE_STATUS=PASS",
+                        "tests_total=1",
+                        "tests_failed=0",
+                        "",
+                        "_test_linear_darcy=PASS",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (run_dir / "TEST_SUITE_RESULTS.csv").write_text(
+                "test_id,status,verification_level,warning_count\n"
+                "_test_linear_darcy,PASS,strict_analytical,0\n",
+                encoding="utf-8",
+            )
+
+            suite = read_test_suite_status("_test_suite", run_dir)
+
+            self.assertEqual(suite["summary"]["tests_failed"], 0)
+            self.assertEqual(suite["results"][0]["verification_level"], "strict_analytical")
+            self.assertIn("TEST_SUITE_RESULTS.csv", suite["files"])
+
+    def test_read_test_suite_status_rejects_symlink_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory) / "run"
+            run_dir.mkdir()
+            outside = Path(directory) / "outside.json"
+            outside.write_text("{}", encoding="utf-8")
+            (run_dir / "TEST_SUITE_STATUS.json").symlink_to(outside)
+
+            with self.assertRaises(ValueError):
+                read_test_suite_status("_test_suite", run_dir)
+
+
+class TestRunStatusServiceTests(unittest.TestCase):
+    def test_read_test_run_status_normalizes_fields_and_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            (run_dir / "TEST_STATUS.txt").write_text(
+                "\n".join(
+                    [
+                        "TEST_STATUS=PASS_WITH_WARNINGS",
+                        "test_id=_test_linear_darcy",
+                        "pressure_check=PASS",
+                        "solver_diverged=false",
+                        "warning_count=1",
+                        "q_error_m_s=4.3e-10",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (run_dir / "test_diagnostics.json").write_text('{"max_rel_pressure_error": 0.001}', encoding="utf-8")
+
+            status = read_test_run_status("_test_linear_darcy", run_dir)
+
+            self.assertEqual(status["status"], "PASS_WITH_WARNINGS")
+            self.assertEqual(status["test_id"], "_test_linear_darcy")
+            self.assertEqual(status["fields"]["warning_count"], 1)
+            self.assertFalse(status["fields"]["solver_diverged"])
+            self.assertAlmostEqual(status["fields"]["q_error_m_s"], 4.3e-10)
+            self.assertEqual(status["diagnostics"]["max_rel_pressure_error"], 0.001)
+            self.assertIn("test_diagnostics.json", status["files"])
+
+    def test_read_test_run_status_keeps_generated_only_message(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            (run_dir / "TEST_STATUS.txt").write_text(
+                "TEST_STATUS=GENERATED_ONLY\nPFLOTRAN executable was not found\n",
+                encoding="utf-8",
+            )
+
+            status = read_test_run_status("_test_missing_solver", run_dir)
+
+            self.assertEqual(status["status"], "GENERATED_ONLY")
+            self.assertEqual(status["messages"], ["PFLOTRAN executable was not found"])
+
+    def test_read_test_run_status_rejects_symlink_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory) / "run"
+            run_dir.mkdir()
+            outside = Path(directory) / "outside.txt"
+            outside.write_text("TEST_STATUS=PASS\n", encoding="utf-8")
+            (run_dir / "TEST_STATUS.txt").symlink_to(outside)
+
+            with self.assertRaises(ValueError):
+                read_test_run_status("_test_bad", run_dir)
+
+
+class RunStatusOverviewServiceTests(unittest.TestCase):
+    def test_read_run_status_overview_combines_suite_test_and_visualization_items(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            plots_dir = run_dir / "plots"
+            plots_dir.mkdir()
+            (run_dir / "TEST_SUITE_STATUS.txt").write_text(
+                "TEST_SUITE_STATUS=PASS\ntests_total=1\ntests_passed=1\ntests_failed=0\n_test_linear_darcy=PASS\n",
+                encoding="utf-8",
+            )
+            (run_dir / "TEST_STATUS.txt").write_text(
+                "TEST_STATUS=PASS\ntest_id=_test_linear_darcy\npressure_check=PASS\nsolver_check=PASS\ncomparison_points=80\n",
+                encoding="utf-8",
+            )
+            (plots_dir / "VISUALIZATION_STATUS.txt").write_text(
+                "VISUALIZATION_STATUS=PASS\nframes_total=12\nprofile_axis=z\ninteractive_html=profiles_animation.html\n",
+                encoding="utf-8",
+            )
+
+            overview = read_run_status_overview("_test_linear_darcy", run_dir)
+
+            self.assertEqual(overview["run_name"], "_test_linear_darcy")
+            self.assertEqual([item["kind"] for item in overview["items"]], ["test-suite", "test-run", "visualization"])
+            self.assertEqual(overview["items"][0]["status"], "PASS")
+            self.assertEqual(overview["items"][1]["subtitle"], "_test_linear_darcy")
+            self.assertEqual(overview["items"][2]["source"], "plots/VISUALIZATION_STATUS.txt")
+
+    def test_read_run_status_overview_has_fallback_for_plain_run_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            overview = read_run_status_overview("plain_run", Path(directory))
+
+            self.assertEqual(len(overview["items"]), 1)
+            self.assertEqual(overview["items"][0]["kind"], "run-files")
 
 
 if __name__ == "__main__":
